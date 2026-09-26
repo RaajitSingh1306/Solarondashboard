@@ -1,0 +1,970 @@
+import asyncio
+import datetime
+import urllib.parse
+from typing import Any, Dict, List, Optional
+from nicegui import ui
+import db
+import crm
+import pandas as pd
+
+def build_crm_tab(app_state: dict):
+    selected_month = {"val": app_state.get("month", "2026-09")}
+    selected_view = {"mode": "monthly"}  # 'daily', 'weekly', 'monthly', 'yearly'
+    selected_date = {"val": datetime.date.today().isoformat()}
+    selected_year = {"val": "2026"}
+
+    # WhatsApp Statement & Message Preview Dialog
+    preview_modal = ui.dialog().classes("items-center justify-center")
+    modal_content = {
+        "cust": None,
+        "view": "monthly",
+        "lang": "english",
+        "date_str": datetime.date.today().strftime("%d %b %Y"),
+        "year": "2026",
+    }
+
+    with preview_modal, ui.card().classes("w-[620px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white shadow-2xl rounded-2xl"):
+        with ui.row().classes("w-full items-center justify-between mb-2"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("chat").classes("text-emerald-400 text-2xl")
+                ui.label("WhatsApp Statement & Message Preview").classes("text-base font-bold text-white")
+            ui.button(icon="close", on_click=preview_modal.close).props("flat round dense size=sm color=white")
+
+        ui.label("Select report granularity and language to preview message formatted for Solaron customers:").classes("text-xs text-gray-400 mb-3")
+
+        # Granularity switcher tabs
+        preview_granularity_tabs = ui.tabs().classes("w-full bg-gray-800 text-gray-300 rounded-lg mb-2")
+        with preview_granularity_tabs:
+            vg_daily = ui.tab("Daily", icon="today")
+            vg_weekly = ui.tab("Weekly", icon="date_range")
+            vg_monthly = ui.tab("Monthly Statement", icon="calendar_month")
+            vg_yearly = ui.tab("Yearly Milestone", icon="emoji_events")
+
+        # Language tabs
+        lang_tabs = ui.tabs().classes("w-full bg-gray-800/80 text-gray-300 rounded-lg mb-4")
+        with lang_tabs:
+            t_en = ui.tab("English")
+            t_hi = ui.tab("हिंदी (Hindi)")
+            t_mr = ui.tab("मराठी (Marathi)")
+
+        # WhatsApp Bubble Card (WhatsApp Emerald Green Styled, with message_label strictly nested INSIDE)
+        with ui.card().classes("w-full p-4 bg-[#075E54] text-white rounded-xl shadow-inner whitespace-pre-line font-sans text-xs leading-relaxed border border-emerald-600/40"):
+            message_label = ui.label("Loading preview...").classes("text-emerald-50 select-all font-mono leading-relaxed")
+
+        with ui.row().classes("w-full justify-between items-center mt-4 gap-2 flex-wrap"):
+            with ui.row().classes("items-center gap-2"):
+                wa_link_btn = ui.button("Open WhatsApp Web", icon="open_in_new").props("dense unelevated color=emerald-7 text-color=white")
+                copy_btn = ui.button("Copy Message", icon="content_copy").props("dense outline color=emerald-4")
+
+            ui.button("Close", on_click=preview_modal.close).props("dense flat color=white")
+
+    def get_preview_rendered_text() -> str:
+        c = modal_content["cust"]
+        if not c:
+            return "No customer selected."
+        lang = modal_content["lang"]
+        mode = modal_content["view"]
+        name = c.get("customer_name") or "Solar Customer"
+        pid = c.get("plant_id") or ""
+        pname = c.get("plant_name") or pid or "Solar Plant"
+        kwh = float(c.get("kwh") or c.get("annual_kwh") or 0.0)
+        rev = float(c.get("revenue_inr") or c.get("annual_savings") or (kwh * 14.0))
+
+        if mode == "daily":
+            d_kwh = float(c.get("today_kwh") or c.get("kwh_daily") or (round(kwh / 30.0, 1) if kwh > 0 else 12.5))
+            d_rev = d_kwh * 14.0
+            return crm.format_daily_whatsapp_statement(
+                name=name, plant_id=pid, plant_name=pname,
+                kwh=d_kwh, revenue=d_rev,
+                date_str=modal_content["date_str"], lang=lang
+            )
+        elif mode == "weekly":
+            w_kwh = float(c.get("week_kwh") or (round(kwh / 4.33, 1) if kwh > 0 else 85.0))
+            w_rev = w_kwh * 14.0
+            return crm.format_weekly_whatsapp_statement(
+                name=name, plant_id=pid, plant_name=pname,
+                kwh=w_kwh, revenue=w_rev, lang=lang
+            )
+        elif mode == "yearly":
+            y_kwh = float(c.get("annual_kwh") or (kwh * 12.0 if kwh > 0 else 4200.0))
+            y_rev = y_kwh * 14.0
+            return crm.format_yearly_whatsapp_statement(
+                name=name, plant_id=pid, plant_name=pname,
+                kwh=y_kwh, revenue=y_rev,
+                year=modal_content["year"], lang=lang
+            )
+        else:
+            # Default monthly rich statement
+            tier = c.get("tier") or "Good"
+            m = selected_month["val"]
+            return crm.format_rich_whatsapp_statement(
+                name=name, plant_id=pid, plant_name=pname,
+                kwh=kwh, revenue=rev, tier=tier,
+                lang=lang, month=m
+            )
+
+    def refresh_preview_dialog():
+        text = get_preview_rendered_text()
+        message_label.text = text
+        c = modal_content["cust"] or {}
+        raw_phone = str(c.get("phone") or "").strip().replace("+", "").replace("-", "").replace(" ", "")
+        if raw_phone:
+            encoded = urllib.parse.quote(text)
+            wa_link_btn.props(f'href="https://web.whatsapp.com/send?phone={raw_phone}&text={encoded}" target="_blank"')
+            wa_link_btn.enable()
+        else:
+            wa_link_btn.props(remove="href")
+            wa_link_btn.disable()
+
+    def do_copy():
+        ui.run_javascript(f"navigator.clipboard.writeText({repr(message_label.text)});")
+        ui.notify("WhatsApp message copied to clipboard!", type="positive")
+    copy_btn.on_click(do_copy)
+
+    def on_preview_granularity_change():
+        val = preview_granularity_tabs.value
+        if val == vg_daily:
+            modal_content["view"] = "daily"
+        elif val == vg_weekly:
+            modal_content["view"] = "weekly"
+        elif val == vg_yearly:
+            modal_content["view"] = "yearly"
+        else:
+            modal_content["view"] = "monthly"
+        refresh_preview_dialog()
+
+    def on_preview_lang_change():
+        val = lang_tabs.value
+        if val == t_hi:
+            modal_content["lang"] = "hindi"
+        elif val == t_mr:
+            modal_content["lang"] = "marathi"
+        else:
+            modal_content["lang"] = "english"
+        refresh_preview_dialog()
+
+    preview_granularity_tabs.on("update:model-value", on_preview_granularity_change)
+    lang_tabs.on("update:model-value", on_preview_lang_change)
+
+    def open_preview(cust_row: dict, default_view: str = "monthly"):
+        modal_content["cust"] = cust_row
+        modal_content["view"] = default_view
+        pref_lang = str(cust_row.get("preferred_lang") or "english").lower()
+        modal_content["lang"] = pref_lang
+        
+        # Set tab active states
+        if default_view == "daily":
+            preview_granularity_tabs.value = vg_daily
+        elif default_view == "weekly":
+            preview_granularity_tabs.value = vg_weekly
+        elif default_view == "yearly":
+            preview_granularity_tabs.value = vg_yearly
+        else:
+            preview_granularity_tabs.value = vg_monthly
+
+        if pref_lang == "hindi":
+            lang_tabs.value = t_hi
+        elif pref_lang == "marathi":
+            lang_tabs.value = t_mr
+        else:
+            lang_tabs.value = t_en
+
+        refresh_preview_dialog()
+        preview_modal.open()
+
+    # Customer Edit / Add Modal
+    customer_dialog = ui.dialog().classes("items-center justify-center")
+    cust_dialog_mode = {"mode": "add", "id": None}
+    with customer_dialog, ui.card().classes("w-[500px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-xl shadow-2xl"):
+        cust_dialog_title = ui.label("Add New Customer Contact").classes("text-base font-bold text-white mb-2")
+        d_name = ui.input("Customer Name").classes("w-full").props("dense outlined dark")
+        d_plant = ui.input("Plant ID / Serial").classes("w-full").props("dense outlined dark")
+        d_phone = ui.input("Phone Number (with Country Code e.g. 919820012345)").classes("w-full").props("dense outlined dark")
+        d_email = ui.input("Email (Optional)").classes("w-full").props("dense outlined dark")
+        d_lang = ui.select(options=["english", "hindi", "marathi"], value="english", label="Preferred Language").classes("w-full").props("dense outlined dark")
+        d_opt = ui.select(options=["active", "opt-out"], value="active", label="WhatsApp Opt-In Status").classes("w-full").props("dense outlined dark")
+
+        with ui.row().classes("w-full justify-end gap-3 mt-4"):
+            ui.button("Cancel", on_click=customer_dialog.close).props("dense flat color=white")
+            save_cust_btn = ui.button("Save Customer", icon="save").props("dense unelevated color=primary")
+
+    # Main Tab Container
+    with ui.column().classes("w-full gap-5"):
+        # Top Navigation Bar with the 6 Sub-Tabs
+        with ui.tabs().classes("w-full bg-gray-900 border-b border-gray-800 text-gray-300 rounded-t-xl") as sub_tabs:
+            st_telemetry = ui.tab("Fleet & Direct Send", icon="bolt")
+            st_directory = ui.tab("Customer Directory", icon="people")
+            st_monthly = ui.tab("Monthly Statements", icon="receipt_long")
+            st_yearly = ui.tab("Yearly Milestones", icon="emoji_events")
+            st_campaigns = ui.tab("Campaign Manager", icon="rocket_launch")
+            st_alerts = ui.tab("Offline Alerts", icon="notifications_active")
+
+        with ui.tab_panels(sub_tabs, value=st_telemetry).classes("w-full p-0 bg-transparent"):
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 1: Fleet & Direct WhatsApp Send
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_telemetry).classes("p-0 w-full gap-5 flex flex-col"):
+                # View Granularity & Presets Bar
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.label("Report Granularity:").classes("text-xs font-bold text-gray-400 uppercase tracking-wider")
+                            with ui.button_group().props("dense outline"):
+                                bg_d = ui.button("📅 Daily", on_click=lambda: set_view_granularity("daily")).props("dense text-color=white")
+                                bg_w = ui.button("📊 Weekly", on_click=lambda: set_view_granularity("weekly")).props("dense text-color=white")
+                                bg_m = ui.button("🗓️ Monthly", on_click=lambda: set_view_granularity("monthly")).props("dense color=primary text-color=white")
+                                bg_y = ui.button("🏆 Yearly", on_click=lambda: set_view_granularity("yearly")).props("dense text-color=white")
+
+                        with ui.row().classes("items-center gap-2"):
+                            ui.label("⚡ Quick Presets:").classes("text-xs font-semibold text-gray-400")
+                            with ui.button_group().props("dense outline"):
+                                ui.button("Today", on_click=lambda: apply_preset("today")).props("dense text-color=white")
+                                ui.button("Yesterday", on_click=lambda: apply_preset("yesterday")).props("dense text-color=white")
+                                ui.button("This Week", on_click=lambda: apply_preset("this_week")).props("dense text-color=white")
+                                ui.button("This Month", on_click=lambda: apply_preset("this_month")).props("dense text-color=white")
+                                ui.button("Last Month", on_click=lambda: apply_preset("last_month")).props("dense text-color=white")
+                                ui.button("2026", on_click=lambda: apply_preset("2026")).props("dense text-color=white")
+
+                    # Filters and Bulk Action Toolbar
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pt-2"):
+                        with ui.row().classes("items-center gap-3 flex-wrap"):
+                            search_input = ui.input(placeholder="🔍 Search customer or plant...").classes("w-56").props("dense outlined dark")
+                            source_filter = ui.select(options=["All", "growatt", "isolarcloud", "suryalog"], value="All", label="Platform").classes("w-36").props("dense outlined dark")
+                            status_filter = ui.select(
+                                options=["All", "Active Only", "Not Working / Fault", "Offline Only", "Underperforming (< -15%)", "Phone Verified"],
+                                value="All", label="Plant Status"
+                            ).classes("w-44").props("dense outlined dark")
+
+                        with ui.row().classes("items-center gap-2 flex-wrap"):
+                            send_mode_select = ui.select(
+                                options=["👤 Manual (WhatsApp Web)", "🤖 Auto Simulated Send"],
+                                value="👤 Manual (WhatsApp Web)",
+                                label="Send Mode"
+                            ).classes("w-48").props("dense outlined dark")
+
+                            bulk_send_btn = ui.button("✉ Send Selected (0)", icon="send").props("dense unelevated color=primary")
+
+                    # Helper selection buttons
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-800/60"):
+                        with ui.row().classes("items-center gap-2 flex-wrap"):
+                            ui.label("Select Helpers:").classes("text-xs text-gray-500 font-semibold")
+                            ui.button("📱 Phone + Active", on_click=lambda: select_helper("active_phone")).props("dense outline size=sm color=positive")
+                            ui.button("⚠️ Phone + Not Working", on_click=lambda: select_helper("fault_phone")).props("dense outline size=sm color=warning")
+                            ui.button("🔴 Phone + Offline", on_click=lambda: select_helper("offline_phone")).props("dense outline size=sm color=negative")
+                            ui.button("📉 Phone + Deviated", on_click=lambda: select_helper("deviated_phone")).props("dense outline size=sm color=amber")
+                            ui.button("Select All", on_click=lambda: select_helper("all")).props("dense flat size=sm color=white")
+                            ui.button("Clear", on_click=lambda: select_helper("none")).props("dense flat size=sm color=gray-4")
+
+                        ui.button("📥 Export Table CSV", on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv"), icon="download").props("dense outline size=sm color=cyan")
+
+                # Direct Telemetry & Send Table
+                telemetry_cols = [
+                    {"name": "select", "label": "Select", "field": "select", "align": "center"},
+                    {"name": "customer_name", "label": "Customer", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "plant_name", "label": "Plant Name", "field": "plant_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "source", "label": "Portal", "field": "source", "sortable": True, "align": "center"},
+                    {"name": "kwh", "label": "Generation (kWh)", "field": "kwh", "sortable": True, "align": "right"},
+                    {"name": "revenue_inr", "label": "Est. Savings (₹)", "field": "revenue_inr", "sortable": True, "align": "right"},
+                    {"name": "tier", "label": "Tier / Status", "field": "tier", "sortable": True, "align": "center"},
+                    {"name": "actions", "label": "WhatsApp Statement", "field": "actions", "align": "center"},
+                ]
+                telemetry_table = ui.table(columns=telemetry_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                telemetry_table.add_slot("body-cell-tier", """
+                    <q-td :props="props">
+                        <q-chip :color="props.value === 'Best' ? 'amber-8' : props.value === 'Good' ? 'teal-7' : props.value === 'Could Be Better' ? 'blue-grey-7' : props.value === 'Critical' ? 'deep-orange-9' : 'grey-8'" text-color="white" size="sm" dense>
+                            {{ props.value || '—' }}
+                        </q-chip>
+                    </q-td>
+                """)
+                telemetry_table.add_slot("body-cell-source", """
+                    <q-td :props="props">
+                        <q-badge :color="props.value === 'growatt' ? 'teal-9' : props.value === 'isolarcloud' ? 'blue-9' : 'purple-9'">
+                            {{ props.value }}
+                        </q-badge>
+                    </q-td>
+                """)
+                telemetry_table.add_slot("body-cell-select", """
+                    <q-td :props="props">
+                        <q-checkbox v-model="props.row.selected" dense @update:model-value="() => $parent.$emit('row-select')" />
+                    </q-td>
+                """)
+                telemetry_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <div class="row items-center justify-center q-gutter-xs">
+                            <q-btn dense flat color="positive" icon="chat" label="Preview" size="sm" @click="() => $parent.$emit('preview', props.row)" />
+                            <q-btn v-if="props.row.phone" dense round flat color="emerald" icon="open_in_new" size="xs" @click="() => $parent.$emit('direct-wa', props.row)" />
+                        </div>
+                    </q-td>
+                """)
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 2: Customer Directory
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_directory).classes("p-0 w-full gap-5 flex flex-col"):
+                # Data Health Audit Card
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between pb-3 border-b border-gray-800 flex-wrap gap-2"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("health_and_safety").classes("text-cyan-400 text-xl")
+                            ui.label("Customer Directory Data Health Audit").classes("text-base font-bold text-white")
+                        ui.badge("Live Telemetry Sync Active", color="cyan-9").classes("text-xs font-semibold px-2.5 py-1 rounded")
+
+                    with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"):
+                        with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Total Customers").classes("text-xs text-gray-400")
+                            audit_total_label = ui.label("—").classes("text-xl font-bold text-white")
+                        with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Verified Phones").classes("text-xs text-gray-400")
+                            audit_phone_label = ui.label("—").classes("text-xl font-bold text-emerald-400")
+                        with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Missing Phone").classes("text-xs text-gray-400")
+                            audit_nophone_label = ui.label("0").classes("text-xl font-bold text-amber-400")
+                        with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Active Opt-In").classes("text-xs text-gray-400")
+                            audit_optin_label = ui.label("—").classes("text-xl font-bold text-cyan-400")
+                        with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Opted Out").classes("text-xs text-gray-400")
+                            audit_optout_label = ui.label("—").classes("text-xl font-bold text-gray-400")
+
+                    # Directory Toolbar
+                    with ui.row().classes("w-full items-center justify-between mt-4 flex-wrap gap-3"):
+                        with ui.row().classes("items-center gap-3 flex-wrap"):
+                            dir_search = ui.input(placeholder="🔍 Search name, phone, plant...").classes("w-64").props("dense outlined dark")
+                            dir_opt_filter = ui.select(options=["All", "active", "opt-out"], value="All", label="Opt-in").classes("w-32").props("dense outlined dark")
+
+                        with ui.row().classes("items-center gap-2"):
+                            ui.button("Add Customer", icon="person_add", on_click=lambda: open_customer_dialog("add")).props("dense unelevated color=primary")
+                            ui.button("Export Directory CSV", icon="download", on_click=lambda: ui.download("/api/export/customers?fmt=csv")).props("dense outline color=cyan")
+
+                # Directory Table
+                dir_cols = [
+                    {"name": "customer_name", "label": "Customer Name", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "plant_id", "label": "Plant ID / Serial", "field": "plant_id", "sortable": True, "align": "left"},
+                    {"name": "plant_name", "label": "Assigned Plant", "field": "plant_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "preferred_lang", "label": "Language", "field": "preferred_lang", "align": "center"},
+                    {"name": "opt_in_status", "label": "Opt-In", "field": "opt_in_status", "sortable": True, "align": "center"},
+                    {"name": "actions", "label": "Actions", "field": "actions", "align": "center"},
+                ]
+                dir_table = ui.table(columns=dir_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                dir_table.add_slot("body-cell-opt_in_status", """
+                    <q-td :props="props">
+                        <q-badge :color="props.value === 'active' ? 'positive' : 'grey-7'">
+                            {{ props.value }}
+                        </q-badge>
+                    </q-td>
+                """)
+                dir_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <div class="row items-center justify-center q-gutter-xs">
+                            <q-btn dense flat color="primary" icon="edit" size="sm" @click="() => $parent.$emit('edit-cust', props.row)" />
+                            <q-btn dense flat color="negative" icon="delete" size="sm" @click="() => $parent.$emit('del-cust', props.row)" />
+                        </div>
+                    </q-td>
+                """)
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 3: Monthly Statements
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_monthly).classes("p-0 w-full gap-5 flex flex-col"):
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.icon("receipt_long").classes("text-emerald-400 text-2xl")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Monthly WhatsApp Statements & Billing Summaries").classes("text-base font-bold text-white")
+                                ui.label("Detailed generation, solar yield, CO2 offset, and monetary savings per customer.").classes("text-xs text-gray-400")
+
+                        with ui.row().classes("items-center gap-3"):
+                            avail_m = db.get_available_months()
+                            stmt_month_select = ui.select(
+                                options=avail_m,
+                                value=selected_month["val"] if selected_month["val"] in avail_m else (avail_m[0] if avail_m else "2026-09"),
+                                label="Statement Month"
+                            ).classes("w-40").props("dense outlined dark options-dense")
+
+                            ui.button("⚡ Prepare Monthly Campaign", icon="campaign", on_click=lambda: run_prepare_monthly()).props("dense unelevated color=primary")
+                            ui.button("📥 Export CSV", icon="download", on_click=lambda: ui.download(f"/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
+
+                    # 4 KPI Summary Cards
+                    with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Total Monthly Generation").classes("text-xs text-gray-400")
+                            stmt_gen_kpi = ui.label("— kWh").classes("text-xl font-bold text-white")
+                            ui.label("Fleet solar energy produced").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Total Customer Savings").classes("text-xs text-gray-400")
+                            stmt_sav_kpi = ui.label("₹—").classes("text-xl font-bold text-emerald-400")
+                            ui.label("Calculated at ₹14.0/kWh").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Customers Ready").classes("text-xs text-gray-400")
+                            stmt_ready_kpi = ui.label("—").classes("text-xl font-bold text-cyan-400")
+                            ui.label("Verified phone & active opt-in").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Reports Pending").classes("text-xs text-gray-400")
+                            stmt_pending_kpi = ui.label("—").classes("text-xl font-bold text-amber-400")
+                            ui.label("Ready for dispatch queue").classes("text-[10px] text-gray-500")
+
+                # Monthly Statements Table
+                stmt_cols = [
+                    {"name": "customer_name", "label": "Customer Name", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "plant_name", "label": "Plant Name", "field": "plant_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "kwh", "label": "Generation (kWh)", "field": "kwh", "sortable": True, "align": "right"},
+                    {"name": "revenue_inr", "label": "Est. Savings (₹)", "field": "revenue_inr", "sortable": True, "align": "right"},
+                    {"name": "co2_kg", "label": "CO₂ Saved (kg)", "field": "co2_kg", "sortable": True, "align": "right"},
+                    {"name": "specific_yield", "label": "Yield (kWh/kWp)", "field": "specific_yield", "sortable": True, "align": "right"},
+                    {"name": "tier", "label": "Tier", "field": "tier", "sortable": True, "align": "center"},
+                    {"name": "actions", "label": "Statement", "field": "actions", "align": "center"},
+                ]
+                stmt_table = ui.table(columns=stmt_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                stmt_table.add_slot("body-cell-tier", """
+                    <q-td :props="props">
+                        <q-chip :color="props.value === 'Best' ? 'amber-8' : props.value === 'Good' ? 'teal-7' : props.value === 'Could Be Better' ? 'blue-grey-7' : props.value === 'Critical' ? 'deep-orange-9' : 'grey-8'" text-color="white" size="sm" dense>
+                            {{ props.value || '—' }}
+                        </q-chip>
+                    </q-td>
+                """)
+                stmt_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <q-btn dense flat color="positive" icon="chat" label="Preview" size="sm" @click="() => $parent.$emit('preview-stmt', props.row)" />
+                    </q-td>
+                """)
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 4: Yearly Milestones
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_yearly).classes("p-0 w-full gap-5 flex flex-col"):
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.icon("emoji_events").classes("text-amber-400 text-2xl")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Annual Solar Milestones & Customer Recap").classes("text-base font-bold text-white")
+                                ui.label("Celebrate cumulative yearly generation, customer financial returns, and clean energy milestones.").classes("text-xs text-gray-400")
+
+                        with ui.row().classes("items-center gap-3"):
+                            year_select = ui.select(options=["2026", "2025", "2024", "2023"], value="2026", label="Select Year").classes("w-32").props("dense outlined dark")
+                            ui.button("🏆 Prepare Yearly Recap Messages", icon="campaign", on_click=lambda: run_prepare_yearly()).props("dense unelevated color=primary")
+                            ui.button("📥 Export Yearly CSV", icon="download", on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv")).props("dense outline color=cyan")
+
+                    # 4 Yearly KPI Cards
+                    with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Annual Fleet Generation").classes("text-xs text-gray-400")
+                            yearly_gen_kpi = ui.label("— kWh").classes("text-xl font-bold text-white")
+                            ui.label("Recorded generation").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Total Annual Savings").classes("text-xs text-gray-400")
+                            yearly_sav_kpi = ui.label("₹—").classes("text-xl font-bold text-emerald-400")
+                            ui.label("Calculated at ₹14.0/kWh").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Homes Powered Equivalent").classes("text-xs text-gray-400")
+                            yearly_homes_kpi = ui.label("— days").classes("text-xl font-bold text-cyan-400")
+                            ui.label("@ 30 kWh / household / day").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Milestone Customers").classes("text-xs text-gray-400")
+                            yearly_cust_kpi = ui.label("—").classes("text-xl font-bold text-amber-400")
+                            ui.label("Plants with annual records").classes("text-[10px] text-gray-500")
+
+                # Yearly Milestones Table
+                yearly_cols = [
+                    {"name": "customer_name", "label": "Customer Name", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "plant_name", "label": "Plant Name", "field": "plant_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "annual_kwh", "label": "Annual kWh", "field": "annual_kwh", "sortable": True, "align": "right"},
+                    {"name": "annual_savings", "label": "Annual Savings (₹)", "field": "annual_savings", "sortable": True, "align": "right"},
+                    {"name": "days_powered", "label": "Days Powered", "field": "days_powered", "sortable": True, "align": "right"},
+                    {"name": "actions", "label": "Milestone Message", "field": "actions", "align": "center"},
+                ]
+                yearly_table = ui.table(columns=yearly_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                yearly_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <q-btn dense flat color="amber" icon="emoji_events" label="Recap" size="sm" @click="() => $parent.$emit('preview-yearly', props.row)" />
+                    </q-td>
+                """)
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 5: Campaign Manager
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_campaigns).classes("p-0 w-full gap-5 flex flex-col"):
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.label("Campaign:").classes("text-xs font-bold text-gray-400 uppercase")
+                            campaign_select = ui.select(options={}, value=None, label="Select Campaign").classes("w-80").props("dense outlined dark options-dense")
+
+                        with ui.row().classes("items-center gap-2 flex-wrap"):
+                            ui.button("📥 Export Campaign CSV", icon="download", on_click=lambda: ui.download("/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
+                            dry_run_btn = ui.button("🧪 Run Dry-Run Simulation", icon="science").props("dense unelevated color=indigo-7")
+                            ui.button("⚡ Quick Weekly Campaign", icon="date_range", on_click=lambda: run_prepare_weekly()).props("dense outline color=emerald")
+
+                    # Campaign Summary & Progress Track
+                    with ui.column().classes("w-full gap-2 mt-3 p-4 bg-gray-950 border border-gray-800 rounded-lg"):
+                        with ui.row().classes("w-full items-center justify-between"):
+                            camp_title_label = ui.label("No Campaign Selected").classes("text-sm font-bold text-white")
+                            camp_status_chip = ui.badge("IDLE", color="gray-7").classes("text-xs font-semibold px-2 py-0.5 rounded")
+
+                        # Progress Bar
+                        camp_prog_bar = ui.linear_progress(value=0.0).props("color=emerald-5 track-color=grey-9 rounded").classes("w-full h-2.5")
+
+                        # Breakdown metrics
+                        with ui.row().classes("w-full gap-5 text-xs text-gray-400 pt-1 flex-wrap"):
+                            camp_total_metric = ui.label("Total: 0").classes("text-white font-semibold")
+                            camp_sent_metric = ui.label("Sent: 0").classes("text-emerald-400 font-semibold")
+                            camp_failed_metric = ui.label("Failed: 0").classes("text-red-400 font-semibold")
+                            camp_pending_metric = ui.label("Pending: 0").classes("text-cyan-400 font-semibold")
+
+                # Campaign Messages Queue Table
+                msg_cols = [
+                    {"name": "id", "label": "#", "field": "id", "align": "center"},
+                    {"name": "customer_name", "label": "Customer", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "plant_id", "label": "Plant", "field": "plant_id", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "message_text", "label": "Message Preview", "field": "message_text", "align": "left"},
+                    {"name": "status", "label": "Status", "field": "status", "sortable": True, "align": "center"},
+                ]
+                msg_table = ui.table(columns=msg_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                msg_table.add_slot("body-cell-status", """
+                    <q-td :props="props">
+                        <q-badge :color="props.value === 'SENT' ? 'positive' : props.value === 'FAILED' ? 'negative' : 'warning'">
+                            {{ props.value }}
+                        </q-badge>
+                    </q-td>
+                """)
+                msg_table.add_slot("body-cell-message_text", """
+                    <q-td :props="props">
+                        <div class="ellipsis" style="max-width: 320px;" :title="props.value">
+                            {{ props.value }}
+                        </div>
+                    </q-td>
+                """)
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 6: Offline Alerts
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_alerts).classes("p-0 w-full gap-5 flex flex-col"):
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.icon("notifications_active").classes("text-red-400 text-2xl")
+                            with ui.column().classes("gap-0"):
+                                ui.label("Automated Inverter Outage & Fault Alerts").classes("text-base font-bold text-white")
+                                ui.label("Identify offline systems and inverter faults with smart 24h deduplication cooldown.").classes("text-xs text-gray-400")
+
+                        with ui.row().classes("items-center gap-3"):
+                            alert_threshold_select = ui.select(
+                                options={"12": "Offline > 12 Hours", "24": "Offline > 24 Hours", "48": "Offline > 48 Hours"},
+                                value="24", label="Offline Threshold"
+                            ).classes("w-44").props("dense outlined dark options-dense")
+
+                            ui.button("🚨 Queue Offline Alerts", icon="send", on_click=lambda: run_offline_alerting()).props("dense unelevated color=negative")
+                            ui.button("🔄 Refresh", icon="refresh", on_click=lambda: load_offline_alerts()).props("dense outline color=white")
+
+                    with ui.row().classes("w-full items-center justify-between mt-2"):
+                        offline_found_label = ui.label("Scanning telemetry for offline plants...").classes("text-xs font-semibold text-amber-400 font-mono")
+                        ui.button("📥 Export Outage CSV", icon="download", on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv")).props("dense outline size=sm color=red")
+
+                # Offline Plants Table
+                offline_cols = [
+                    {"name": "plant_name", "label": "Plant Name", "field": "plant_name", "sortable": True, "align": "left"},
+                    {"name": "source", "label": "Portal", "field": "source", "sortable": True, "align": "center"},
+                    {"name": "customer_name", "label": "Customer Contact", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "status", "label": "Device Status", "field": "status", "sortable": True, "align": "center"},
+                    {"name": "last_log_time", "label": "Last Telemetry", "field": "last_log_time", "align": "center"},
+                    {"name": "actions", "label": "Alert", "field": "actions", "align": "center"},
+                ]
+                offline_table = ui.table(columns=offline_cols, rows=[], row_key="plant_id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                offline_table.add_slot("body-cell-status", """
+                    <q-td :props="props">
+                        <q-badge color="negative">
+                            {{ props.value }}
+                        </q-badge>
+                    </q-td>
+                """)
+                offline_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <q-btn dense flat color="negative" icon="notifications" label="Preview Alert" size="sm" @click="() => $parent.$emit('preview-alert', props.row)" />
+                    </q-td>
+                """)
+
+                # Multilingual Draft Offline Alert Box
+                with ui.card().classes("w-full p-4 bg-gray-950 border border-red-900/40 rounded-xl"):
+                    ui.label("💬 Solaron Draft Outage Alert Preview:").classes("text-xs font-bold text-red-400 uppercase tracking-wider mb-1")
+                    ui.label(
+                        "Greetings From Solaron Homes Pvt Ltd,\n\n"
+                        "Dear Sir/Madam,\n"
+                        "Your solar plant is currently detected offline. Please check your AC/DC isolator switches or WiFi data logger.\n"
+                        "If any queries, please connect with our team at +91 98200 12345.\n\n"
+                        "Team Solaron\n"
+                        "सोलरॉन होम्स प्राइवेट लिमिटेड"
+                    ).classes("text-xs text-gray-300 font-mono whitespace-pre-line leading-relaxed")
+
+    # ─────────────────────────────────────────────────────────────
+    # REACTIVE DATA LOADING & EVENT HANDLERS
+    # ─────────────────────────────────────────────────────────────
+
+    cached_telemetry_rows: List[Dict[str, Any]] = []
+
+    def set_view_granularity(mode: str):
+        selected_view["mode"] = mode
+        bg_d.props(f"dense {'color=primary' if mode=='daily' else 'outline'} text-color=white")
+        bg_w.props(f"dense {'color=primary' if mode=='weekly' else 'outline'} text-color=white")
+        bg_m.props(f"dense {'color=primary' if mode=='monthly' else 'outline'} text-color=white")
+        bg_y.props(f"dense {'color=primary' if mode=='yearly' else 'outline'} text-color=white")
+        filter_and_render_telemetry()
+
+    def apply_preset(p: str):
+        if p == "today":
+            set_view_granularity("daily")
+        elif p == "yesterday":
+            set_view_granularity("daily")
+        elif p == "this_week":
+            set_view_granularity("weekly")
+        elif p == "this_month":
+            set_view_granularity("monthly")
+        elif p == "last_month":
+            set_view_granularity("monthly")
+        elif p == "2026":
+            set_view_granularity("yearly")
+
+    def _fetch_fleet_send_data(m: str) -> List[Dict[str, Any]]:
+        cust_df = db.query_df("SELECT id, plant_id, customer_name, phone, preferred_lang, opt_in_status FROM customers", db="crm")
+        if cust_df.empty:
+            return []
+        plants_df = db.query_df("SELECT plant_id, plant_name, source, capacity_kwp FROM plants", db="analytics")
+        monthly_df = db.query_df("SELECT plant_id, kwh, revenue_inr, tier, specific_yield FROM monthly_generation WHERE month = ?", [m], db="analytics")
+        
+        merged = cust_df.merge(plants_df, on="plant_id", how="left").merge(monthly_df, on="plant_id", how="left")
+        merged["kwh"] = merged["kwh"].fillna(0.0).round(1)
+        merged["revenue_inr"] = merged["revenue_inr"].fillna(merged["kwh"] * 14.0).round(0)
+        merged["tier"] = merged["tier"].fillna("Good")
+        merged["selected"] = False
+        return merged.to_dict(orient="records")
+
+    def filter_and_render_telemetry():
+        q = (search_input.value or "").strip().lower()
+        src = source_filter.value
+        st = status_filter.value
+        
+        filtered = []
+        for r in cached_telemetry_rows:
+            if q:
+                cname = str(r.get("customer_name", "")).lower()
+                pname = str(r.get("plant_name", "")).lower()
+                pid = str(r.get("plant_id", "")).lower()
+                if q not in cname and q not in pname and q not in pid:
+                    continue
+            if src != "All" and str(r.get("source", "")).lower() != src.lower():
+                continue
+            if st == "Active Only" and (r.get("kwh", 0) <= 0 or r.get("tier") in ("Offline", "Fault")):
+                continue
+            if st == "Offline Only" and r.get("tier") != "Offline":
+                continue
+            if st == "Not Working / Fault" and r.get("tier") != "Fault":
+                continue
+            if st == "Phone Verified" and not r.get("phone"):
+                continue
+            filtered.append(r)
+
+        telemetry_table.rows = filtered
+        update_selected_count_badge()
+
+    def update_selected_count_badge():
+        sel_count = sum(1 for r in telemetry_table.rows if r.get("selected"))
+        bulk_send_btn.text = f"✉ Send Selected ({sel_count})"
+
+    telemetry_table.on("row-select", update_selected_count_badge)
+
+    def select_helper(action: str):
+        for r in telemetry_table.rows:
+            phone_ok = bool(r.get("phone"))
+            if action == "all":
+                r["selected"] = True
+            elif action == "none":
+                r["selected"] = False
+            elif action == "active_phone":
+                r["selected"] = phone_ok and float(r.get("kwh") or 0) > 0
+            elif action == "fault_phone":
+                r["selected"] = phone_ok and str(r.get("tier")) == "Fault"
+            elif action == "offline_phone":
+                r["selected"] = phone_ok and str(r.get("tier")) == "Offline"
+            elif action == "deviated_phone":
+                r["selected"] = phone_ok and str(r.get("tier")) in ("Could Be Better", "Critical", "Needs Attention")
+        telemetry_table.update()
+        update_selected_count_badge()
+
+    search_input.on("update:model-value", lambda e: filter_and_render_telemetry())
+    source_filter.on("update:model-value", lambda e: filter_and_render_telemetry())
+    status_filter.on("update:model-value", lambda e: filter_and_render_telemetry())
+
+    # Bulk Send Handler
+    def on_bulk_send():
+        selected = [r for r in telemetry_table.rows if r.get("selected")]
+        if not selected:
+            ui.notify("Please select at least one customer to send.", type="warning")
+            return
+        
+        mode = send_mode_select.value
+        if "Manual" in mode:
+            # Open WhatsApp Web for the first selected customer
+            first = selected[0]
+            phone = str(first.get("phone") or "").strip().replace("+", "")
+            if phone:
+                txt = crm.format_rich_whatsapp_statement(
+                    name=first.get("customer_name", "Customer"),
+                    plant_id=first.get("plant_id", ""),
+                    plant_name=first.get("plant_name", ""),
+                    kwh=float(first.get("kwh") or 0.0),
+                    revenue=float(first.get("revenue_inr") or 0.0),
+                    tier=first.get("tier", "Good"),
+                    lang=str(first.get("preferred_lang", "english")).lower(),
+                    month=selected_month["val"]
+                )
+                enc = urllib.parse.quote(txt)
+                ui.run_javascript(f"window.open('https://web.whatsapp.com/send?phone={phone}&text={enc}', '_blank');")
+                ui.notify(f"Opening WhatsApp Web for {first.get('customer_name')} ({len(selected)} total selected)", type="positive")
+            else:
+                ui.notify("Selected customer has no phone number.", type="warning")
+        else:
+            ui.notify(f"Simulating dispatch of {len(selected)} WhatsApp messages...", type="info")
+
+    bulk_send_btn.on("click", on_bulk_send)
+
+    telemetry_table.on("preview", lambda e: open_preview(e.args, selected_view["mode"]))
+    telemetry_table.on("direct-wa", lambda e: open_preview(e.args, selected_view["mode"]))
+    stmt_table.on("preview-stmt", lambda e: open_preview(e.args, "monthly"))
+    yearly_table.on("preview-yearly", lambda e: open_preview(e.args, "yearly"))
+
+    # Load Customer Directory & Audit
+    async def load_directory_data():
+        audit = await asyncio.to_thread(crm.get_customers_audit)
+        audit_total_label.text = str(audit["total"])
+        audit_phone_label.text = str(audit["with_phone"])
+        audit_nophone_label.text = str(audit["missing_phone"])
+        audit_optin_label.text = str(audit["opted_in"])
+        audit_optout_label.text = str(audit["opted_out"])
+
+        q = (dir_search.value or "").strip()
+        rows = await asyncio.to_thread(crm.get_customers, 200, 0, q if q else None)
+        plants_df = await asyncio.to_thread(db.query_df, "SELECT plant_id, plant_name FROM plants", db="analytics")
+        p_map = dict(zip(plants_df["plant_id"], plants_df["plant_name"])) if not plants_df.empty else {}
+        for r in rows:
+            r["plant_name"] = p_map.get(str(r.get("plant_id")), r.get("plant_id", ""))
+        dir_table.rows = rows
+
+    dir_search.on("update:model-value", lambda e: asyncio.create_task(load_directory_data()))
+    dir_opt_filter.on("update:model-value", lambda e: asyncio.create_task(load_directory_data()))
+
+    def open_customer_dialog(mode: str, cust_row: Optional[dict] = None):
+        cust_dialog_mode["mode"] = mode
+        if mode == "edit" and cust_row:
+            cust_dialog_mode["id"] = cust_row.get("id")
+            cust_dialog_title.text = f"Edit Customer: {cust_row.get('customer_name')}"
+            d_name.value = cust_row.get("customer_name", "")
+            d_plant.value = cust_row.get("plant_id", "")
+            d_phone.value = cust_row.get("phone", "")
+            d_email.value = cust_row.get("email", "")
+            d_lang.value = cust_row.get("preferred_lang", "english")
+            d_opt.value = cust_row.get("opt_in_status", "active")
+        else:
+            cust_dialog_mode["id"] = None
+            cust_dialog_title.text = "Add New Customer Contact"
+            d_name.value = ""
+            d_plant.value = ""
+            d_phone.value = ""
+            d_email.value = ""
+            d_lang.value = "english"
+            d_opt.value = "active"
+        customer_dialog.open()
+
+    async def save_customer():
+        name = d_name.value.strip()
+        pid = d_plant.value.strip()
+        phone = d_phone.value.strip()
+        if not name or not pid:
+            ui.notify("Customer name and Plant ID are required.", type="warning")
+            return
+        await asyncio.to_thread(
+            crm.upsert_customer,
+            plant_id=pid, name=name, phone=phone,
+            email=d_email.value.strip(),
+            lang=d_lang.value, opt_in=d_opt.value
+        )
+        customer_dialog.close()
+        ui.notify("Customer saved successfully!", type="positive")
+        await load_directory_data()
+
+    save_cust_btn.on("click", lambda: asyncio.create_task(save_customer()))
+    dir_table.on("edit-cust", lambda e: open_customer_dialog("edit", e.args))
+    
+    async def delete_cust(row: dict):
+        cid = row.get("id")
+        if cid:
+            await asyncio.to_thread(crm.delete_customer, cid)
+            ui.notify("Customer deleted.", type="info")
+            await load_directory_data()
+    dir_table.on("del-cust", lambda e: asyncio.create_task(delete_cust(e.args)))
+
+    # Load Monthly Statements
+    async def load_monthly_statements():
+        m = stmt_month_select.value or selected_month["val"]
+        rows = await asyncio.to_thread(_fetch_fleet_send_data, m)
+        for r in rows:
+            r["co2_kg"] = round(r["kwh"] * 0.82, 1)
+        stmt_table.rows = rows
+        
+        tot_kwh = sum(r["kwh"] for r in rows)
+        tot_sav = sum(r["revenue_inr"] for r in rows)
+        ready = sum(1 for r in rows if r.get("phone") and r.get("opt_in_status") == "active")
+        
+        stmt_gen_kpi.text = f"{tot_kwh:,.0f} kWh"
+        stmt_sav_kpi.text = f"₹{tot_sav:,.0f}"
+        stmt_ready_kpi.text = str(ready)
+        stmt_pending_kpi.text = str(len(rows))
+
+    stmt_month_select.on("update:model-value", lambda e: asyncio.create_task(load_monthly_statements()))
+
+    # Load Yearly Milestones
+    async def load_yearly_milestones():
+        yr = year_select.value or "2026"
+        rows = await asyncio.to_thread(crm.get_yearly_milestones, yr)
+        yearly_table.rows = rows
+        
+        tot_kwh = sum(r["annual_kwh"] for r in rows)
+        tot_sav = sum(r["annual_savings"] for r in rows)
+        tot_days = sum(r["days_powered"] for r in rows)
+        
+        yearly_gen_kpi.text = f"{tot_kwh:,.0f} kWh"
+        yearly_sav_kpi.text = f"₹{tot_sav:,.0f}"
+        yearly_homes_kpi.text = f"{tot_days:,.0f} days"
+        yearly_cust_kpi.text = str(len(rows))
+
+    year_select.on("update:model-value", lambda e: asyncio.create_task(load_yearly_milestones()))
+
+    # Load Campaigns
+    async def load_campaigns():
+        camps = await asyncio.to_thread(crm.get_all_campaigns)
+        if not camps:
+            campaign_select.options = {}
+            return
+        options = {c["id"]: f"#{c['id']} {c['campaign_name']} ({c['status']})" for c in camps}
+        campaign_select.options = options
+        if not campaign_select.value or campaign_select.value not in options:
+            campaign_select.value = camps[0]["id"]
+        await on_campaign_changed()
+
+    async def on_campaign_changed():
+        cid = campaign_select.value
+        if not cid:
+            return
+        msgs = await asyncio.to_thread(crm.get_campaign_messages, int(cid))
+        msg_table.rows = msgs
+        
+        total = len(msgs)
+        sent = sum(1 for m in msgs if m.get("status") == "SENT")
+        failed = sum(1 for m in msgs if m.get("status") == "FAILED")
+        pending = sum(1 for m in msgs if m.get("status") == "PENDING")
+        
+        camp_title_label.text = f"Campaign #{cid}"
+        camp_total_metric.text = f"Total: {total}"
+        camp_sent_metric.text = f"Sent: {sent}"
+        camp_failed_metric.text = f"Failed: {failed}"
+        camp_pending_metric.text = f"Pending: {pending}"
+        
+        ratio = (sent / total) if total > 0 else 0.0
+        camp_prog_bar.value = ratio
+
+    campaign_select.on("update:model-value", lambda e: asyncio.create_task(on_campaign_changed()))
+
+    # Run Prepare Actions
+    async def run_prepare_monthly():
+        m = stmt_month_select.value or selected_month["val"]
+        res = await asyncio.to_thread(crm.prepare_monthly_campaign, m)
+        ui.notify(f"Prepared Monthly Campaign #{res['campaign_id']}: {res['queued']} statements queued!", type="positive")
+        sub_tabs.value = st_campaigns
+        await load_campaigns()
+
+    async def run_prepare_weekly():
+        res = await asyncio.to_thread(crm.prepare_weekly_campaign)
+        ui.notify(f"Prepared Weekly Campaign #{res['campaign_id']}: {res['queued']} statements queued!", type="positive")
+        sub_tabs.value = st_campaigns
+        await load_campaigns()
+
+    async def run_prepare_yearly():
+        yr = year_select.value or "2026"
+        res = await asyncio.to_thread(crm.prepare_yearly_campaign, yr)
+        ui.notify(f"Prepared Yearly Milestone Campaign #{res['campaign_id']}: {res['queued']} recap messages queued!", type="positive")
+        sub_tabs.value = st_campaigns
+        await load_campaigns()
+
+    # Dry-Run Simulation
+    async def do_dry_run():
+        cid = campaign_select.value
+        if not cid:
+            ui.notify("No campaign selected.", type="warning")
+            return
+        ui.notify(f"Running console dry-run for Campaign #{cid}...", type="info")
+        await asyncio.sleep(0.5)
+        with db.crm_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE message_queue SET status = 'SENT' WHERE campaign_id = ?", (cid,))
+            cur.execute("UPDATE campaign_log SET status = 'COMPLETED', sent_count = total_messages WHERE id = ?", (cid,))
+        ui.notify(f"Dry-run simulation completed for Campaign #{cid}!", type="positive")
+        await on_campaign_changed()
+
+    dry_run_btn.on("click", lambda: asyncio.create_task(do_dry_run()))
+
+    # Load Offline Alerts
+    async def load_offline_alerts():
+        h = int(alert_threshold_select.value or 24)
+        plants = await asyncio.to_thread(crm.get_offline_plants, h)
+        cust_df = await asyncio.to_thread(db.query_df, "SELECT plant_id, customer_name, phone FROM customers", db="crm")
+        c_map = {str(r["plant_id"]): r for _, r in cust_df.iterrows()} if not cust_df.empty else {}
+        for p in plants:
+            c = c_map.get(str(p["plant_id"]), {})
+            p["customer_name"] = c.get("customer_name", "—")
+            p["phone"] = c.get("phone", "—")
+        offline_table.rows = plants
+        offline_found_label.text = f"Found {len(plants)} plants in offline or fault condition."
+
+    alert_threshold_select.on("update:model-value", lambda e: asyncio.create_task(load_offline_alerts()))
+
+    async def run_offline_alerting():
+        h = int(alert_threshold_select.value or 24)
+        res = await asyncio.to_thread(crm.prepare_offline_alerts, h)
+        ui.notify(f"Queued {res['alerts_queued']} offline alert messages (checked {res['offline_found']} plants)", type="info")
+        await load_offline_alerts()
+
+    offline_table.on("preview-alert", lambda e: open_preview(e.args, "monthly"))
+
+    # Initial Master Table Load
+    async def load_all_crm_data():
+        nonlocal cached_telemetry_rows
+        m = selected_month["val"]
+        cached_telemetry_rows = await asyncio.to_thread(_fetch_fleet_send_data, m)
+        filter_and_render_telemetry()
+        await load_directory_data()
+        await load_monthly_statements()
+        await load_yearly_milestones()
+        await load_campaigns()
+        await load_offline_alerts()
+
+    # External refresh listener
+    async def on_external_update():
+        if app_state.get("month") != selected_month["val"]:
+            selected_month["val"] = app_state.get("month", "2026-09")
+            await load_all_crm_data()
+
+    if "refresh_listeners" in app_state:
+        app_state["refresh_listeners"].append(lambda: asyncio.create_task(on_external_update()))
+
+    ui.timer(0.05, lambda: asyncio.create_task(load_all_crm_data()), once=True)

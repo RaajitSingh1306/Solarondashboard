@@ -1,0 +1,486 @@
+plant_id,plant_name,source,capacity_kwp,ac_capacity_kw,latitude,longitude,city,state,country,timezone,install_date,plant_type,panel_brand,panel_model,panel_watt,panel_count,inverter_brand,inverter_model,inverter_type,inverter_count,tilt_angle,azimuth,price_per_unit,currency
+11156917,Tanvi Tushar Late,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11154000,Harish Rana,growatt,4.0,4.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11151904,Suvarna Prit Patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11151899,Ganesh Gaikwad,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11150160,Mandar Keskar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11145859,Amol Thote,growatt,4.1,4.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11138114,Shailendra Dhomne,growatt,4.5,4.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11136038,Subhas Bhusri,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11126779,Githadivi Mistry,growatt,6.4,6.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11126734,sandip divekar,growatt,4.4,4.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11122245,Gopal Naidu,growatt,3.9,3.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11120425,keskar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11120267,vivek mandir,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11115963,Imtiyaz mistri,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11115804,jyotiniwas,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11101806,Punam Soan,growatt,7.2,7.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11098124,Mahesh Walke,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11097958,Mahesh Bandewar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11095744,amol tawade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11093624,Fiji kurian,growatt,10.4,10.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11083098,Shailesh Shah,growatt,12.9,12.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11073618,deva kadukar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11071763,Shankar Sahu,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11063863,sagar galani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11061765,Jagdish Zodape,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11059695,kiran mahajan,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11054656,lucky tantharate,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11054603,balram kodwani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11054516,Rajendra chavhan 6kw,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11052496,rakesh goplani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11052490,Subhangi Zanjal,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11043492,Pushpa Thakare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11040520,Bhartari Patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11038083,shantikumar koli,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11032102,Virbhan Wadhwani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11027058,Atul Kapkar,growatt,4.4,4.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11024995,Amit Ghumde,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11024879,Akash Gaikwad,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11024422,Vishnu Gajwani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11022463,Swapnil Bhendarkar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11007556,Mohan patil,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+11003389,rajendra borkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10970452,Dhyaneshwar Nimje,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10963423,Pravinsingh Rathod,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10963063,Manish Choudhary,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10959491,Rahul Bhosale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10957154,shivaji ramgude,growatt,4.3,4.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10956928,Sukhadeo kambale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10955372,Saurabh Nimbalkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10955172,Kailas kakade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10952413,Web food network pvt Ltd,growatt,22.2,22.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10950151,Yash Gawande,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10946850,gulve,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10946846,gavle,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10944752,Jamdade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10940614,Vilas Dunadar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10939541,kavita ukey,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10937803,Ganesh Waskude,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10929459,Tarachand Sattani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10929440,manoj more nashik phata,growatt,4.1,4.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10927328,Linga,growatt,11.1,11.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10919021,Anil Keshwani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10918931,Kulesh Thakur,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10917250,Sanjeev Kumar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10915244,Naima syed,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10913321,nilesh diwase,growatt,5.1,5.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10912823,Vijay komle,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10909952,Kailas Belsare,growatt,6.8,6.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10907832,Jedraj Zine,growatt,3.5,3.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10905724,Ashish Husukle,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10905660,Anita Rathod,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10898708,Nitin Sonni,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10898585,Vaibhav Milind Suryawanshi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10896822,Amit Ukey,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10894296,bhansingh shau,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10892504,Sachin Hajare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10892345,Kunal Borkar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10888277,Chandrapal Singh Chahan,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10888246,Mahesh Gupta,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10885927,Ashok Sankpal,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10880816,Janeshwar Mishra,growatt,3.1,3.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10879006,Param Singh Kainth,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10878830,Milid Tiwari,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10876600,Rizwana Begum Ansari,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10866370,Mayur pandharipande,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10863147,Kishor bure,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10856830,Sandeep Gupta,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10850634,Christopher Mariyan,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10838583,Prakash Khatwani,growatt,4.8,4.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10833636,Vaibhav Hindurao Waghmare,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10822490,Harminder Singh Ramani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10822339,Fulchand Ishwarkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10822300,Premnath patil,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10820889,Prashant Bambole,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10820613,Yogesh Kumbhare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10816341,Vasudev Goplani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10814171,Mansons International Pvt Ltd U-2,growatt,194.4,194.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10814005,Manoj pipare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10805431,Sachin ghatbandhe,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10798700,sanjay warange,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10795086,Modispaces Amizarana Malad,growatt,12.7,12.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10794257,Chandrakant Patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10792266,Vishal Kadam,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10790327,Prashant Parhad,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10787983,Prashant Mahakalkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10782650,JIO BP IGATPURI,growatt,12.9,12.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10779684,Sidram Burute,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10779655,Sushila Burute,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10775586,Kishor Sende,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10773259,William Jacob,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10773240,James Jacob,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10766925,Karan Mhankale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10756210,Ashok patel958,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10746005,Rajendra Nibuddhe,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10741385,vinod bhosle,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10739391,Vivek kadam,growatt,3.4,3.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10739359,Parvez,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10728521,Santosh Sattani,growatt,3.9,3.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10728515,SUSHIL SATTANI,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10727315,Vijay badhe,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10723191,Kishor Zade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10722895,Dharmesh Soneji,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10722879,Rakesh Shrivastav,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10722806,Pankaj atkare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10721028,Rahul Bhisen,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10711225,Vivek paunkar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10706459,Deepak Ramrasar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10690432,Vikash Wase,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10684854,Hitesh Parmar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10674488,Satish Prithyani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10674368,Deepak Kumar Kundu,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10674290,Kishan Walecha,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10666563,Swati Kamble,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10664961,Ravi kugawani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10664929,Balkrishna babu Pardhi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10657084,Janardhan Kamble,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10650695,Mahesh goplani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10649123,Rekha Tupkhane,growatt,5.4,5.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10640054,Atul Kumar Chaudhary,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10632773,Ravi Singh Rathor,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10629371,Yeshwant Nagdeote,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10625805,Suresh Aswale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10619364,agatha kalwa,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10617829,shafi Azam,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10610774,Pandurang malkhapure,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10605293,Rasik Ravindra Ambone,growatt,3.5,3.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10597273,Bhaskar Ghate,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10597201,Shakil Nande,growatt,3.4,3.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10592742,Indrajeet Mondal,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10592496,Neeta Zabak,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10592486,Nilesh Zabak,growatt,11.1,11.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10585419,arun karemore,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10569506,Rahul Gokhale,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10566184,rajendra dhawale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10566173,Pramod Dhawale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10564243,Amit Thakur,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10547502,Thakurthash Tejwani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10537447,Vijay Karemore,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10537271,Maduri Padole,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10528191,Naresh Bora,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10526439,Subhash Pawar,growatt,3.8,3.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10526435,Sunil Pawar,growatt,5.0,5.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10518199,Sanjay ghoge,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10513532,Pratik patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10509814,Ranjit munjevar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10507948,Afjal Doshi,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10489129,kishor chauhan,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10485401,Pravina Tekade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10480841,Avinash Admane,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10471815,Devra kadukar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10469794,Jitendra Joshi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10467594,Ramchandra Bhure,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10464982,shakil sheikh,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10464974,moiinuddini sheikh,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10455554,Hiraman Nikure,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10451728,Rajendra Newaskar,growatt,4.2,4.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10451628,Sanjay Goplani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10451382,dhillon,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10418364,Anil Giri,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10409838,Sunil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10409807,Sunil fulore,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10401759,Hasmukh Narayan Hingu,growatt,4.7,4.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10394828,Ramesh Gopalani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10394824,Vikram Goplani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10386829,Ramesh Hirnkhede,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10378102,Mamta Rangari,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10377858,Nilesh Bahekar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10377849,Mukesh Bahekar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10371862,Ashish Ramteke,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10366086,Virendr Narad,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10365982,Sharukh Bhagade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10342426,Varghese Mathew 2,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10327497,Chandraprakash Yeole,growatt,3.8,3.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10318838,Fatima Fernadis,growatt,4.0,4.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10311650,carmel impex,growatt,10.1,10.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10311498,Dhanram Barai,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10299420,Ajay Bangre,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10295169,Kodhal Chambers,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10285920,Kishor Palandurkar,growatt,4.5,4.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10284266,Nishikant Bahekar,growatt,4.9,4.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10273523,Rajesh Gupta,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10257485,Om sundar CHS,growatt,11.6,11.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10241129,sanjay jain,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10240884,Prakash Aba Patil,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10200210,Eknath Patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10196254,kiran patil sir,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10180029,Dilip Sattani,growatt,4.9,4.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10179736,Milind Aloni,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10169458,Kunal Dharmani,growatt,7.5,7.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10169390,nitin shukla,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10169380,Wasudeo Waghmare,growatt,3.5,3.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10165316,Suraj Nighot,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10163550,Gajre Hospital,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10162972,Mohit Jain,growatt,3.4,3.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10137127,Manish Wadhawani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10133969,ravindra bhivgade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10133666,fatteshing otekar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10105026,Nitin Bhojwani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10104865,Anujkumar Bajpai,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10098436,Nawab shabir khan,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10085629,Ramiz Sheikh,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10085193,nitu chandu durge,growatt,5.2,5.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10074506,Amit Sahu,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10067888,Snehlata bharne,growatt,4.1,4.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10067274,gaurishankar gokhale,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10018242,Preetpal singh mann,growatt,6.2,6.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10016308,Masjid Va Madrsa Mumbra,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10008378,Anjali Akhare,growatt,4.4,4.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10006463,Kunal Tarte,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+10000235,FELICITY PARK KHAR ROAD,growatt,7.6,7.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9991257,Simardeep Singh bhatia,growatt,8.7,8.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9990865,Likesh Hirapure,growatt,5.2,5.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9990412,Preet Singh  Gulati,growatt,15.1,15.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9986322,Raj Kewat,growatt,4.1,4.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9968937,Sachin deng,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9965193,Ajay Sagtani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9965160,Vijay Sangtani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9956284,Nizamuddin Sayyed,growatt,6.9,6.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9948584,Manish khandelwal,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9929226,kushnure Naigaon,growatt,4.6,4.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9927627,Gautam modi,growatt,5.0,5.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9927226,Bhanudas Phuge,growatt,5.4,5.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9925822,Reshma Lashkari,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9902885,rajpurohit,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9351063,Mangesh Badle,growatt,5.7,5.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9333882,Linkrose,growatt,15.4,15.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9327048,Raju Kuttarmare,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9304796,Gurudwara Gondia Jaistamb,growatt,13.8,13.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9304686,Bliss Bar,growatt,16.7,16.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9304221,Namdeo petrolium katol,growatt,6.5,6.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9280154,Rakesh Pande,growatt,3.8,3.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9276471,Ganesh Patil,growatt,5.1,5.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9270889,DSA,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9252378,Shantaram Meshram,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9237077,Shashikala Gaurkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9235471,Gokuldas dhromal,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9226559,Manish Shingne,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9224724,Kartikpetrolpump,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9224387,Roshan Raut,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9215982,Owais Sir,growatt,5.8,5.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9211346,Parag Goraskar,growatt,6.5,6.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9211341,Avinash gorashkar,growatt,6.2,6.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9209516,naresh mankani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9209507,nandlal mankani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9207345,arun shrivastav,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9205407,AMRITPAL SINGH BHATIA,growatt,8.6,8.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9200408,Maroti Dohare,growatt,4.8,4.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+9193975,Rajureshwar petroleum,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2842299,Tushar late,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2841585,Satish M.Urkude,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2841378,Sharif Sheikh,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2833295,D. lanje,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2819866,harvendhr singh bhatia,growatt,4.5,4.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2819576,R.H.  Raut,growatt,5.5,5.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2819429,Heritage,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2819378,devedhrpal singh bhatia,growatt,4.8,4.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2803798,BIT 100 Kw,growatt,100.0,100.0,0.0,0.0,,,India,Asia/Kolkata,2024-07-17,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2771523,Sandeep Korde,growatt,3.7,3.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2759951,Parladha Thote,growatt,5.1,5.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2755685,Amit Jani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2749655,Shivraj petroleum,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2749591,abhindan bhatia,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2749313,Ravi paryani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2748128,Vikrant Zambare,growatt,3.8,3.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2727484,mahesh wadavani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2715806,naresh paryani,growatt,6.9,6.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2706231,Girdharilal Bhojwani,growatt,6.6,6.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2698940,jyoti sawwashere,growatt,5.3,5.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2668442,Sanjay chauragade,growatt,6.4,6.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2668359,Trishna Gupta,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2640959,Ramnit bhatia,growatt,10.2,10.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2633253,Archana Nimkar,growatt,6.6,6.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2622552,Wandhekar Fuel Station,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2619170,Prashant Khodecha,growatt,4.1,4.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2617727,Payal Bagga,growatt,3.1,3.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2617583,Avneetshing Bhatia 1,growatt,26.9,26.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2617351,Gukudhas daryanumal,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2586924,shubhlaxmi petrol pump parshivni,growatt,10.9,10.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2528549,Vijay Awasti,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2528452,Vinod prateke,growatt,4.5,4.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2528449,Revendra Hirankhede,growatt,5.7,5.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2510341,shyamlal Katre,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2502199,G B HALVANKAR,growatt,5.6,5.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2501691,prakhar sing Kshatriya,growatt,5.0,5.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2492014,Shriram Apartment,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2485302,satish dheulakar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2428454,Rangaswami Revelliwar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2422345,Tirupati balaji petroleum,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2409090,vinod shende,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2404159,Sanjay wahane,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2387901,Jyoti D. Shanmare,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2379191,Suresh patne,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2367847,Prithviraj Mishra,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2365853,Parveen arneja,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2352137,Ashok Mankani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2330408,Tolaram Mankani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2322209,Walhekar Family,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2308879,Dhanshree Ranade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2293081,Omshivshrusti,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2283356,Eureka print solution,growatt,6.1,6.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2281476,Baban Khobragade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2264709,Bhupendra Chauhan,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2264705,Uday Mheta Matunga,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2240330,Deepesh Gurunani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2227745,Shell plastic pvt ltd,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2210768,Manojkumar Bokade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2198150,Adani Ashagad,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2196350,Wandhekar Petroleum,growatt,6.9,6.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2179005,shreedhar phaye,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2164749,Ishwar Shivkar1,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2135554,Dharmendra paryani,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2134716,Gondia Gurudwara singh sabha 1,growatt,23.5,23.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2081213,Prakash jakatdar1,growatt,3.4,3.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2027907,Lakhabir Singh,growatt,9.5,9.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+2018663,urja petroleum,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1990859,Manoj Upadhye,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1980806,Avinash Bhivgade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1870138,P Raipure,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1852934,Megha Durge,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1835707,Prabhakar Bharate,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1808976,Umesh Mudliyar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1778816,rituraj vasant,growatt,3.2,3.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1765173,Umesh chitriv,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1692484,HCL Technologies Ltd,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1574691,green city,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1551079,Ramu Chakole,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1496517,Sachin Umathe,growatt,3.7,3.7,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1485463,Bipin Verma,growatt,4.5,4.5,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1394988,Krishna Kukwase,growatt,6.9,6.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1314937,Shashi Nair,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1258429,Medico Remedies Ltd,growatt,76.2,76.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+1207487,Munir Doshi,growatt,3.4,3.4,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+942273,Vijay Badgayye,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+884874,Prakash Gore,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+863493,Bharati Airtel Ltd,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+855921,Pavan Borkar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+851184,Prashant Bodhankar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+760364,Devendra Mokashi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+757622,Abuzz Parel 2,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+757614,Abuzz Parel 1,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+741623,Ankalwar Girls Hostel,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+723353,B S Rao,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+712834,Budhharam Wadhai,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+708188,Adani Power House Vangaon.,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+632638,Rajesh Kothari,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+601868,Mr. Vinit Modi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+539512,Mahavir Jain,growatt,4.9,4.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+539509,Shambhu Mahalle,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+539502,Harvindersingh Oberoi,growatt,10.9,10.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+468379,"Kaushik Shah, Pune",growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+442105,shivshakti,growatt,5.1,5.1,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+408402,Lakhesingh Girase,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+381822,Harikrishna Mudliyar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+360956,yuvraj jain,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+338755,AJIT NAIK,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+334801,Sindhu Daftary,growatt,3.6,3.6,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+333414,Saroj Desai,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+329097,Shiromani Gajbhiye,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+313088,SYGANGURDE,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+311954,Kishor Gondanale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+302419,Gurudwara Kamptee,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+272452,Guru Nanak School,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+264753,D S Patil,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+264273,Rafik Mawani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+263311,Aparna Khandera,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+259691,Anil Sonawane,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+226965,Manmohan Toshniwal,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+222498,Mahila College office,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+215699,Pratik Kathade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+214430,Vishnu Sukhadare,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+213085,Shekhar Mayekar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+181143,Dhiren Mehta,growatt,5.0,5.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+175589,Praful Patil Nagpur,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+173054,Manoj Kadam,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+166151,Gulshan Petroleum,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+164727,Jemen Kujur,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+163413,Jivhala Solapur,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+159510,ASHOK WATH,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+159282,Vijay Khandera,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+159167,Mukesh Mate,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+152554,Ravindra Admane,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+152294,Vilas Gawande,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+152267,Bhavana Thakar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+148593,Vinod Zade,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+148554,Indarmohan Sethi,growatt,4.9,4.9,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+127051,Kamlesh Sahare,growatt,8.2,8.2,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+125974,Purushottam Kishnani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+125955,Ram Kishnani,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+125911,Laxman Kishnani,growatt,5.0,5.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+118819,Devid Swami,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+118767,C R Wairagade,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+116506,Mathew Varghese,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+112461,Ashok B Pande,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+112369,Manik Lonkar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+105994,Nishant Patane,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+105833,Nakul Soan,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+104920,B G Madavi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+104913,Sandeep Thoke,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+102732,Rajat FarSan,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+101734,Damodhar Bhomble,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+100699,Keshav Tank,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+98305,Manoj Itankar,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+89638,Rajesh Gore,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+89191,Dilip Gondanale,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+84382,Ashok Tawale,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+77769,Rajendra Narawde,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+76353,Narendra Mathurkar,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+73224,Manmohan Kohali,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+71082,Dilip Jain,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+70987,Punamchand Yadav,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+70975,Aman Signature,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+70271,Ajaykant Ruiya,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+69964,Diwakar Patne,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+67433,Rekha Waghmare,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+67356,Kirti Gandhi,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+66019,Villa Velloz,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+65361,Rajesh Pardikar,growatt,3.8,3.8,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+64575,Sunil Shah,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+64413,Prafulla Patil,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+62656,Narayan Valia,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+61828,Prakash Khatiwala,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+60665,Sameer Diwan,growatt,5.3,5.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+60478,Sunil Modi,growatt,3.0,3.0,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+60476,Hiralal Modi,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+59824,Prapti Shah,growatt,3.3,3.3,0.0,0.0,,,India,Asia/Kolkata,,rooftop,,,0.0,0,Growatt,,string,1,0.0,180.0,14.0,INR
+SG-001,1.Sungrow_Pune_3kW,isolarcloud,3.0,3.0,18.5204,73.8567,Pune,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-002,2.Sungrow_Mumbai_3kW,isolarcloud,3.0,3.0,19.076,72.8777,Mumbai,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-003,3.Sungrow_Thane_3kW,isolarcloud,3.0,3.0,19.2183,72.9781,Thane,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-004,4.Sungrow_Nashik_3kW,isolarcloud,3.0,3.0,19.9975,73.7898,Nashik,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-005,5.Sungrow_Nagpur_3kW,isolarcloud,3.0,3.0,21.1458,79.0882,Nagpur,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-006,6.Sungrow_Aurangabad_3kW,isolarcloud,3.0,3.0,19.8762,75.3433,Aurangabad,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-007,7.Sungrow_Kolhapur_3kW,isolarcloud,3.0,3.0,16.705,74.2433,Kolhapur,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-008,8.Sungrow_Solapur_3kW,isolarcloud,3.0,3.0,17.6599,75.9064,Solapur,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-009,9.Sungrow_Navi Mumbai_3kW,isolarcloud,3.0,3.0,19.033,73.0297,Navi Mumbai,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-010,10.Sungrow_Jalgaon_3kW,isolarcloud,3.0,3.0,21.0077,75.5626,Jalgaon,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG3.0RS,string,1,18.0,180.0,14.0,INR
+SG-011,11.Sungrow_Satara_5kW,isolarcloud,5.0,5.0,17.6805,73.9997,Satara,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-012,12.Sungrow_Amravati_5kW,isolarcloud,5.0,5.0,20.9374,77.7796,Amravati,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-013,13.Sungrow_Ahmednagar_5kW,isolarcloud,5.0,5.0,19.0948,74.748,Ahmednagar,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-014,14.Sungrow_Sangli_5kW,isolarcloud,5.0,5.0,16.8524,74.5815,Sangli,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-015,15.Sungrow_Pune_5kW,isolarcloud,5.0,5.0,18.5204,73.8567,Pune,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-016,16.Sungrow_Mumbai_5kW,isolarcloud,5.0,5.0,19.076,72.8777,Mumbai,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-017,17.Sungrow_Thane_5kW,isolarcloud,5.0,5.0,19.2183,72.9781,Thane,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-018,18.Sungrow_Nashik_5kW,isolarcloud,5.0,5.0,19.9975,73.7898,Nashik,Maharashtra,India,Asia/Kolkata,2023-03-15,residential,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG5.0RS,string,1,18.0,180.0,14.0,INR
+SG-019,19.Sungrow_Nagpur_6kW,isolarcloud,6.0,6.0,21.1458,79.0882,Nagpur,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-020,20.Sungrow_Aurangabad_6kW,isolarcloud,6.0,6.0,19.8762,75.3433,Aurangabad,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-021,21.Sungrow_Kolhapur_6kW,isolarcloud,6.0,6.0,16.705,74.2433,Kolhapur,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-022,22.Sungrow_Solapur_6kW,isolarcloud,6.0,6.0,17.6599,75.9064,Solapur,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-023,23.Sungrow_Navi Mumbai_6kW,isolarcloud,6.0,6.0,19.033,73.0297,Navi Mumbai,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-024,24.Sungrow_Jalgaon_10kW,isolarcloud,10.0,10.0,21.0077,75.5626,Jalgaon,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG10RT,string,1,18.0,180.0,14.0,INR
+SG-025,25.Sungrow_Satara_10kW,isolarcloud,10.0,10.0,17.6805,73.9997,Satara,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG10RT,string,1,18.0,180.0,14.0,INR
+SG-026,26.Sungrow_Amravati_10kW,isolarcloud,10.0,10.0,20.9374,77.7796,Amravati,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG10RT,string,1,18.0,180.0,14.0,INR
+SG-027,27.Sungrow_Ahmednagar_6.5kW,isolarcloud,6.5,6.5,19.0948,74.748,Ahmednagar,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SG-028,28.Sungrow_Sangli_6.5kW,isolarcloud,6.5,6.5,16.8524,74.5815,Sangli,Maharashtra,India,Asia/Kolkata,2023-03-15,c&i,Tier-1 Mono PERC,540W,540.0,0,Sungrow,SG6.0RS,string,1,18.0,180.0,14.0,INR
+SL-001,1.BHANPURI_RAIPUR,suryalog,10.0,10.0,21.2514,81.6296,Raipur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-002,2.CHITRA_APPARTMENT,suryalog,21.28,20.0,22.0797,82.1409,Bilaspur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-003,3.CHOUBEY_COLONY_RAIPUR,suryalog,6.48,5.0,21.2514,81.6296,Raipur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-004,4.Dr_Sunilgajare,suryalog,3.0,3.0,19.7515,75.7139,Maharashtra,Maharashtra,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-005,5.Dr_Tilotamagajare,suryalog,3.0,3.0,19.7515,75.7139,Maharashtra,Maharashtra,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-006,6.HARMANDEEP_ANAND_30KW,suryalog,32.0,30.0,21.2514,81.6296,Raipur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-007,7.HIMGIRI_COOLING_TOWER,suryalog,21.0,20.0,20.2763,73.0083,Silvassa,DNH,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-008,8.HIMGIRI_COOLING_TOWER_ATHAL_DNH,suryalog,50.25,50.0,20.2763,73.0083,Athal,DNH,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,2,18.0,180.0,14.0,INR
+SL-009,9.PW_SolarOn,suryalog,10.0,10.0,21.2514,81.6296,Raipur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-010,10.SUPELA_BHILAI,suryalog,12.96,10.0,21.2121,81.3733,Bhilai,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-011,11.TATIBAND_RAIPUR,suryalog,6.48,5.0,21.2514,81.6296,Raipur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
+SL-012,12.TELIPARA_BILASPUR,suryalog,9.18,10.0,22.0797,82.1409,Bilaspur,Chhattisgarh,India,Asia/Kolkata,2023-04-10,c&i,Tier-1 Mono PERC,540W,540.0,0,ABB / FIMER,PVS Series String Inverter,string,1,18.0,180.0,14.0,INR
