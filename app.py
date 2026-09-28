@@ -237,12 +237,13 @@ if __name__ == "__main__":
     print(f"  Open in browser: http://localhost:{settings.app_port} or http://127.0.0.1:{settings.app_port}")
     print("=" * 60 + "\n")
     app_target = "solaron.app:app" if (Path.cwd() / "solaron").exists() else "app:app"
+    enable_reload = os.environ.get("RELOAD", "false").lower() in ("1", "true", "yes")
     uvicorn.run(
         app_target,
         host="127.0.0.1",
         port=settings.app_port,
-        reload=True,
-        reload_dirs=[str(solaron_dir)],
-        reload_excludes=["*.db*", "data/*", "scratch/*", "*.log", "*.pyc", "__pycache__/*", ".git/*"]
+        reload=enable_reload,
+        reload_dirs=[str(solaron_dir)] if enable_reload else None,
+        reload_excludes=["*.db*", "data/*", "scratch/*", "*.log", "*.pyc", "__pycache__/*", ".git/*"] if enable_reload else None
     )
 
