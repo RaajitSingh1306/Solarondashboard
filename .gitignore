@@ -30,6 +30,9 @@ playwright/.auth/
 *.log
 exports/
 
+# Data files
+data/raw/
+
 # IDE files
 .vscode/
 .idea/
