@@ -1,7 +1,7 @@
 # Solaron — Solar Operations, Telemetry & CRM Intelligence Platform
 
 > **Version**: 2.1.0 · **Python**: 3.10+ · **Framework**: FastAPI + NiceGUI · **Portals**: Growatt, iSolarCloud, SuryaLog  
-> **Fleet**: 490 Aggregated Installations · **Active Generating Fleet**: 295 Inverters (1.80 MWp) · **Monthly Harvest**: ~121.32 MWh · **Est. Commercial Value**: ₹5,01,410
+> **Fleet**: 490 Aggregated Installations · **Active Operational Fleet**: 295 Inverters (1.81 MWp) · **Monthly Harvest**: ~103.14 MWh · **Est. Commercial Value**: ₹14,43,960
 
 > [!IMPORTANT]
 > **Master Data & Analytics Specification**: For the complete empirical fleet baseline (490 plants), solar physics derivations ($GHI, Y_f, Y_d, PR, CUF$), scikit-learn Isolation Forest ML equations, and 7-issue engineering audit, consult:
@@ -24,8 +24,10 @@
    - 7.4 [Performance Ratio (PR %) with NASA POWER GHI](#74-performance-ratio-pr--with-nasa-power-ghi)
    - 7.5 [Expected Baseline Generation Model](#75-expected-baseline-generation-model)
    - 7.6 [6-Part Loss Attribution Waterfall & Conservation Law](#76-6-part-loss-attribution-waterfall--conservation-law)
-   - 7.8 [Performance Tier Classification Matrix (Absolute PR-Based Engine)](#78-performance-tier-classification-matrix-absolute-pr-based-engine)
-   - 7.9 [Machine Learning Anomaly Detection Engine (Isolation Forest)](#79-machine-learning-anomaly-detection-engine-isolation-forest)
+   - 7.7 [Environmental ($CO_2$) & Commercial Financial Equations](#77-environmental-co_2--commercial-financial-equations)
+   - 7.8 [Peer-Group Percentiles across Capacity Brackets](#78-peer-group-percentiles-across-capacity-brackets)
+   - 7.9 [Performance Tier Classification Matrix (Absolute PR-Based Engine)](#79-performance-tier-classification-matrix-absolute-pr-based-engine)
+   - 7.10 [Machine Learning Anomaly Detection Engine (Isolation Forest)](#710-machine-learning-anomaly-detection-engine-isolation-forest)
 8. [Telemetry Sanitization & Anti-Cracked-Data Rules](#8-telemetry-sanitization--anti-cracked-data-rules)
    - 8.1 [Inverter Heatsink Operating Temperature Model](#81-inverter-heatsink-operating-temperature-model)
    - 8.2 [CEC 97.5% Inverter Efficiency Standard](#82-cec-975-inverter-efficiency-standard)
@@ -56,11 +58,12 @@
 | **Total Aggregated Installations** | **490** | Master fleet directory spanning all three monitoring portals |
 | **Active Operational Fleet** | **295** | Inverters actively connected and operational (`operational_status != 'decommissioned'`) |
 | **Decommissioned / Inactive** | **195** | Permanently retired installations (listed in directory, excluded from analytics) |
-| **Active Nominal Capacity** | **1.80 MWp** | Cumulative nominal DC capacity of the 295 active installations |
+| **Active Nominal Capacity** | **1.81 MWp** | Cumulative nominal DC capacity of the 295 active installations (1,807.63 kWp) |
 | **Active Generating Plants** | **276 / 295** | Active systems producing positive harvest ($E > 1.0\text{ kWh}$) |
 | **Fault / Zero Generation** | **19 / 295** | Active installations producing zero harvest (equipment trip, breaker open, grid loss) |
-| **Monthly Fleet Energy Harvest** | **121.32 MWh** | Realized active fleet energy yield for September 2026 |
-| **Est. Direct Commercial Value** | **₹5,01,410** | Direct energy cost savings at commercial tariff (₹14.0/kWh benchmark) |
+| **Monthly Fleet Energy Harvest** | **103.14 MWh** | Realized active fleet energy yield for September 2026 |
+| **Est. Direct Commercial Value** | **₹14,43,960** | Direct energy cost savings at commercial tariff (₹14.0/kWh benchmark) |
+| **Statistical ML Anomalies** | **8 sites** | Unsupervised Isolation Forest flagged underperforming anomalies |
 | **Monitored Inverters** | **490 inverters** | Full telemetry coverage with operating heatsink temperature and DC input |
 
 ---
@@ -332,50 +335,86 @@ $$E_{\text{expected}} = \begin{cases} P_{\text{nominal}} \ (\text{kWp}) \times \
 > **Important**: Decommissioned plants evaluate strictly to $0.0\text{ kWh}$ expected baseline so their permanent retirement does not inject false shortfalls into the fleet waterfall.
 
 ### 7.6 6-Part Loss Attribution Waterfall & Conservation Law
-When an active installation generates less energy than its physical baseline, the Net Energy Shortfall is decomposed into six root causes:
+When an active installation generates less energy than its physical baseline, the Net Energy Shortfall is decomposed into six verifiable root causes in [`ml_analytics.py:calculate_adaptive_losses`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L165-L242):
 
-$$\text{Shortfall} = \max(0, E_{\text{expected}} - E_{\text{actual}})$$
+$$\text{Shortfall} \ (S) = \max(0.0, E_{\text{expected}} - E_{\text{actual}})$$
 
 ```
-Expected Physical Baseline (194.5 MWh)
+Expected Physical Baseline (195.2 MWh)
   │
-  ├── [–] Communication & Datalogger Loss (31.2 MWh)
-  ├── [–] Inverter Fault & Tripping Loss (0.0 MWh)
-  ├── [–] Weather & Irradiance Deficit (14.3 MWh)
-  ├── [–] Soiling & Dust Accumulation (7.1 MWh)
-  ├── [–] Shading & Parapet Obstruction (4.5 MWh)
-  └── [–] Balance of System / Clipping Residual (38.2 MWh)
+  ├── [–] Communication & Datalogger Loss (11.1 MWh)
+  ├── [–] Inverter Fault & Tripping Loss (0.01 MWh / 9.2 kWh)
+  ├── [–] Weather & Irradiance Deficit (9.0 MWh)
+  ├── [–] Seasonal Soiling & Dust Accumulation (3.6 MWh)
+  ├── [–] Shading & Obstruction Loss (3.6 MWh)
+  └── [–] Balance of System (BOS) / Residual Loss (67.4 MWh)
   │
   ▼
-Actual Realized Fleet Harvest (121.3 MWh)
+Actual Realized Fleet Harvest (103.1 MWh)
 ```
 
-#### Attribution Formulas
+#### Adaptive Attribution Formulations
 
-1. **Communication & Zero-Gen Loss**: Energy lost when an active system produces 0 kWh due to datalogger dropouts, SIM card deactivation, or grid disconnection:
-   $$\text{Loss}_{\text{comm}} = \text{Shortfall} \times \min\left(0.40, \frac{N_{\text{zero\_days}}}{N_{\text{total\_days}}} \times 0.70\right)$$
+1. **Communication & Datalogger Loss ($L_{\text{comm}}$)**:
+   Energy lost when an active system logs zero energy or offline status due to datalogger dropouts, SIM card deactivations, or grid loss:
+   $$L_{\text{comm}} = S \times \min\left(0.60, \frac{N_{\text{zero\_days}}}{D_{\text{days}}} \times 0.85\right)$$
 
-2. **Inverter Shutdown / Fault Loss**: Energy lost due to inverter error codes, ground faults, or overvoltage trips:
-   $$\text{Loss}_{\text{fault}} = \text{Shortfall} \times \min\left(0.35, \frac{N_{\text{fault\_days}}}{N_{\text{total\_days}}} \times 0.80\right)$$
+2. **Inverter Shutdown / Fault Loss ($L_{\text{fault}}$)**:
+   Energy lost due to recorded inverter hardware error codes, ground faults, or overvoltage trips:
+   $$L_{\text{fault}} = S \times \min\left(0.40, \frac{N_{\text{fault\_days}}}{D_{\text{days}}} \times 0.90\right)$$
 
-3. **Weather / Irradiance Deficit**: Cloud cover and monsoon rain suppression below standard clear-sky irradiance:
-   $$\text{Loss}_{\text{weather}} = \text{Shortfall} \times 0.15$$
+3. **Weather / Irradiance Deficit ($L_{\text{weather}}$)**:
+   Accounts for solar irradiance suppression caused by monsoon cloud cover below the clear-sky baseline ($GHI_{\text{clear\_sky}} \approx \max(5.5, GHI_{\text{clim}})$):
+   $$\text{Deficit Factor} = \max\left(0.0, \frac{GHI_{\text{clear\_sky}} - GHI}{GHI_{\text{clear\_sky}}}\right)$$
+   $$\text{Weather Ratio} = \min(0.45, \max(0.08, \text{Deficit Factor} \times 0.75))$$
+   $$L_{\text{weather}} = S \times \text{Weather Ratio}$$
 
-4. **Soiling Loss**: Particulate dust, pollution, and bird dropping accumulation:
-   $$\text{Loss}_{\text{soiling}} = \min(\text{Shortfall} \times 0.15, E_{\text{expected}} \times 0.04)$$
+4. **Seasonal Soiling Loss ($L_{\text{soiling}}$)**:
+   Scaled dynamically across India's seasonal dust deposition and monsoon self-cleaning calendar:
+   $$L_{\text{soiling}} = \min(S \times 0.20, E_{\text{expected}} \times \text{SEASONAL\_SOILING\_MAP}[m])$$
 
-5. **Shading Loss**: Obstructions from adjacent buildings, parapets, and seasonal sun angles:
-   $$\text{Loss}_{\text{shading}} = \min(\text{Shortfall} \times 0.10, E_{\text{expected}} \times 0.025)$$
+   ```python
+   SEASONAL_SOILING_MAP = {
+       "01": 0.05, "02": 0.05, "03": 0.06,  # Dry winter, rising ambient dust
+       "04": 0.06, "05": 0.06, "06": 0.03,  # Summer dust storms -> Early monsoon showers
+       "07": 0.02, "08": 0.02, "09": 0.02,  # Heavy monsoon natural washing window
+       "10": 0.03, "11": 0.04, "12": 0.04,  # Post-monsoon drying & winter dust accumulation
+   }
+   ```
 
-6. **Balance of System (BOS) / Clipping Residual**: Thermal derating, AC/DC cable impedance, and inverter power saturation:
-   $$\text{Loss}_{\text{BOS}} = \max\left(0, \text{Shortfall} - \sum \text{Classified Losses}\right)$$
+5. **Shading & Obstruction Loss ($L_{\text{shading}}$)**:
+   Loss from parapet walls, neighboring buildings, trees, and winter sun horizon angles:
+   $$L_{\text{shading}} = \min(S \times 0.10, E_{\text{expected}} \times 0.02)$$
 
-#### Conservation of Energy Law
-The analytics engine strictly guarantees that all loss components sum exactly to the net shortfall:
-$$\text{Loss}_{\text{comm}} + \text{Loss}_{\text{fault}} + \text{Loss}_{\text{weather}} + \text{Loss}_{\text{soiling}} + \text{Loss}_{\text{shading}} + \text{Loss}_{\text{BOS}} \equiv \text{Shortfall}$$
+6. **Balance of System (BOS) / Residual Loss ($L_{\text{unknown}}$)**:
+   Covers cable resistance, inverter thermal derating, clipping, and sub-optimal string matching.
 
-### 7.7 Peer-Group Percentiles across Capacity Brackets
-To prevent unfair comparisons (e.g. ranking a 3 kWp residential rooftop against a 194 kWp factory with high tilt angles), active producing plants are partitioned into capacity brackets:
+#### Mathematical Conservation of Energy Law & Reconciler
+The physics engine strictly guarantees that decomposed losses equal the exact energy shortfall. If the sum of classified losses exceeds the net shortfall, all components are proportionally scaled down:
+
+$$\text{Classified} = \sum_{i=1}^5 L_i$$
+$$\text{If } \text{Classified} > S: \quad \text{Scale} = \frac{S}{\text{Classified}}, \quad L_{1..5} = L_{1..5} \times \text{Scale}, \quad L_{\text{unknown}} = 0.0$$
+$$\text{Else}: \quad L_{\text{unknown}} = S - \text{Classified}$$
+$$\sum_{i=1}^6 L_i \equiv S \quad \forall \text{ installations and reporting periods}$$
+
+---
+
+### 7.7 Environmental ($CO_2$) & Commercial Financial Equations
+
+#### Carbon Emission Reductions ($CO_2$)
+Computed using the Central Electricity Authority (CEA) of India standardized baseline emission factor for grid electricity:
+$$CO_2 \ [\text{kg}] = E_{\text{actual}} \ [\text{kWh}] \times 0.82\text{ kg CO}_2/\text{kWh}$$
+
+#### Commercial Tariff Financial Savings
+Calculated based on state commercial electricity tariffs offset by solar self-consumption:
+$$\text{Financial Savings} \ [₹] = E_{\text{actual}} \ [\text{kWh}] \times \text{Tariff} \ [₹/\text{kWh}]$$
+- Default commercial rooftop tariff: **₹14.0/kWh**.
+- Default general tariff in [`analytics.py:revenue()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L95): **₹5.5/kWh**.
+
+---
+
+### 7.8 Peer-Group Percentiles across Capacity Brackets
+To prevent unfair comparisons (e.g. ranking a 3.3 kWp residential rooftop against a 194.4 kWp industrial facility), active producing plants are partitioned into capacity brackets in [`data_quality.py:get_capacity_bracket`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L137-L157):
 
 | Bracket | Installed Capacity Range | Typical Customer Class |
 |---|---|---|
@@ -385,29 +424,62 @@ To prevent unfair comparisons (e.g. ranking a 3 kWp residential rooftop against 
 | **`10–50 kWp`** | $10.5 < P_{\text{nominal}} \le 50.0\text{ kWp}$ | Commercial Rooftop / Petrol Pumps |
 | **`50+ kWp`** | $P_{\text{nominal}} > 50.0\text{ kWp}$ | Industrial Factories & Utility Sites |
 
-Within each capacity bracket, plants are ranked by Specific Yield ($Y_f$) to compute their peer percentile ($0.0\text{ to }100.0$).
+Within active producing installations, plants are ranked by Specific Yield ($Y_f$) using pandas `rank(pct=True) * 100.0` to calculate their empirical peer percentile ($0.0\text{ to }100.0$).
 
-### 7.8 Performance Tier Classification Matrix (Absolute PR-Based Engine)
-Solaron features an absolute, physics-grounded Performance Ratio classification matrix implemented in [`ml_analytics.py:pr_to_tier`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py) that evaluates equipment health against real solar irradiance rather than masking underperformance behind peer group rankings:
+---
 
-| Performance Tier | Absolute PR Threshold | Operational Description & O&M Action |
-|---|---|---|
-| 🌟 **Best** | $\text{PR} \ge 75\%$ | Top performers, optimal yield matching industry benchmarks |
-| 🟢 **Good** | $60\% \le \text{PR} < 75\%$ | Healthy operation, normal seasonal yield |
-| 🟡 **Could Be Better** | $45\% \le \text{PR} < 60\%$ | Moderate generation; panel cleaning / soiling inspection recommended |
-| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | Significant yield loss; dispatch technician to inspect strings and datalogger |
-| 🔴 **Critical** | $\text{PR} < 30\%$ | Severe underperformance; urgent inverter/wiring inspection |
-| ⚪ **Offline / Fault** | Active system with $E \le 1.0\text{ kWh}$ | Equipment tripped, breaker open, or datalogger disconnected |
-| 🟣 **Decommissioned** | Permanently retired installations | Excluded from fleet rankings and baseline calculations |
+### 7.9 Performance Tier Classification Matrix (Absolute PR-Based Engine)
+Solaron features an absolute, physics-grounded Performance Ratio classification matrix implemented in [`ml_analytics.py:pr_to_tier`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L41-L68) that evaluates equipment health against real solar irradiance rather than masking underperformance behind peer group rankings:
 
-### 7.9 Machine Learning Anomaly Detection Engine (Isolation Forest)
-To distinguish between ordinary seasonal variance and genuine hardware/electrical faults, Solaron deploys an unsupervised scikit-learn `IsolationForest` pipeline (`contamination=0.10`) inside [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py):
+| Performance Tier | Absolute PR Threshold | Sep 2026 Count | Operational Description & O&M Action |
+|---|:---:|:---:|---|
+| ⭐ **Best** | $\text{PR} \ge 75\%$ | **13** | Top performers, optimal yield matching clear-sky benchmarks |
+| ✅ **Good** | $60\% \le \text{PR} < 75\%$ | **12** | Healthy commercial operation, normal seasonal yield |
+| ⚠️ **Could Be Better** | $45\% \le \text{PR} < 60\%$ | **53** | Moderate generation; panel cleaning / soiling inspection recommended |
+| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | **131** | Significant yield loss; dispatch technician to inspect strings and datalogger |
+| 🔴 **Critical** | $\text{PR} < 30\%$ | **67** | Severe underperformance; urgent inverter, fuse, and string inspection |
+| ⚪ **Offline** | Active with $E \le 1.0\text{ kWh}$ | **19** | Equipment tripped, breaker open, or datalogger disconnected |
+| 🟣 **Decommissioned** | Retired sites | **195** | Permanently decommissioned; excluded from fleet rankings |
 
-- **Multidimensional Feature Space**:
-  $$\vec{x} = \begin{bmatrix} Y_d & \frac{\text{PR}}{\text{PR}_{\text{median}}} & P_{\text{nominal}} & \frac{\text{GHI} - \mu_{\text{GHI}}}{\mu_{\text{GHI}}} & \sin\left(\frac{2\pi m}{12}\right) & \cos\left(\frac{2\pi m}{12}\right) & \frac{N_{\text{zero}}}{N_{\text{total}}} \end{bmatrix}^T$$
-- **Telemetry Anomaly Score**: Outputs `anomaly_score` (`-1` = outlier, `1` = inlier) and `anomaly_flag` (asserted when $z < -1.8$).
-- **Database Persistence**: Stored directly in `monthly_generation(anomaly_score, anomaly_flag)` via SQLite schema migrations.
-- **Visual Alerting**: Surfaces high-priority `⚡ Anomaly` badges on Fleet cards and detailed warning callouts in the Plant Cockpit.
+---
+
+### 7.10 Machine Learning Anomaly Detection Engine (Isolation Forest)
+To distinguish between ordinary seasonal variance and genuine hardware/electrical faults, Solaron deploys an unsupervised scikit-learn `IsolationForest` pipeline inside [`ml_analytics.py:train_and_detect_anomalies`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L81-L163):
+
+#### Hyperparameter Configuration
+```python
+IsolationForest(
+    n_estimators=100,      # Ensemble of 100 random decision isolation trees
+    contamination=0.08,    # Fleet operational fault prior rate (8%)
+    random_state=42,       # Deterministic reproducible training seed
+    n_jobs=-1              # Multi-core parallel execution across all CPU cores
+)
+```
+
+#### Multidimensional Feature Space ($X \in \mathbb{R}^{N \times 5}$)
+For every active producing installation ($E > 1.0\text{ kWh}$), a 5-dimensional feature vector is synthesized:
+
+$$\vec{x} = \begin{bmatrix} 
+x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 
+\end{bmatrix} = \begin{bmatrix} 
+Y_d & \text{(Daily Specific Yield: units/kWp/day)} \\
+PR & \text{(Performance Ratio percentage: \%)} \\
+P_{\text{nominal}} & \text{(Installed capacity in kWp)} \\
+\sin\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic month sine encoding)} \\
+\cos\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic month cosine encoding)}
+\end{bmatrix}$$
+
+- Missing attributes are robustly imputed using feature column medians.
+
+#### Dual-Gate Underperformance Anomaly Identification
+To prevent high-performing outliers or peak summer generation from being mistakenly flagged as defects, Solaron enforces a strict dual-criterion gate:
+
+$$\text{Anomaly Flag} = 1 \iff (\text{Isolation Prediction} = -1) \land (Y_d < \text{Median}_m(Y_d))$$
+
+1. **Isolation Forest Tree Prediction**: Identifies geometric outliers in the 5D feature space (`raw_pred == -1`).
+2. **Peer Median Yield Gating**: Confirms the installation's daily yield is strictly below the monthly peer group median ($Y_d < \widetilde{Y}_{d, m}$).
+3. **Database Persistence**: Persisted directly to `monthly_generation(anomaly_score, anomaly_flag)` in SQLite.
+4. **Fallback Safety Rule**: If dataset size $N < 10$ or scikit-learn training encounters an exception, rule-based safety flags systems where $PR < 25.0\%$ and $Y_d < 1.0\text{ units/kWp/day}$.
 
 ---
 

@@ -5,15 +5,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.0,
-    "today_energy_kwh": 12.3,
-    "month_energy_kwh": 383.1,
+    "current_power_kw": 2.83,
+    "today_energy_kwh": 7.3,
+    "month_energy_kwh": 417.8,
     "address": "OFFICE, Brahmavrind Housing Society, Ingawale Nagar, Pimple Nilakh, Pune, Pimpri-Chinchwad, Maharashtra 411027, India",
     "city": "Pune",
-    "status": "Offline",
+    "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-002",
@@ -29,7 +29,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-003",
@@ -37,15 +37,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.153,
-    "today_energy_kwh": 4.8,
-    "month_energy_kwh": 115.0,
+    "current_power_kw": 2.46,
+    "today_energy_kwh": 1.9,
+    "month_energy_kwh": 120.3,
     "address": "80, Jaripatka, Nagpur, Maharashtra 440014, India",
     "city": "Nagpur",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-004",
@@ -53,15 +53,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.176,
-    "today_energy_kwh": 9.5,
-    "month_energy_kwh": 279.3,
+    "current_power_kw": 2.52,
+    "today_energy_kwh": 6.0,
+    "month_energy_kwh": 302.6,
     "address": ", Kohali, Maharashtra 441502, India",
     "city": "Pune",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-005",
@@ -77,7 +77,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-006",
@@ -85,15 +85,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.133,
-    "today_energy_kwh": 2.2,
-    "month_energy_kwh": 72.8,
+    "current_power_kw": 0.0,
+    "today_energy_kwh": 0.1,
+    "month_energy_kwh": 76.1,
     "address": ", Masala, Maharashtra 440029, India",
     "city": "Pune",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-007",
@@ -101,15 +101,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.11,
-    "today_energy_kwh": 7.4,
-    "month_energy_kwh": 238.0,
+    "current_power_kw": 2.61,
+    "today_energy_kwh": 6.6,
+    "month_energy_kwh": 257.5,
     "address": "3473/A/22, Ekatmata Nagar, Hingna, Digdoh, Maharashtra 440036, India",
     "city": "Pune",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-008",
@@ -125,7 +125,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-009",
@@ -141,7 +141,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-010",
@@ -157,7 +157,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-011",
@@ -173,7 +173,7 @@
     "status": "Offline",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-012",
@@ -181,15 +181,15 @@
     "capacity_kwp": 5.0,
     "installed_power": 5.0,
     "ac_capacity_kw": 5.0,
-    "current_power_kw": 0.364,
-    "today_energy_kwh": 21.4,
-    "month_energy_kwh": 433.6,
+    "current_power_kw": 3.3,
+    "today_energy_kwh": 6.5,
+    "month_energy_kwh": 463.3,
     "address": "Bhukum, Maharashtra, India",
     "city": "Bhukum",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-013",
@@ -197,15 +197,15 @@
     "capacity_kwp": 15.0,
     "installed_power": 15.0,
     "ac_capacity_kw": 15.0,
-    "current_power_kw": 0.787,
-    "today_energy_kwh": 42.0,
-    "month_energy_kwh": 1270.0,
+    "current_power_kw": 7.23,
+    "today_energy_kwh": 28.6,
+    "month_energy_kwh": 1380.0,
     "address": ", Fulchur, Maharashtra 441601, India",
     "city": "Fulchur",
     "status": "Offline",
     "plant_type": "C&I PV",
     "inverter_model": "SG15RT",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-014",
@@ -221,7 +221,7 @@
     "status": "Commissioning unfinished",
     "plant_type": "Residential PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-015",
@@ -229,15 +229,15 @@
     "capacity_kwp": 5.0,
     "installed_power": 5.0,
     "ac_capacity_kw": 5.0,
-    "current_power_kw": 0.235,
-    "today_energy_kwh": 10.6,
-    "month_energy_kwh": 145.5,
+    "current_power_kw": 0.0,
+    "today_energy_kwh": 3.5,
+    "month_energy_kwh": 159.7,
     "address": "D/26, Mahalaxmi Nagar, Ambika Nagar, Ayodhya nagar, Nagpur, Maharashtra 440034, India",
     "city": "Nagpur",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-016",
@@ -245,15 +245,15 @@
     "capacity_kwp": 5.0,
     "installed_power": 5.0,
     "ac_capacity_kw": 5.0,
-    "current_power_kw": 0.802,
-    "today_energy_kwh": 16.2,
-    "month_energy_kwh": 310.0,
+    "current_power_kw": 1.2,
+    "today_energy_kwh": 6.7,
+    "month_energy_kwh": 339.1,
     "address": "Bhima Shankar Nagar Road, Vikas Nagar-Singhagad Colony, Kiwale, Pimpri-Chinchwad 412101, India",
     "city": "Pimpri-Chinchwad",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-017",
@@ -269,7 +269,7 @@
     "status": "Commissioning unfinished",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-018",
@@ -277,15 +277,15 @@
     "capacity_kwp": 4.0,
     "installed_power": 4.0,
     "ac_capacity_kw": 4.0,
-    "current_power_kw": 0.0,
-    "today_energy_kwh": 0.0,
-    "month_energy_kwh": 245.2,
+    "current_power_kw": 3.24,
+    "today_energy_kwh": 7.6,
+    "month_energy_kwh": 256.1,
     "address": "179/147, Pratham Reflections Society, Wakad, Pimpri Chinchwad, Pimpri-Chinchwad, Maharashtra 411057, India",
     "city": "Pimpri-Chinchwad",
-    "status": "Offline",
+    "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG4RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-019",
@@ -293,15 +293,15 @@
     "capacity_kwp": 4.0,
     "installed_power": 4.0,
     "ac_capacity_kw": 4.0,
-    "current_power_kw": 0.0,
-    "today_energy_kwh": 0.0,
-    "month_energy_kwh": 245.5,
+    "current_power_kw": 3.12,
+    "today_energy_kwh": 7.1,
+    "month_energy_kwh": 254.3,
     "address": "179/138, Pratham Reflections Society, Wakad, Pimpri Chinchwad, Pimpri-Chinchwad, Maharashtra 411057, India",
     "city": "Pimpri-Chinchwad",
-    "status": "Offline",
+    "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG4RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-020",
@@ -309,15 +309,15 @@
     "capacity_kwp": 3.0,
     "installed_power": 3.0,
     "ac_capacity_kw": 3.0,
-    "current_power_kw": 0.39,
-    "today_energy_kwh": 16.4,
-    "month_energy_kwh": 351.6,
+    "current_power_kw": 2.77,
+    "today_energy_kwh": 6.9,
+    "month_energy_kwh": 380.1,
     "address": "64, New DP Rd, Freedom Park Society, Vishal Nagar, Pimple Nilakh, Pimpri-Chinchwad, Maharashtra 411027, India",
     "city": "Pimpri-Chinchwad",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-021",
@@ -333,7 +333,7 @@
     "status": "Commissioning unfinished",
     "plant_type": "C&I PV",
     "inverter_model": "SG9RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-022",
@@ -349,7 +349,7 @@
     "status": "Commissioning unfinished",
     "plant_type": "C&I PV",
     "inverter_model": "SG6.84RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-023",
@@ -365,7 +365,7 @@
     "status": "Offline",
     "plant_type": "C&I PV",
     "inverter_model": "SG15RT",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-024",
@@ -381,7 +381,7 @@
     "status": "Offline",
     "plant_type": "C&I PV",
     "inverter_model": "SG15RT",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-025",
@@ -397,7 +397,7 @@
     "status": "Offline",
     "plant_type": "C&I PV",
     "inverter_model": "SG5RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-026",
@@ -405,15 +405,15 @@
     "capacity_kwp": 4.3,
     "installed_power": 4.3,
     "ac_capacity_kw": 4.3,
-    "current_power_kw": 0.326,
-    "today_energy_kwh": 11.4,
-    "month_energy_kwh": 215.2,
+    "current_power_kw": 1.94,
+    "today_energy_kwh": 2.2,
+    "month_energy_kwh": 231.0,
     "address": "195/3/132, Pandav Nagar Colony Rd No 3, Chakrapani Vasti, Bhosari, Pimpri Chinchwad, Pimpri-Chinchwad, Maharashtra 411039, India",
     "city": "Pimpri-Chinchwad",
     "status": "Normal",
     "plant_type": "Residential PV",
     "inverter_model": "SG4.3RS",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-027",
@@ -421,30 +421,30 @@
     "capacity_kwp": 10.0,
     "installed_power": 10.0,
     "ac_capacity_kw": 10.0,
-    "current_power_kw": 0.51,
-    "today_energy_kwh": 27.0,
-    "month_energy_kwh": 712.8,
+    "current_power_kw": 5.1,
+    "today_energy_kwh": 17.0,
+    "month_energy_kwh": 766.8,
     "address": ", Kurkheda - Wadsa - Bramhapuri - Nagpur Hwy, Bhandarkar Layout, Umred, Maharashtra 441203, India",
     "city": "Nagpur",
     "status": "Normal",
     "plant_type": "C&I PV",
     "inverter_model": "SG15RT",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "last_log_time": "28/Sep/2026 11:17:11"
   },
   {
     "plant_id": "SG-028",
     "plant_name": "Ginni Bhatia",
-    "capacity_kwp": 10.0,
-    "installed_power": 10.0,
-    "ac_capacity_kw": 10.0,
-    "current_power_kw": 0.0,
+    "capacity_kwp": 3.0,
+    "installed_power": 3.0,
+    "ac_capacity_kw": 3.0,
+    "current_power_kw": 10.0,
     "today_energy_kwh": 0.0,
-    "month_energy_kwh": 757.9,
+    "month_energy_kwh": 18.2,
     "address": "Shastri Ward",
     "city": "Pune",
-    "status": "Offline",
-    "plant_type": "Residential PV",
-    "inverter_model": "SG15RT",
-    "last_log_time": "26/Sep/2026 17:25:02"
+    "status": "Fault",
+    "plant_type": "(1)",
+    "inverter_model": "SG3RS",
+    "last_log_time": "28/Sep/2026 11:17:11"
   }
 ]

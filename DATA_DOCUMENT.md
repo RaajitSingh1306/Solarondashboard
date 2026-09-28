@@ -45,12 +45,12 @@ The platform aggregates real-time inverter telemetry, daily generation profiles,
 | Fleet Cohort | Installations | Capacity (kWp) | Operational Status & Scope Criteria |
 |:---|:---:|:---:|:---|
 | **Total Monitored Fleet** | **490** | **2,410.2 kWp** | Complete portfolio directory across all 3 monitoring platforms |
-| **Active Operational Fleet** | **295** | **1,802.4 kWp** | Commissioned sites actively monitored (`operational_status = 'active'`) |
-| **Decommissioned / Inactive** | **195** | **607.8 kWp** | Permanently retired or offline sites (`operational_status = 'decommissioned'`) |
-| **Active Generating (Current Month)** | **276 / 295** | **1,748.2 kWp** | Operational systems producing positive harvest ($E_{\text{month}} > 1.0\text{ kWh}$) |
+| **Active Operational Fleet** | **295** | **1,807.6 kWp** | Commissioned sites actively monitored (`operational_status = 'active'`) |
+| **Decommissioned / Inactive** | **195** | **602.6 kWp** | Permanently retired or offline sites (`operational_status = 'decommissioned'`) |
+| **Active Generating (Current Month)** | **276 / 295** | **1,753.4 kWp** | Operational systems producing positive harvest ($E_{\text{month}} > 1.0\text{ kWh}$) |
 | **Active Offline / Fault (Current Month)**| **19 / 295** | **54.2 kWp** | Operational systems with zero monthly output (tripped breaker, comms loss) |
-| **Generating Today (Live)** | **18 / 295** | **214.5 kWp** | Systems transmitting positive generation on the current day |
-| **Statistical ML Anomalies** | **7 / 295** | **182.3 kWp** | Multi-attribute statistical outliers flagged by the Isolation Forest |
+| **Generating Today (Live)** | **Dynamic** | **—** | Systems transmitting positive generation on the current day (`today_kwh > 0.05`) |
+| **Statistical ML Anomalies** | **8 / 295** | **194.2 kWp** | Multi-attribute statistical outliers flagged by the Isolation Forest |
 
 ---
 
@@ -146,18 +146,18 @@ The platform supports two distinct operational extraction modes:
 | **Jun 2026** | 490 | 244 | 51.1% | 48.2% | 133,790 kWh | ₹18,73,060 |
 | **Jul 2026** | 490 | 244 | 63.0% | 61.5% | 134,505 kWh | ₹18,83,070 |
 | **Aug 2026** | 490 | 287 | 82.1% | 79.4% | 188,622 kWh | ₹26,40,708 |
-| **Sep 2026** | 490 | 276 | **39.6%** | **36.8%** | **102,308 kWh** | **₹14,32,312** |
+| **Sep 2026** | 490 | 276 | **37.2%** | **35.1%** | **103,140 kWh** | **₹14,43,960** |
 
 > [!NOTE]
-> The August spike (82.1% PR, 188.6 MWh) reflects clear post-monsoon skies and peak irradiance across Western and Central India. The September drop to 39.6% reflects localized late-monsoon cloud cover combined with mid-month telemetry arrivals.
+> The August spike (82.1% PR, 188.6 MWh) reflects clear post-monsoon skies and peak irradiance across Western and Central India. The September drop to 37.2% reflects localized late-monsoon cloud cover combined with mid-month telemetry arrivals.
 
 ### 3.2 Active Plant Statistical Distribution (September 2026, 276 Generating Sites)
 
 | Metric | Mean | Median | P10 | P25 | P75 | P90 | Physical Benchmark |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Specific Yield ($Y_f$, kWh/kWp)** | 57.0 | 53.0 | 33.1 | 43.9 | 66.4 | 83.3 | $90.0 - 115.0\text{ kWh/kWp}$ |
-| **Yield / Day ($Y_d$, u/kWp/d)** | 2.19 | 2.04 | 1.27 | 1.69 | 2.55 | 3.20 | $3.50 - 4.50\text{ u/kWp/d}$ |
-| **Performance Ratio ($PR, \%$)** | **39.6%** | **36.8%** | 23.0% | 30.4% | 46.1% | 57.9% | $\ge 75.0\%$ |
+| **Specific Yield ($Y_f$, kWh/kWp)** | 57.4 | 53.6 | 33.1 | 43.9 | 66.8 | 83.5 | $90.0 - 115.0\text{ kWh/kWp}$ |
+| **Yield / Day ($Y_d$, u/kWp/d)** | 2.21 | 2.06 | 1.27 | 1.69 | 2.57 | 3.21 | $3.50 - 4.50\text{ u/kWp/d}$ |
+| **Performance Ratio ($PR, \%$)** | **37.2%** | **35.1%** | 22.4% | 29.8% | 44.5% | 56.8% | $\ge 75.0\%$ |
 
 ---
 
@@ -180,11 +180,13 @@ INDIA_MONTHLY_GHI_DEFAULTS = {
 ### 4.2 Specific Yield ($Y_f$)
 Normalizes actual energy generation by nominal DC capacity:
 $$Y_f = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}]} \quad [\text{kWh/kWp}]$$
-- **Physical Boundary**: Strictly clamped to $0.0 \le Y_f \le 220.0\text{ kWh/kWp/month}$.
+- **Physical Boundary**: Strictly clamped to $0.0 \le Y_f \le 220.0\text{ kWh/kWp/month}$ (monthly) and $\le 8.0\text{ kWh/kWp/day}$ (daily).
+- **Noise Floor Suppression**: Daily generation $< 0.05\text{ kWh}$ or monthly $< 1.0\text{ kWh}$ yields $Y_f = 0.0$.
 
 ### 4.3 Normalized Daily Specific Yield ($Y_d$)
 Normalizes generation by the elapsed calendar days in the measurement window:
 $$Y_d = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}] \times D_{\text{elapsed}}} \quad [\text{units/kWp/day}]$$
+- **Elapsed Day Accounting**: For ongoing months, $D_{\text{elapsed}} = \max(1, \min(\text{today.day}, D_{\text{total}}))$. For completed months, $D_{\text{elapsed}} = D_{\text{total}}$.
 - **Physical Boundary**: Bounded to $0.0 \le Y_d \le 8.0\text{ units/kWp/day}$.
 
 ### 4.4 Performance Ratio ($PR$)
@@ -201,6 +203,16 @@ $$RR = \frac{E_{\text{actual}}}{E_{\text{expected}}} \times 100\%$$
 
 ### 4.7 Capacity Utilisation Factor ($CUF$)
 $$CUF = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}] \times 24 \text{ hours} \times D_{\text{days}}} \times 100\%$$
+
+### 4.8 Environmental Carbon Offsets ($CO_2$)
+Computed using the Central Electricity Authority (CEA) of India standardized baseline grid factor:
+$$CO_2 \ [\text{kg}] = E_{\text{actual}} \ [\text{kWh}] \times 0.82\text{ kg CO}_2/\text{kWh}$$
+
+### 4.9 Commercial Tariff Financial Savings
+Direct electricity bill savings calculated via solar self-consumption:
+$$\text{Financial Savings} \ [₹] = E_{\text{actual}} \ [\text{kWh}] \times \text{Tariff} \ [₹/\text{kWh}]$$
+- Standard commercial rooftop benchmark tariff: **₹14.0/kWh**.
+- Default general tariff in [`analytics.py:revenue()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L95): **₹5.5/kWh**.
 
 ---
 
@@ -220,25 +232,25 @@ $$CUF = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}
 
 ## 6. Machine Learning Anomaly Detection Engine (Isolation Forest)
 
-Implemented in [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py), Solaron deploys an unsupervised scikit-learn `IsolationForest` pipeline (`contamination=0.10`) to distinguish between expected weather drops and genuine electrical/hardware faults.
+Implemented in [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py), Solaron deploys an unsupervised scikit-learn `IsolationForest` pipeline (`contamination=0.08`, `n_estimators=100`, `random_state=42`) to distinguish between expected weather drops and genuine electrical/hardware faults.
 
-### 6.1 Feature Vector Representation ($\vec{x} \in \mathbb{R}^7$)
+### 6.1 Feature Vector Representation ($\vec{x} \in \mathbb{R}^5$)
 
-For every active plant-month record, the feature vector is synthesized as:
+For every active producing installation ($E_{\text{month}} > 1.0\text{ kWh}$), the feature vector is synthesized as:
 
 $$\vec{x} = \begin{bmatrix} 
-x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 \\ x_6 \\ x_7 
+x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 
 \end{bmatrix} = \begin{bmatrix} 
-Y_d & \text{(Daily Specific Yield: kWh/kWp/day)} \\
-\frac{PR}{PR_{\text{fleet\_median}}} & \text{(Context-Adjusted Relative Efficiency)} \\
+Y_d & \text{(Daily Specific Yield: units/kWp/day)} \\
+PR & \text{(Performance Ratio: \%)} \\
 P_{\text{nominal}} & \text{(Installed Capacity in kWp)} \\
-\frac{GHI_{\text{actual}} - GHI_{\text{regional}}}{GHI_{\text{regional}}} & \text{(Satellite Irradiance Anomaly Ratio)} \\
-\sin\left(\frac{2\pi \cdot m}{12}\right) & \text{(Cyclic Month Sine Encoding)} \\
-\cos\left(\frac{2\pi \cdot m}{12}\right) & \text{(Cyclic Month Cosine Encoding)} \\
-\frac{N_{\text{zero\_days}}}{N_{\text{elapsed\_days}}} & \text{(Datalogger & Telemetry Uptime Fraction)}
+\sin\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic Month Sine Seasonality Encoding)} \\
+\cos\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic Month Cosine Seasonality Encoding)}
 \end{bmatrix}$$
 
-### 6.2 Decision Boundary & Scoring Mathematics
+- Missing attributes are imputed using column medians.
+
+### 6.2 Decision Boundary, Scoring & Dual-Gate Filter
 
 The isolation score $s(\vec{x}, n)$ is computed from the average path length $h(\vec{x})$ across $T=100$ isolation trees:
 
@@ -246,8 +258,10 @@ $$s(\vec{x}, n) = 2^{-\frac{\mathbb{E}[h(\vec{x})]}{c(n)}}$$
 
 Where $c(n) = 2\ln(n - 1) + 0.5772156649 - \frac{2(n - 1)}{n}$ is the average path length of an unsuccessful search in a Binary Search Tree of $n$ instances.
 
-* **Inliers (Normal)**: $s \ge 0.0$ (dense cluster of normal operating plants).
-* **Outliers (Anomalies)**: $s < -0.05$ and statistical deviation $Z_{PR} < -1.8$.
+* **Tree Outlier Prediction**: `raw_pred == -1` (lower decision scores indicate geometric anomalies).
+* **Dual-Gate Underperformance Condition**: To prevent over-performing summer plants or high-efficiency arrays from false-positive alerting, anomalies are strictly gated:
+  $$\text{Anomaly Flag} = 1 \iff (\text{raw\_pred} = -1) \land (Y_d < \text{Median}_m(Y_d))$$
+* **Rule-Based Fallback**: If dataset size $N < 10$ or scikit-learn fails: $\text{Anomaly Flag} = 1 \iff (PR < 25.0\% \land Y_d < 1.0)$.
 * **Database Fields**: Persisted to SQLite in `monthly_generation(anomaly_score, anomaly_flag)`.
 
 ### 6.3 Absolute PR Health Tier Matrix (`ml_analytics.py:pr_to_tier`)
@@ -256,12 +270,12 @@ Where $c(n) = 2\ln(n - 1) + 0.5772156649 - \frac{2(n - 1)}{n}$ is the average pa
 ┌──────────────────────┬────────────┬──────────────┬─────────────────────────────────────┐
 │ Performance Tier     │ PR Range   │ Sep 2026 Qty │ Operational Meaning                 │
 ├──────────────────────┼────────────┼──────────────┼─────────────────────────────────────┤
-│ ⭐ Best             │ ≥ 75.0%    │ 8            │ Optimal harvest matching benchmark  │
-│ ✅ Good             │ 60.0–75.0% │ 30           │ Healthy seasonal operation          │
-│ ⚠️ Could Be Better  │ 45.0–60.0% │ 50           │ Moderate loss; panel cleaning due   │
-│ 🟠 Needs Attention  │ 30.0–45.0% │ 100          │ Substantial shortfall; audit arrays │
-│ 🔴 Critical         │ < 30.0%    │ 88           │ Severe failure; immediate dispatch  │
-│ ⚪ Offline / Fault   │ E ≤ 1 kWh  │ 19           │ Equipment tripped or disconnected   │
+│ ⭐ Best             │ ≥ 75.0%    │ 13           │ Optimal harvest matching benchmark  │
+│ ✅ Good             │ 60.0–75.0% │ 12           │ Healthy seasonal operation          │
+│ ⚠️ Could Be Better  │ 45.0–60.0% │ 53           │ Moderate loss; panel cleaning due   │
+│ 🟠 Needs Attention  │ 30.0–45.0% │ 131          │ Substantial shortfall; audit arrays │
+│ 🔴 Critical         │ < 30.0%    │ 67           │ Severe failure; immediate dispatch  │
+│ ⚪ Offline           │ E ≤ 1 kWh  │ 19           │ Equipment tripped or disconnected   │
 │ 🟣 Decommissioned   │ Retired    │ 195          │ Excluded from fleet rankings        │
 └──────────────────────┴────────────┴──────────────┴─────────────────────────────────────┘
 ```
@@ -272,30 +286,36 @@ Where $c(n) = 2\ln(n - 1) + 0.5772156649 - \frac{2(n - 1)}{n}$ is the average pa
 
 When an active installation generates less energy than its physical baseline, the Net Energy Shortfall is decomposed into six verifiable root causes:
 
-$$\text{Shortfall} \ (S) = \max(0, E_{\text{expected}} - E_{\text{actual}})$$
+$$\text{Shortfall} \ (S) = \max(0.0, E_{\text{expected}} - E_{\text{actual}})$$
 
 ```
-Expected Physical Baseline (194.5 MWh)
+Expected Physical Baseline (195.2 MWh)
   │
-  ├── [–] Communication & Datalogger Loss (31.2 MWh)
-  ├── [–] Inverter Fault & Tripping Loss (0.0 MWh)
-  ├── [–] Weather & Irradiance Deficit (14.3 MWh)
-  ├── [–] Seasonal Soiling & Dust Accumulation (7.1 MWh)
-  ├── [–] Shading & System Degradation (4.5 MWh)
-  └── [–] Balance of System (BOS) / Clipping Residual (38.2 MWh)
+  ├── [–] Communication & Datalogger Loss (11.1 MWh)
+  ├── [–] Inverter Fault & Tripping Loss (0.01 MWh / 9.2 kWh)
+  ├── [–] Weather & Irradiance Deficit (9.0 MWh)
+  ├── [–] Seasonal Soiling & Dust Accumulation (3.6 MWh)
+  ├── [–] Shading & Obstruction Loss (3.6 MWh)
+  └── [–] Balance of System (BOS) / Residual Loss (67.4 MWh)
   │
   ▼
-Actual Realized Fleet Harvest (102.3 MWh)
+Actual Realized Fleet Harvest (103.1 MWh)
 ```
 
 ### 7.1 Mathematical Formulations
 
 1. **Communication & Zero-Gen Loss ($L_{\text{comm}}$)**:
-   $$L_{\text{comm}} = S \times \min\left(0.40, \frac{N_{\text{zero\_days}}}{N_{\text{total\_days}}} \times 0.70\right)$$
+   $$L_{\text{comm}} = S \times \min\left(0.60, \frac{N_{\text{zero\_days}}}{D_{\text{days}}} \times 0.85\right)$$
+
 2. **Inverter Shutdown / Fault Loss ($L_{\text{fault}}$)**:
-   $$L_{\text{fault}} = S \times \min\left(0.35, \frac{N_{\text{fault\_days}}}{N_{\text{total\_days}}} \times 0.80\right)$$
+   $$L_{\text{fault}} = S \times \min\left(0.40, \frac{N_{\text{fault\_days}}}{D_{\text{days}}} \times 0.90\right)$$
+
 3. **Weather / Irradiance Deficit ($L_{\text{weather}}$)**:
-   $$L_{\text{weather}} = \min\left(S, E_{\text{expected}} \times \max\left(0, \frac{GHI_{\text{clim}} - GHI_{\text{actual}}}{GHI_{\text{clim}}}\right)\right)$$
+   $$\text{Clear-Sky Ref} = \max(5.5, GHI_{\text{clim}})$$
+   $$\text{Deficit Factor} = \max\left(0.0, \frac{\text{Clear-Sky Ref} - GHI}{\text{Clear-Sky Ref}}\right)$$
+   $$\text{Weather Ratio} = \min(0.45, \max(0.08, \text{Deficit Factor} \times 0.75))$$
+   $$L_{\text{weather}} = S \times \text{Weather Ratio}$$
+
 4. **Seasonal Soiling Loss ($L_{\text{soiling}}$)**:
    $$L_{\text{soiling}} = \min(S \times 0.20, E_{\text{expected}} \times \text{SEASONAL\_SOILING\_MAP}[m])$$
    ```python
@@ -306,10 +326,14 @@ Actual Realized Fleet Harvest (102.3 MWh)
        "10": 0.03, "11": 0.04, "12": 0.04,  # Post-monsoon dust accumulation
    }
    ```
-5. **Shading & Age Degradation ($L_{\text{shading}}$)**:
-   $$L_{\text{shading}} = \min(S \times 0.10, E_{\text{expected}} \times 0.025)$$
-6. **Balance of System (BOS) / Clipping Residual ($L_{\text{BOS}}$)**:
-   $$L_{\text{BOS}} = \max\left(0, S - \sum_{i=1}^5 L_i\right)$$
+
+5. **Shading & Obstruction Loss ($L_{\text{shading}}$)**:
+   $$L_{\text{shading}} = \min(S \times 0.10, E_{\text{expected}} \times 0.02)$$
+
+6. **Balance of System (BOS) / Clipping Residual & Conservation Reconciler ($L_{\text{unknown}}$)**:
+   $$\text{Classified} = \sum_{i=1}^5 L_i$$
+   $$\text{If } \text{Classified} > S: \quad \text{Scale} = \frac{S}{\text{Classified}}, \quad L_{1..5} = L_{1..5} \times \text{Scale}, \quad L_{\text{unknown}} = 0.0$$
+   $$\text{Else}: \quad L_{\text{unknown}} = S - \text{Classified}$$
 
 ### 7.2 Conservation of Energy Law
 The analytics engine strictly guarantees mathematical conservation:

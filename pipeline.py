@@ -457,7 +457,10 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
             cap = pid_to_cap.get(pid, 3.3)
 
             pac_val = float(pac) if pd.notna(pac) else None
-            ppv_val = float(ppv) if pd.notna(ppv) else (round(pac_val / 0.975, 1) if pac_val else None)
+            if pac_val and pac_val > 0:
+                ppv_val = round(pac_val / 0.975, 1)
+            else:
+                ppv_val = float(ppv) if pd.notna(ppv) else (round(pac_val / 0.975, 1) if pac_val else None)
             temp_val = float(temp) if pd.notna(temp) else None
             if temp_val is None or temp_val < 20.0 or temp_val > 75.0:
                 load_ratio = min(1.0, (pac_val or 0.0) / max(100.0, cap * 1000.0))

@@ -326,53 +326,88 @@ class SuryaLogExtractor(BaseExtractor):
             pr = self._get_plant_pr(pid, base_pr=0.78)
             base_daily = cap * ghi * pr
 
-            is_chitra = (raw_id == "SL-002" or "CHITRA" in raw_id.upper() or "CHITRA" in str(p.get("plant_name", "")).upper())
             cached_today_kwh = self.safe_float(p.get("today_energy_kwh"))
             cached_cur_kw = self.safe_float(p.get("current_power_kw"))
             cached_yest_kwh = self.safe_float(p.get("yesterday_energy_kwh"))
             cached_month_kwh = self.safe_float(p.get("month_energy_kwh"))
             status_raw = str(p.get("status", "")).lower()
-            is_offline = "offline" in status_raw and (
+
+            is_offline = (
+                (cached_month_kwh is not None and cached_month_kwh <= 1.0) and
                 (cached_today_kwh is None or cached_today_kwh <= 0.05) and
-                (cached_cur_kw is None or cached_cur_kw <= 0.05) and
-                (cached_yest_kwh is None or cached_yest_kwh <= 0.05) and
-                (cached_month_kwh is None or cached_month_kwh <= 1.0)
-            )
+                (cached_yest_kwh is None or cached_yest_kwh <= 0.05)
+            ) or ("offline" in status_raw and (cached_month_kwh is None or cached_month_kwh <= 1.0))
+
+            if is_offline:
+                for day_int in range(1, target_day + 1):
+                    d_str = f"{year_month}-{day_int:02d}"
+                    results.append({
+                        "plant_id": pid,
+                        "date": d_str,
+                        "kwh": 0.0,
+                        "revenue_inr": 0.0,
+                        "specific_yield": 0.0,
+                        "yield_per_day": 0.0,
+                        "live_power_kw": 0.0,
+                        "status": "offline",
+                        "last_log_time": str(p.get("last_log_time") or "") if day_int == target_day else None,
+                    })
+                continue
+
+            # Plant is active. Reconcile daily generation with portal monthly total.
+            today_kwh = cached_today_kwh if (cached_today_kwh is not None and cached_today_kwh >= 0) else round(base_daily * 0.45, 2)
+            yest_kwh = cached_yest_kwh if (cached_yest_kwh is not None and cached_yest_kwh >= 0) else round(base_daily * 0.95, 2)
+
+            daily_kwh_map = {}
+            if target_day == 1:
+                daily_kwh_map[1] = today_kwh
+            elif target_day == 2:
+                if cached_month_kwh is not None and cached_month_kwh >= today_kwh:
+                    daily_kwh_map[1] = round(cached_month_kwh - today_kwh, 2)
+                else:
+                    daily_kwh_map[1] = yest_kwh
+                daily_kwh_map[2] = today_kwh
+            else:
+                daily_kwh_map[target_day] = today_kwh
+                daily_kwh_map[target_day - 1] = yest_kwh
+
+                # Reconcile days 1 .. target_day - 2 against remaining monthly total
+                if cached_month_kwh is not None and cached_month_kwh >= (today_kwh + yest_kwh):
+                    rem_kwh = cached_month_kwh - today_kwh - yest_kwh
+                elif cached_month_kwh is not None and cached_month_kwh > today_kwh:
+                    rem_kwh = cached_month_kwh - today_kwh
+                    daily_kwh_map[target_day - 1] = round(rem_kwh * 0.10, 2)
+                    rem_kwh = rem_kwh - daily_kwh_map[target_day - 1]
+                else:
+                    rem_kwh = base_daily * (target_day - 2)
+
+                w_list = []
+                for d in range(1, target_day - 1):
+                    d_str = f"{year_month}-{d:02d}"
+                    w = self._get_daily_weather_factor(city, d_str, pid)
+                    w_list.append((d, w))
+                sum_w = sum(w for _, w in w_list) if w_list else 1.0
+
+                allocated_sum = 0.0
+                for d, w in w_list:
+                    val = round(rem_kwh * (w / sum_w), 2)
+                    daily_kwh_map[d] = val
+                    allocated_sum += val
+
+                diff = round(rem_kwh - allocated_sum, 2)
+                last_d = target_day - 2
+                daily_kwh_map[last_d] = max(0.0, round(daily_kwh_map[last_d] + diff, 2))
 
             for day_int in range(1, target_day + 1):
                 d_str = f"{year_month}-{day_int:02d}"
-
-                if is_offline:
-                    kwh = 0.0
-                    live_power = 0.0
-                    status = "offline"
-                elif is_chitra and year_month == "2026-09":
-                    # On-site real telemetry for CHITRA_APPARTMENT
-                    if day_int == target_day:
-                        kwh = cached_today_kwh if (cached_today_kwh is not None and cached_today_kwh > 0) else 48.78
-                        live_power = cached_cur_kw if cached_cur_kw is not None else 14.644
-                    elif day_int == target_day - 1:
-                        kwh = cached_yest_kwh if (cached_yest_kwh is not None and cached_yest_kwh > 0) else 67.99
-                        live_power = cached_cur_kw if cached_cur_kw is not None else 0.0
-                    else:
-                        idx = min(day_int - 1, len(chitra_d1_21) - 1)
-                        kwh = chitra_d1_21[idx]
-                        live_power = 13.15
-                    status = "active"
+                kwh = daily_kwh_map.get(day_int, 0.0)
+                if day_int == target_day:
+                    live_power = cached_cur_kw if cached_cur_kw is not None else (round(cap * 0.40, 2) if kwh > 0 else 0.0)
                 else:
-                    w = self._get_daily_weather_factor(city, d_str, pid)
-                    if day_int == target_day:
-                        kwh = cached_today_kwh if cached_today_kwh is not None else round(base_daily * w * 0.35, 2)
-                        live_power = cached_cur_kw if cached_cur_kw is not None else round(cap * 0.38, 2)
-                    elif day_int == target_day - 1 and cached_yest_kwh is not None:
-                        kwh = cached_yest_kwh
-                        live_power = round(cap * 0.72, 2)
-                    else:
-                        kwh = round(base_daily * w, 2)
-                        live_power = round(cap * 0.72, 2)
-                    status = "active" if (live_power > 0 or kwh > 0) else "offline"
+                    live_power = round(min(cap, kwh / 4.8), 2) if kwh > 0 else 0.0
 
                 sy = round(kwh / cap, 3) if cap > 0 else 0.0
+                stat = "active" if (kwh > 0.05 or live_power > 0) else "offline"
                 results.append({
                     "plant_id": pid,
                     "date": d_str,
@@ -381,7 +416,7 @@ class SuryaLogExtractor(BaseExtractor):
                     "specific_yield": sy,
                     "yield_per_day": sy,
                     "live_power_kw": live_power,
-                    "status": status,
+                    "status": stat,
                     "last_log_time": str(p.get("last_log_time") or "") if day_int == target_day else None,
                 })
 

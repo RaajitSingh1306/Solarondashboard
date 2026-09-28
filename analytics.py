@@ -170,6 +170,16 @@ def sync_decommissioned_plants() -> int:
             decom_ids,
             db="analytics"
         )
+        db.execute(
+            f"UPDATE loss_analysis SET expected_kwh = 0.0, shortfall_kwh = 0.0 WHERE plant_id IN ({placeholders})",
+            decom_ids,
+            db="analytics"
+        )
+        db.execute(
+            f"UPDATE expected_generation SET expected_kwh = 0.0 WHERE plant_id IN ({placeholders})",
+            decom_ids,
+            db="analytics"
+        )
     return len(decom_ids)
 
 def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
