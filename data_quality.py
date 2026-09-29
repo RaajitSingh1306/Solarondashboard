@@ -29,6 +29,52 @@ MIN_MONTHLY_YIELD_KWH_KWP = 0.0
 NOISE_FLOOR_DAILY_KWH = 0.05
 NOISE_FLOOR_MONTHLY_KWH = 1.0
 
+DECOMMISSIONED_PLANT_IDS = {
+    'growatt_10016308', 'growatt_10067274', 'growatt_100699', 'growatt_10074506', 'growatt_10085629',
+    'growatt_10133666', 'growatt_10137127', 'growatt_10169390', 'growatt_10179736', 'growatt_10200210',
+    'growatt_10241129', 'growatt_102732', 'growatt_10273523', 'growatt_10371862', 'growatt_10377849',
+    'growatt_10377858', 'growatt_10409807', 'growatt_10409838', 'growatt_10467594', 'growatt_10489129',
+    'growatt_104913', 'growatt_104920', 'growatt_10513532', 'growatt_10518199', 'growatt_10537447',
+    'growatt_10547502', 'growatt_10569506', 'growatt_105833', 'growatt_10585419', 'growatt_10592496',
+    'growatt_10597273', 'growatt_105994', 'growatt_10617829', 'growatt_10657084', 'growatt_10664929',
+    'growatt_10664961', 'growatt_10674290', 'growatt_10674488', 'growatt_10721028', 'growatt_10739359',
+    'growatt_10773259', 'growatt_10792266', 'growatt_10794257', 'growatt_10805431', 'growatt_10833636',
+    'growatt_10856830', 'growatt_10878830', 'growatt_10892345', 'growatt_10898585', 'growatt_10898708',
+    'growatt_10905660', 'growatt_10905724', 'growatt_10917250', 'growatt_10929459', 'growatt_10937803',
+    'growatt_10939541', 'growatt_10940614', 'growatt_10944752', 'growatt_10946846', 'growatt_10946850',
+    'growatt_10950151', 'growatt_10955172', 'growatt_11022463', 'growatt_11038083', 'growatt_11040520',
+    'growatt_11061765', 'growatt_11063863', 'growatt_11073618', 'growatt_11097958', 'growatt_11115804',
+    'growatt_11115963', 'growatt_11120267', 'growatt_11120425', 'growatt_11136038', 'growatt_11151904',
+    'growatt_11176283', 'growatt_11176497', 'growatt_11187649', 'growatt_11189560', 'growatt_112461',
+    'growatt_116506', 'growatt_118819', 'growatt_125955', 'growatt_125974', 'growatt_148593',
+    'growatt_152294', 'growatt_152554', 'growatt_1551079', 'growatt_1574691', 'growatt_159167',
+    'growatt_159282', 'growatt_163413', 'growatt_164727', 'growatt_166151', 'growatt_1692484',
+    'growatt_173054', 'growatt_175589', 'growatt_1808976', 'growatt_1835707', 'growatt_1852934',
+    'growatt_1870138', 'growatt_1990859', 'growatt_2018663', 'growatt_213085', 'growatt_214430',
+    'growatt_215699', 'growatt_2164749', 'growatt_2179005', 'growatt_2210768', 'growatt_222498',
+    'growatt_2227745', 'growatt_2240330', 'growatt_2264705', 'growatt_226965', 'growatt_2293081',
+    'growatt_2308879', 'growatt_2330408', 'growatt_2352137', 'growatt_2422345', 'growatt_2428454',
+    'growatt_2485302', 'growatt_2492014', 'growatt_2510341', 'growatt_259691', 'growatt_2617351',
+    'growatt_2622552', 'growatt_263311', 'growatt_264273', 'growatt_264753', 'growatt_2668359',
+    'growatt_272452', 'growatt_2727484', 'growatt_2749591', 'growatt_2749655', 'growatt_2755685',
+    'growatt_2841378', 'growatt_302419', 'growatt_313088', 'growatt_329097', 'growatt_338755',
+    'growatt_360956', 'growatt_381822', 'growatt_408402', 'growatt_539509', 'growatt_59824',
+    'growatt_601868', 'growatt_60476', 'growatt_62656', 'growatt_632638', 'growatt_64575',
+    'growatt_66019', 'growatt_67433', 'growatt_69964', 'growatt_70271', 'growatt_70975',
+    'growatt_70987', 'growatt_71082', 'growatt_723353', 'growatt_73224', 'growatt_741623',
+    'growatt_757614', 'growatt_757622', 'growatt_77769', 'growatt_84382', 'growatt_851184',
+    'growatt_855921', 'growatt_863493', 'growatt_89638', 'growatt_9193975', 'growatt_9207345',
+    'growatt_9209507', 'growatt_9209516', 'growatt_9224724', 'growatt_9235471', 'growatt_9270889',
+    'growatt_9327048', 'growatt_942273', 'growatt_9902885', 'growatt_9965160', 'growatt_9965193',
+    'isolarcloud_SG-002', 'isolarcloud_SG-005', 'isolarcloud_SG-009', 'isolarcloud_SG-011',
+    'isolarcloud_SG-014', 'isolarcloud_SG-017', 'isolarcloud_SG-021', 'isolarcloud_SG-022',
+    'isolarcloud_SG-023', 'isolarcloud_SG-024', 'isolarcloud_SG-025', 'suryalog_SL-001',
+    'suryalog_SL-004', 'suryalog_SL-005', 'suryalog_SL-009'
+}
+
+def is_decommissioned(plant_id: str) -> bool:
+    return str(plant_id).lower() in DECOMMISSIONED_PLANT_IDS
+
 
 def clean_plant_name(name: Any) -> str:
     """Normalize and trim plant names, collapsing multiple whitespace characters."""
@@ -51,8 +97,8 @@ def normalize_capacity(cap: Any, default: Optional[float] = None) -> Optional[fl
         val = float(cap)
         if val <= 0:
             return default
-        # Only divide if clearly entered in Watts (> 5000 W)
-        if val > 5000:
+        # Only divide if clearly entered in Watts (>= 1000 W)
+        if val >= 1000:
             val = val / 1000.0
         # Bounds check: 0.1 kWp to 10,000 kWp
         if 0.1 <= val <= 10000.0:

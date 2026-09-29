@@ -38,7 +38,7 @@ def normalize_plant_record(p: Dict[str, Any]) -> Dict[str, Any]:
         "install_date": p.get("install_date", ""),
         "inverter_model": p.get("inverter_model", ""),
         "panel_model": p.get("panel_model", ""),
-        "operational_status": p.get("operational_status", "active"),
+        "operational_status": "decommissioned" if (data_quality.is_decommissioned(str(p.get("plant_id"))) or p.get("operational_status") == "decommissioned") else "active",
         "last_log_time": p.get("last_log_time"),
         "total_energy_kwh": p.get("total_energy_kwh"),
     }
@@ -337,7 +337,7 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
                 "install_date": str(row.get("install_date", "")) if pd.notna(row.get("install_date")) else "",
                 "inverter_model": str(row.get("inverter_model", "")) if pd.notna(row.get("inverter_model")) else "",
                 "panel_model": str(row.get("panel_model", "")) if pd.notna(row.get("panel_model")) else "",
-                "operational_status": "active",
+                "operational_status": "decommissioned" if data_quality.is_decommissioned(pid) else "active",
             }
             db.upsert_plant(rec)
             counts["plants"] += 1

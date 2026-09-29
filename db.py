@@ -127,8 +127,12 @@ def executemany(sql: str, rows: List[Union[tuple, list, dict]], db: str = "analy
         return cur.rowcount
 
 def upsert_plant(row: Dict[str, Any]) -> None:
+    import data_quality
     row_copy = dict(row)
-    row_copy.setdefault("operational_status", "active")
+    if data_quality.is_decommissioned(row_copy.get("plant_id", "")) or row_copy.get("operational_status") == "decommissioned":
+        row_copy["operational_status"] = "decommissioned"
+    else:
+        row_copy.setdefault("operational_status", "active")
     row_copy.setdefault("last_log_time", None)
     row_copy.setdefault("total_energy_kwh", None)
     sql = """
@@ -149,7 +153,7 @@ def upsert_plant(row: Dict[str, Any]) -> None:
         install_date = coalesce(excluded.install_date, plants.install_date),
         inverter_model = coalesce(excluded.inverter_model, plants.inverter_model),
         panel_model = coalesce(excluded.panel_model, plants.panel_model),
-        operational_status = coalesce(excluded.operational_status, plants.operational_status),
+        operational_status = CASE WHEN plants.operational_status = 'decommissioned' OR excluded.operational_status = 'decommissioned' THEN 'decommissioned' ELSE coalesce(excluded.operational_status, plants.operational_status) END,
         last_log_time = coalesce(nullif(excluded.last_log_time, ''), plants.last_log_time),
         total_energy_kwh = coalesce(excluded.total_energy_kwh, plants.total_energy_kwh),
         updated_at = CURRENT_TIMESTAMP;

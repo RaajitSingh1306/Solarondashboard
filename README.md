@@ -1,622 +1,754 @@
-# Solaron — Solar Operations, Telemetry & CRM Intelligence Platform
+# Solaron — Enterprise Solar Operations, Telemetry & CRM Intelligence Platform
 
-> **Version**: 2.1.0 · **Python**: 3.10+ · **Framework**: FastAPI + NiceGUI · **Portals**: Growatt, iSolarCloud, SuryaLog  
-> **Fleet**: 490 Aggregated Installations · **Active Operational Fleet**: 295 Inverters (1.81 MWp) · **Monthly Harvest**: ~103.14 MWh · **Est. Commercial Value**: ₹14,43,960
-
-> [!IMPORTANT]
-> **Master Data & Analytics Specification**: For the complete empirical fleet baseline (490 plants), solar physics derivations ($GHI, Y_f, Y_d, PR, CUF$), scikit-learn Isolation Forest ML equations, and 7-issue engineering audit, consult:
-> - 📄 [**`DATA_DOCUMENT.md`**](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/DATA_DOCUMENT.md) — Unified Master Data, Solar Physics & Machine Learning Specification
+> **Version:** 2.2.0 · **Python:** 3.10+ · **Stack:** FastAPI + NiceGUI (Tailwind CSS / Quasar) + SQLite  
+> **Integrated Portals:** Growatt Server API, Sungrow iSolarCloud, SuryaLog Cloud  
+> **Total Monitored Fleet:** 490 Sites (2,410.2 kWp) · **Active Operational Fleet:** 295 Inverters (1,807.6 kWp)  
+> **Monthly Energy Harvest:** ~103.14 MWh · **Est. Commercial Value:** ₹14,43,960 / month  
 
 ---
 
 ## Table of Contents
 
-1. [Executive Overview](#1-executive-overview)
-2. [System Architecture](#2-system-architecture)
-3. [Directory Layout](#3-directory-layout)
-4. [Installation & Setup](#4-installation--setup)
-5. [Execution Modes & Windows Multiprocessing Safety](#5-execution-modes--windows-multiprocessing-safety)
-6. [Multi-Portal Telemetry Ingestion](#6-multi-portal-telemetry-ingestion)
-7. [The Mathematical Physics Engine](#7-the-mathematical-physics-engine)
-   - 7.1 [Specific Yield ($Y_f$)](#71-specific-yield-y_f)
-   - 7.2 [Daily Specific Yield ($Y_d$)](#72-daily-specific-yield-y_d)
-   - 7.3 [Capacity Utilisation Factor (CUF %)](#73-capacity-utilisation-factor-cuf-)
-   - 7.4 [Performance Ratio (PR %) with NASA POWER GHI](#74-performance-ratio-pr--with-nasa-power-ghi)
-   - 7.5 [Expected Baseline Generation Model](#75-expected-baseline-generation-model)
-   - 7.6 [6-Part Loss Attribution Waterfall & Conservation Law](#76-6-part-loss-attribution-waterfall--conservation-law)
-   - 7.7 [Environmental ($CO_2$) & Commercial Financial Equations](#77-environmental-co_2--commercial-financial-equations)
-   - 7.8 [Peer-Group Percentiles across Capacity Brackets](#78-peer-group-percentiles-across-capacity-brackets)
-   - 7.9 [Performance Tier Classification Matrix (Absolute PR-Based Engine)](#79-performance-tier-classification-matrix-absolute-pr-based-engine)
-   - 7.10 [Machine Learning Anomaly Detection Engine (Isolation Forest)](#710-machine-learning-anomaly-detection-engine-isolation-forest)
-8. [Telemetry Sanitization & Anti-Cracked-Data Rules](#8-telemetry-sanitization--anti-cracked-data-rules)
-   - 8.1 [Inverter Heatsink Operating Temperature Model](#81-inverter-heatsink-operating-temperature-model)
-   - 8.2 [CEC 97.5% Inverter Efficiency Standard](#82-cec-975-inverter-efficiency-standard)
-   - 8.3 [Daily Yield Physical Clamping](#83-daily-yield-physical-clamping)
-   - 8.4 [Decommissioned Plant Exclusion & Active Producing Gating](#84-decommissioned-plant-exclusion--active-producing-gating)
-   - 8.5 [Universal Ingestion Firewall & Anti-Future-Date Clamping](#85-universal-ingestion-firewall--anti-future-date-clamping)
-   - 8.6 [Real-Time Diurnal Telemetry Sync & Clock-Hour Clamping](#86-real-time-diurnal-telemetry-sync--clock-hour-clamping)
-9. [Interactive Web Cockpit (5 Tabs)](#9-interactive-web-cockpit-5-tabs)
-10. [REST API Documentation](#10-rest-api-documentation)
-11. [Automated Scheduling Engine](#11-automated-scheduling-engine)
-12. [Verification & Audit Suite](#12-verification--audit-suite)
-13. [Operational Runbook & Troubleshooting](#13-operational-runbook--troubleshooting)
+1. [Executive Summary & Platform Scope](#1-executive-summary--platform-scope)
+   - 1.1 [Platform Scope & Purpose](#11-platform-scope--purpose)
+   - 1.2 [Master Fleet Directory & Composition](#12-master-fleet-directory--composition)
+2. [System Architecture & Ingestion Topology](#2-system-architecture--ingestion-topology)
+   - 2.1 [High-Level Architecture (Mermaid)](#21-high-level-architecture)
+   - 2.2 [Component Responsibilities & Interaction Matrix](#22-component-responsibilities--interaction-matrix)
+   - 2.3 [Multi-Process Execution & Windows Safety](#23-multi-process-execution--windows-safety)
+3. [Data Architecture, Pipelines & Anti-Cracked Telemetry](#3-data-architecture-pipelines--anti-cracked-telemetry)
+   - 3.1 [Multi-Portal Telemetry Ingestion Engines (`extractors/`)](#31-multi-portal-telemetry-ingestion-engines)
+   - 3.2 [Ingestion Orchestrator (`pipeline.py`)](#32-ingestion-orchestrator)
+   - 3.3 [Data Quality & Anti-Cracked Telemetry Rules (`data_quality.py`)](#33-data-quality--anti-cracked-telemetry-rules)
+   - 3.4 [Dual Database Schema Reference (`db.py` & `crm.py`)](#34-dual-database-schema-reference)
+4. [Mathematical Physics Engine & Machine Learning Core](#4-mathematical-physics-engine--machine-learning-core)
+   - 4.1 [Specific Yield ($Y_f$) & Daily Yield ($Y_d$)](#41-specific-yield-y_f--daily-yield-y_d)
+   - 4.2 [Performance Ratio (PR %) with NASA POWER GHI Benchmarks](#42-performance-ratio-pr--with-nasa-power-ghi-benchmarks)
+   - 4.3 [Expected Generation Baseline Model](#43-expected-generation-baseline-model)
+   - 4.4 [Adaptive 6-Part Loss Attribution Waterfall & Energy Conservation Law](#44-adaptive-6-part-loss-attribution-waterfall--energy-conservation-law)
+   - 4.5 [Unsupervised Machine Learning Anomaly Detection (Isolation Forest)](#45-unsupervised-machine-learning-anomaly-detection-isolation-forest)
+   - 4.6 [Carbon Emission Reductions ($CO_2$) & Financial Savings](#46-carbon-emission-reductions-co_2--financial-savings)
+   - 4.7 [Capacity Brackets & Absolute PR Health Tiers](#47-capacity-brackets--absolute-pr-health-tiers)
+5. [Interactive Web Cockpit: In-Depth Tab Walkthrough](#5-interactive-web-cockpit-in-depth-tab-walkthrough)
+   - 5.1 [Tab 1: Fleet Command Center (`ui/fleet.py`)](#51-tab-1-fleet-command-center)
+   - 5.2 [Tab 2: Full Analytics & Loss Attribution (`ui/analytics.py`)](#52-tab-2-full-analytics--loss-attribution)
+   - 5.3 [Tab 3: Plant Cockpit & Granular Inspector (`ui/plant.py`)](#53-tab-3-plant-cockpit--granular-inspector)
+   - 5.4 [Tab 4: CRM & Multi-Channel Communications Hub (`ui/crm.py`)](#54-tab-4-crm--multi-channel-communications-hub)
+   - 5.5 [Tab 5: Data Pipeline & Ingestion Workbench (`ui/fetch_tab.py`)](#55-tab-5-data-pipeline--ingestion-workbench)
+6. [Backend API Reference & Endpoints](#6-backend-api-reference--endpoints)
+   - 6.1 [Telemetry & Fleet Endpoints (`routes/data.py`)](#61-telemetry--fleet-endpoints)
+   - 6.2 [CRM & Campaign Endpoints (`routes/crm.py`)](#62-crm--campaign-endpoints)
+   - 6.3 [Data Export & Streaming Endpoints (`routes/export.py`)](#63-data-export--streaming-endpoints)
+7. [Installation, Configuration & Operational Runbook](#7-installation-configuration--operational-runbook)
+   - 7.1 [Prerequisites & Environment Setup](#71-prerequisites--environment-setup)
+   - 7.2 [Environment Variables Reference (`.env`)](#72-environment-variables-reference)
+   - 7.3 [Starting the Platform Server](#73-starting-the-platform-server)
+   - 7.4 [Background Automated Scheduler (`scheduler.py`)](#74-background-automated-scheduler)
+   - 7.5 [Troubleshooting & Diagnostics Guide](#75-troubleshooting--diagnostics-guide)
+8. [Verification & Audit Suite](#8-verification--audit-suite)
+   - 8.1 [Consolidated Verification (`verify_all.py`)](#81-consolidated-verification)
+   - 8.2 [Granularity & Quick Presets Integration Test (`test_granularity_verification.py`)](#82-granularity--quick-presets-integration-test)
+   - 8.3 [Comprehensive Test Suite (`test_comprehensive_suite.py`)](#83-comprehensive-test-suite)
 
 ---
 
-## 1. Executive Overview
+## 1. Executive Summary & Platform Scope
 
-**Solaron** is a unified solar operations, loss attribution, and customer messaging platform designed for commercial and residential distributed solar portfolios. It aggregates real-time inverter telemetry, daily generation profiles, and monthly yields across three disparate OEM solar monitoring portals:
+### 1.1 Platform Scope & Purpose
+**Solaron** is an enterprise-grade solar operations, loss attribution, and customer relationship management (CRM) intelligence platform. Designed specifically for distributed residential, commercial, and industrial rooftop solar portfolios across India, Solaron solves the challenges of fragmented OEM portals by centralizing inverter telemetry, applying rigorous solar physics modeling, identifying statistical performance anomalies, and dispatching multi-lingual customer communications.
 
-- **Growatt Server API**: 450 residential and commercial rooftop installations.
-- **Sungrow iSolarCloud**: 28 commercial rooftop installations.
-- **SuryaLog Cloud**: 12 industrial solar installations.
+### 1.2 Master Fleet Directory & Composition
+The platform monitors 490 total installations representing **2,410.2 kWp** of solar photovoltaic capacity across three disparate OEM monitoring cloud portals:
 
-### Key Portfolio Metrics (September 2026 Baseline)
+| Monitoring Platform | Total Sites | Share (%) | Extractor Module | Extraction Protocol |
+|:---|:---:|:---:|:---|:---|
+| **Growatt Server API** | 450 | 91.8% | [`extractors/growatt.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/growatt.py) | REST API v2 session auth + 30-min live curve telemetry |
+| **Sungrow iSolarCloud** | 28 | 5.7% | [`extractors/isolarcloud.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/isolarcloud.py) | Web3 / Playwright headless session scraper + JSON API |
+| **SuryaLog Cloud** | 12 | 2.5% | [`extractors/suryalog.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/suryalog.py) | AE Cloud REST API token + multi-inverter telemetry |
+| **Total Monitored Portfolio** | **490** | **100.0%** | [`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) | Normalized SQLite storage (`analytics.db`) |
 
-| Portfolio Metric | Metric Value | Scope & Verification Criteria |
-|---|---|---|
-| **Total Aggregated Installations** | **490** | Master fleet directory spanning all three monitoring portals |
-| **Active Operational Fleet** | **295** | Inverters actively connected and operational (`operational_status != 'decommissioned'`) |
-| **Decommissioned / Inactive** | **195** | Permanently retired installations (listed in directory, excluded from analytics) |
-| **Active Nominal Capacity** | **1.81 MWp** | Cumulative nominal DC capacity of the 295 active installations (1,807.63 kWp) |
-| **Active Generating Plants** | **276 / 295** | Active systems producing positive harvest ($E > 1.0\text{ kWh}$) |
-| **Fault / Zero Generation** | **19 / 295** | Active installations producing zero harvest (equipment trip, breaker open, grid loss) |
-| **Monthly Fleet Energy Harvest** | **103.14 MWh** | Realized active fleet energy yield for September 2026 |
-| **Est. Direct Commercial Value** | **₹14,43,960** | Direct energy cost savings at commercial tariff (₹14.0/kWh benchmark) |
-| **Statistical ML Anomalies** | **8 sites** | Unsupervised Isolation Forest flagged underperforming anomalies |
-| **Monitored Inverters** | **490 inverters** | Full telemetry coverage with operating heatsink temperature and DC input |
+#### Fleet Operational Status Breakdown
+
+| Fleet Cohort | Inverters / Sites | Total Capacity | Status Definition & Criteria |
+|:---|:---:|:---:|:---|
+| **Total Monitored Fleet** | **490** | **2,410.2 kWp** | Complete database directory across all 3 OEM portals |
+| **Active Operational Fleet** | **295** | **1,807.6 kWp** | Commissioned systems actively monitored (`operational_status = 'active'`) |
+| **Decommissioned / Inactive** | **195** | **602.6 kWp** | Retired or inactive sites (`operational_status = 'decommissioned'`), excluded from loss baselines |
+| **Active Generating (Current Month)** | **276 / 295** | **1,753.4 kWp** | Operational systems producing positive yield ($E_{\text{month}} > 1.0\text{ kWh}$) |
+| **Active Offline / Zero Yield** | **19 / 295** | **54.2 kWp** | Operational systems with zero monthly energy (tripped breakers, comms outages) |
+| **Statistical ML Anomalies** | **8 / 295** | **194.2 kWp** | Statistically divergent underperformers flagged by the Isolation Forest engine |
 
 ---
 
-## 2. System Architecture
+## 2. System Architecture & Ingestion Topology
+
+### 2.1 High-Level Architecture
 
 ```mermaid
-graph TD
-    subgraph Data Sources
-        G[Growatt API - 450 Plants]
-        I[iSolarCloud Playwright - 28 Plants]
-        S[SuryaLog Scraper - 12 Plants]
-        E[Monthly Excel Reports]
-        N[NASA POWER Satellite GHI API]
+flowchart TD
+    subgraph OEM_Portals [OEM Solar Monitoring Clouds]
+        G[Growatt Server API\n450 Sites]
+        S[Sungrow iSolarCloud\n28 Sites]
+        SL[SuryaLog AE Cloud\n12 Sites]
     end
 
-    subgraph Data Processing Pipeline
-        DQ[Data Quality & Physics Bounds Sanitization]
-        DB[(Normalized SQLite / PostgreSQL Database)]
-        ENG[Physics Analytics & 6-Part Loss Waterfall Engine]
+    subgraph Extractors [Ingestion Extractors: extractors/]
+        EG[growatt.py\nREST v2 + Token]
+        ES[isolarcloud.py\nPlaywright Scraper]
+        ESL[suryalog.py\nREST JSON Token]
     end
 
-    subgraph Presentation & Delivery
-        API[FastAPI REST API: /api/*]
-        UI[NiceGUI Interactive Reactive Cockpit]
-        CRM[WhatsApp Customer Statement Campaign Generator]
-        SCH[APScheduler Background Jobs]
+    G --> EG
+    S --> ES
+    SL --> ESL
+
+    subgraph Pipeline [Ingestion Pipeline: pipeline.py]
+        ORCH[Universal Ingestion Pipeline\nDaily / Monthly / Snapshots]
+        FW[Universal Ingestion Firewall\nStrict Date <= Today Bounding]
+        DQ[data_quality.py\nPhysics Clamping & Efficiency Sanity]
     end
 
-    G --> DQ
-    I --> DQ
-    S --> DQ
-    E --> DQ
-    DQ --> DB
-    N --> ENG
-    DB --> ENG
-    ENG --> DB
-    DB --> API
-    DB --> UI
-    DB --> CRM
-    SCH --> DQ
+    EG --> ORCH
+    ES --> ORCH
+    ESL --> ORCH
+    ORCH --> FW --> DQ
+
+    subgraph Storage [High-Performance SQLite Databases: db.py]
+        DB_AN[solar_analytics.db\nplants | daily_generation\nmonthly_generation | inverter_snapshots\nloss_analysis | expected_generation]
+        DB_CRM[crm_data.db\ncustomers | message_templates\ncampaign_log | customer_communications]
+    end
+
+    DQ --> DB_AN
+
+    subgraph Analytics_Engine [Physics & ML Analytics Engine]
+        PHYS[analytics.py\nNASA POWER GHI Baseline\n6-Part Loss Waterfall & Conservation]
+        ML[ml_analytics.py\nIsolation Forest Anomaly Engine\nAbsolute PR Tiers: Best/Good/Critical]
+    end
+
+    DB_AN --> PHYS
+    DB_AN --> ML
+    PHYS --> DB_AN
+    ML --> DB_AN
+
+    subgraph Presentation [Reactive Web Dashboard: NiceGUI + FastAPI]
+        APP[app.py / run.py\nFastAPI Routes + NiceGUI Context]
+        T1[ui/fleet.py\nFleet Command Center]
+        T2[ui/analytics.py\nLoss Attribution & Analytics]
+        T3[ui/plant.py\nPlant Cockpit & Granularity]
+        T4[ui/crm.py\nCRM & WhatsApp Dispatcher]
+        T5[ui/fetch_tab.py\nData Ingestion Workbench]
+    end
+
+    DB_AN --> APP
+    DB_CRM --> APP
+    APP --> T1
+    APP --> T2
+    APP --> T3
+    APP --> T4
+    APP --> T5
 ```
 
-### Architecture Highlights
-1. **Unified Schema**: Normalizes vendor-specific payload fields (`currentPac`, `todayEnergy`, `eToday`, `month_energy_kwh`) into canonical database schemas (`ac_power_w`, `e_today_kwh`, `kwh`, `specific_yield`).
-2. **Path Normalization**: Database paths are anchored using `settings.resolved_solar_analytics_db_path`, guaranteeing consistent SQLite handle resolution regardless of working directory.
-3. **Reactive NiceGUI Client State**: Asynchronous, event-driven UI tabs built with Quasar / Tailwind primitives and Apache ECharts.
-4. **Subprocess Resilience**: Dynamic `sys.path` and subprocess environment variable propagation ensures zero import crashes on Windows multi-processing reload workers.
+### 2.2 Component Responsibilities & Interaction Matrix
+
+| File / Component | Role & Scope | Key Dependents |
+|:---|:---|:---|
+| [`app.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/app.py) | Application entrypoint; initializes FastAPI, mounts static routes, registers NiceGUI tabs, handles startup/shutdown hooks. | `ui/*`, `routes/*`, `scheduler.py` |
+| [`run.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/run.py) | Standalone launcher ensuring proper Python module resolution (`PYTHONPATH`) and Windows multiprocessing guards. | `app.py` |
+| [`config.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/config.py) | Pydantic-based configuration management loading `.env` properties (credentials, DB paths, server ports). | All modules |
+| [`db.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/db.py) | SQLite database abstraction layer supporting connection pooling, thread-safe transactions, WAL mode, and parameterized queries. | `pipeline.py`, `ui/*`, `routes/*` |
+| [`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) | Core extraction orchestrator; coordinates multi-threading across OEM extractors, enforces date clamping, and populates `db.py`. | `extractors/*`, `data_quality.py` |
+| [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py) | Physics-based telemetry sanitizer; clips irradiance spikes, enforces CEC inverter efficiency, and filters future timestamps. | `pipeline.py`, `extractors/*` |
+| [`analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py) | Solar physics calculation engine; evaluates NASA POWER GHI benchmarks, computes PR %, and decomposes the 6-part loss waterfall. | `ui/analytics.py`, `ui/fleet.py` |
+| [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py) | Scikit-learn unsupervised machine learning module; trains Isolation Forest models and computes absolute PR health tiers. | `pipeline.py`, `ui/plant.py` |
+| [`crm.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/crm.py) | Customer management logic, WhatsApp template compilation (English, Hindi, Marathi), and campaign logging. | `ui/crm.py`, `routes/crm.py` |
+| [`scheduler.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/scheduler.py) | APScheduler background worker for automated periodic telemetry polling, hourly snapshot captures, and monthly report prep. | `app.py` |
+
+### 2.3 Multi-Process Execution & Windows Safety
+On Windows systems, Python uses the `spawn` multiprocessing start method rather than `fork`. To prevent recursive process execution loops when spawning subprocesses or uvicorn worker threads, all executions must be guarded by `if __name__ == '__main__':` and launched via [`run.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/run.py) or [`app.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/app.py).
 
 ---
 
-## 3. Directory Layout
+## 3. Data Architecture, Pipelines & Anti-Cracked Telemetry
 
-The codebase is organized into clean, focused packages:
+### 3.1 Multi-Portal Telemetry Ingestion Engines
 
-```
-Solaron/
-├── run.py                      # Dedicated root runner (propagates PYTHONPATH, boots Uvicorn)
-├── verify_all.py               # Master 4-pillar automated integrity verification suite
-├── README.md                   # Authoritative system documentation & physics formulas
-├── .env.example                # Sample environment configuration
-├── .gitignore                  # Git ignore rules
-│
-├── docs/                       # Technical specifications & architecture manuals
-│   ├── BACKEND.md              # Deep backend API & database architecture
-│   ├── FRONTEND.md             # NiceGUI tab components & reactive state design
-│   ├── SECURITY.md             # Authentication, credential vaulting & API security
-│   └── SYSTEM_DESIGN.md        # Telemetry ingestion & scheduler architectural design
-│
-├── solaron/                    # Core application package
-│   ├── __init__.py             # Package declaration (v2.0.0)
-│   ├── app.py                  # FastAPI server definition & NiceGUI page routes
-│   ├── config.py               # Pydantic Settings with absolute path resolution
-│   ├── db.py                   # Thread-safe SQLite connection manager & CRUD helpers
-│   ├── pipeline.py             # Telemetry extraction, normalization & ingestion pipeline
-│   ├── analytics.py            # Physics baseline, 6-part loss waterfall & tier classifier
-│   ├── data_quality.py         # Physics clamping, noise reduction & sanity checks
-│   ├── crm.py                  # Customer directory, statement builder & WhatsApp sender
-│   ├── scheduler.py            # APScheduler jobs (hourly snapshots, daily/monthly sync)
-│   ├── requirements.txt        # Production dependencies
-│   ├── verify_platform.py      # Quick platform health & telemetry audit script
-│   ├── verify_audit.py         # 13-bug regression audit script
-│   │
-│   ├── extractors/             # Multi-portal ingestion extractors
-│   │   ├── base.py             # BaseExtractor abstract base class
-│   │   ├── growatt.py          # growattServer API client & local cache fallback
-│   │   ├── isolarcloud.py      # Sungrow Playwright scraper & structured cache
-│   │   ├── suryalog.py         # SuryaLog cloud scraper & structured cache
-│   │   └── excel_parser.py     # Monthly SolarOn Excel ingestion parser
-│   │
-│   ├── routes/                 # FastAPI REST API endpoints
-│   │   ├── data.py             # Fleet directory, daily/monthly telemetry endpoints
-│   │   ├── export.py           # CSV and Excel export streaming endpoints
-│   │   └── crm.py              # Customer statement generation & campaign triggers
-│   │
-│   ├── ui/                     # NiceGUI interactive UI components
-│   │   ├── fleet.py            # Fleet Command Center tab with KPI cards & filters
-│   │   ├── analytics.py        # Full Analytics tab with waterfall charts & PR curves
-│   │   ├── plant.py            # Plant Cockpit tab with inverter telemetry table
-│   │   ├── crm.py              # CRM & WhatsApp campaigns tab
-│   │   └── fetch_tab.py        # Portal sync controls & Excel upload modal
-│   │
-│   └── data/                   # Canonical database and cached datasets
-│       ├── solar_analytics.db  # Primary SQLite operational database
-│       ├── crm_data.db         # CRM customer and campaign database
-│       └── raw/                # Extractor raw cache dumps (Growatt, Sungrow, SuryaLog)
-│
-├── solaron_analytics_dataset_csv/ # Seed CSV dataset files for cold-start rehydration
-└── archive/                    # Archived legacy backups, exploratory scripts & spreadsheets
-```
+#### 1. Growatt Server API ([`extractors/growatt.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/growatt.py))
+- **Fleet Volume:** 450 residential and commercial plants.
+- **Protocol:** HTTP REST API v2 with session cookie and token authentication.
+- **Data Extracted:**
+  - Fleet plant directory, installed capacity ($P_{\text{nominal}}$ in kWp), plant coordinates, and datalogger serial numbers.
+  - Daily generation timeseries ($E_{\text{day}}$ in kWh) via `getPlantData` endpoint.
+  - Monthly generation totals ($E_{\text{month}}$ in kWh) and historical annual yields.
+  - Live 30-minute interval power curves via `plant_detail` API with multi-threaded chunking.
 
----
+#### 2. Sungrow iSolarCloud ([`extractors/isolarcloud.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/isolarcloud.py))
+- **Fleet Volume:** 28 commercial rooftop sites.
+- **Protocol:** Headless browser session scraping via Playwright, capturing dynamic bearer tokens to access internal JSON endpoints.
+- **Data Extracted:**
+  - Plant metadata, active inverter device IDs, and string-level MPPT configurations.
+  - Diurnal generation timeseries and daily cumulative energy counters.
+  - Alarm tables and active grid error codes.
 
-## 4. Installation & Setup
+#### 3. SuryaLog AE Cloud ([`extractors/suryalog.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/suryalog.py))
+- **Fleet Volume:** 12 industrial solar installations.
+- **Protocol:** AE Cloud authenticated REST API with bearer token headers.
+- **Data Extracted:**
+  - Multi-inverter telemetry tables with live DC current/voltage, AC active power, frequency, and grid voltage.
+  - Real-time internal heatsink temperature sensors (°C).
+  - Daily generation counters normalized to UTC+05:30 (Indian Standard Time).
 
-### Prerequisites
-- **Python**: Version 3.10 or higher (Python 3.11 / 3.12 recommended).
-- **Operating System**: Windows 10/11, Ubuntu 20.04+, or macOS.
-- **Node/Playwright**: Required for headless browser scraping (Chromium).
-
-### 1. Clone & Setup Virtual Environment
-```pwsh
-# Clone repository
-git clone https://github.com/Solaron/solaron.git
-cd Solaron
-
-# Create virtual environment
-python -m venv .venv
-
-# Activate virtual environment (Windows PowerShell)
-.venv\Scripts\Activate.ps1
-# On Linux/macOS: source .venv/bin/activate
-```
-
-### 2. Install Dependencies
-```pwsh
-pip install --upgrade pip
-pip install -r solaron/requirements.txt
-
-# Install Playwright browser binaries
-playwright install chromium
-```
-
-### 3. Environment Configuration
-Copy `.env.example` to `solaron/.env`:
-```ini
-# Portal Credentials
-GROWATT_USER=your_growatt_username
-GROWATT_PASSWORD=your_growatt_password
-GROWATT_SERVER_URL=https://server-api.growatt.com/
-
-ISOLARCLOUD_USER=your_isolarcloud_email
-ISOLARCLOUD_PASSWORD=your_isolarcloud_password
-ISOLARCLOUD_URL=https://web3.isolarcloud.in/
-
-SURYALOG_USER=your_suryalog_username
-SURYALOG_PASSWORD=your_suryalog_password
-SURYALOG_URL=https://cloud.suryalog.ae/
-
-# Database Paths (resolved to absolute paths automatically)
-SOLAR_ANALYTICS_DB_PATH=data/solar_analytics.db
-CRM_DB_PATH=data/crm_data.db
-
-# Commercial Tariffs & Reference Benchmarks
-PRICE_PER_UNIT=14.0
-DEFAULT_PR_REF=0.75
-SCHEDULER_ENABLED=false
-PLAYWRIGHT_HEADLESS=true
-APP_PORT=8000
-```
-
----
-
-## 5. Execution Modes & Windows Multiprocessing Safety
-
-### The Windows Reloader Root Cause & Fix
-On Windows, Python's multiprocessing uses `spawn` instead of `fork`. When Uvicorn runs with `--reload`, it launches a child worker process (`SpawnProcess-1`). In spawned processes, `sys.path[0]` is reset to the child process's entry file, which historically caused:
-```
-ModuleNotFoundError: No module named 'solaron'
-```
-
-### Supported Execution Modes
-
-#### Mode A: Root Runner (Recommended)
-From the repository root, execute:
-```pwsh
-python run.py
-```
-`run.py` configures `sys.path` and propagates `PYTHONPATH` to all child processes before launching Uvicorn:
+### 3.2 Ingestion Orchestrator (`pipeline.py`)
+[`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) provides unified orchestration across all three extractors:
 ```python
-root_dir = Path(__file__).resolve().parent
-solaron_dir = root_dir / "solaron"
-sys.path.insert(0, str(root_dir))
-sys.path.insert(0, str(solaron_dir))
-os.environ["PYTHONPATH"] = f"{root_dir}{os.pathsep}{solaron_dir}{os.pathsep}{cur_pp}"
+# Pipeline execution interface
+pipeline.run_fleet(sources=None, force_refresh=False)            # Synchronize plant directories
+pipeline.run_daily(sources=None, force_refresh=False)            # Pull daily generation histories
+pipeline.run_monthly(month_str="2026-09", force_refresh=False)  # Pull monthly totals & recalculate ratings
+pipeline.run_snapshots()                                         # Pull live inverter telemetry snapshots
+pipeline.run_full_extract(month_str="2026-09", force_refresh=True) # Full end-to-end sync
 ```
 
-#### Mode B: Subdirectory Execution
-You can also launch directly from within `solaron/`:
-```pwsh
-cd solaron
-python app.py
-```
-`solaron/app.py` contains identical self-healing environment bootstrap logic, allowing seamless execution from either directory.
+### 3.3 Data Quality & Anti-Cracked Telemetry Rules (`data_quality.py`)
+Raw OEM telemetry often contains corrupted data, negative values, clock drift, or astronomical spikes caused by counter roll-overs. Solaron implements rigorous data hygiene rules inside [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py):
+
+1. **Universal Ingestion Firewall ($\text{Date} \le \text{Today}$):**
+   - Telemetry extractors and database ingestion functions strictly enforce that no daily record can have a date greater than current local time:
+   $$\text{Reject record if: } \text{record.date} > \text{datetime.date.today()}$$
+   - Prevents portals from pre-populating future calendar dates with phantom zeros that skew average yield metrics.
+
+2. **Physical Daily Yield Ceiling ($E_{\text{day}} \le 8.5 \times P_{\text{capacity}}$):**
+   - In Indian latitudes, peak solar insolation never exceeds $7.5\text{ to }8.0\text{ PSH}$ (Peak Sun Hours) even on clear summer solstice days.
+   - Any raw telemetry point reporting $E_{\text{day}} > 8.5 \times P_{\text{capacity}}$ is identified as a datalogger accumulator spike and clamped:
+   $$E_{\text{day, clamped}} = \min(E_{\text{raw}}, P_{\text{capacity}} \times 8.5)$$
+
+3. **CEC 97.5% Inverter Efficiency Standard:**
+   - Inverter models frequently omit DC input telemetry or report identical DC and AC values ($P_{\text{DC}} = P_{\text{AC}}$), violating thermodynamic energy conversion laws.
+   - Solaron back-calculates true DC input power using California Energy Commission (CEC) weighted inverter efficiency ($\eta_{\text{inv}} = 97.5\%$):
+   $$P_{\text{DC}} = \frac{P_{\text{AC}}}{0.975} \quad (\text{if } P_{\text{DC}} \le P_{\text{AC}} \text{ or } P_{\text{DC}} = 0)$$
+
+4. **Inverter Heatsink Thermal Physics Model:**
+   - Where OEM inverters report $0^\circ\text{C}$ due to unmapped internal thermistors, Solaron computes realistic operational junction temperatures using ambient temperature ($T_{\text{ambient}}$) and instantaneous electrical load:
+   $$T_{\text{heatsink}} = T_{\text{ambient}} + \left(\frac{P_{\text{AC}}}{P_{\text{nominal}}}\right) \times 24.5^\circ\text{C} + \Delta_{\text{thermal}}$$
+   - Bounded realistically between $28.0^\circ\text{C}$ (standby night) and $52.5^\circ\text{C}$ (peak summer mid-day).
+
+5. **Diurnal Telemetry Clock Clamping:**
+   - For real-time daily generation curves viewed during the current day, any hour slot beyond the current local clock hour ($\text{hour} > \text{now.hour}$) is strictly clamped to $0.0\text{ kWh}$.
+
+### 3.4 Dual Database Schema Reference
+
+The platform stores all state in two distinct, decoupled SQLite databases configured with **Write-Ahead Logging (WAL)** for high concurrency:
+
+#### 1. Solar Analytics Database (`data/solar_analytics.db`)
+
+##### `plants` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `plant_id` | `VARCHAR(64) PRIMARY KEY` | Unique normalized ID (e.g. `growatt_123456`, `isolarcloud_789`) |
+| `plant_name` | `VARCHAR(255)` | Human-readable plant name from portal |
+| `source` | `VARCHAR(32)` | OEM portal: `growatt`, `isolarcloud`, `suryalog` |
+| `capacity_kwp` | `FLOAT` | Rated DC nameplate capacity in kWp |
+| `city` | `VARCHAR(64)` | Geographical city location (default: Pune / Western India) |
+| `operational_status` | `VARCHAR(32)` | `active` (operational) or `decommissioned` (retired) |
+| `created_at` | `DATETIME` | Timestamp of initial ingestion |
+
+##### `daily_generation` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Auto-increment primary key |
+| `plant_id` | `VARCHAR(64)` | Foreign key reference to `plants.plant_id` |
+| `date` | `DATE` | Generation date (`YYYY-MM-DD`, indexed) |
+| `kwh` | `FLOAT` | Total energy generated on date in kWh |
+| `specific_yield` | `FLOAT` | Specific yield ($Y_f = \text{kwh} / \text{capacity\_kwp}$) |
+| `live_power_kw` | `FLOAT` | Instantaneous power at last portal poll |
+| `status` | `VARCHAR(32)` | Daily operating state: `active`, `offline`, `fault` |
+| `last_log_time` | `VARCHAR(32)` | Raw portal timestamp string |
+
+##### `monthly_generation` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Auto-increment primary key |
+| `plant_id` | `VARCHAR(64)` | Foreign key reference to `plants.plant_id` |
+| `month` | `VARCHAR(7)` | Reporting month (`YYYY-MM`, indexed) |
+| `kwh` | `FLOAT` | Cumulative monthly energy harvest |
+| `specific_yield` | `FLOAT` | Monthly yield per kWp ($Y_f$) |
+| `yield_per_day` | `FLOAT` | Average daily specific yield ($Y_d = Y_f / \text{days}$) |
+| `pr_pct` | `FLOAT` | Performance Ratio percentage against NASA GHI |
+| `tier` | `VARCHAR(32)` | Absolute PR tier: `Best`, `Good`, `Could Be Better`, `Needs Attention`, `Critical`, `Offline` |
+| `percentile` | `FLOAT` | Peer-group percentile ($0.0 - 100.0$) within capacity bracket |
+| `anomaly_flag` | `INTEGER` | `1` if flagged by Isolation Forest; `0` otherwise |
+| `anomaly_score` | `FLOAT` | Negative outlier decision score from Isolation Forest |
+
+##### `inverter_snapshots` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Auto-increment primary key |
+| `plant_id` | `VARCHAR(64)` | Foreign key reference to `plants.plant_id` |
+| `inverter_sn` | `VARCHAR(64)` | Datalogger or inverter hardware serial number |
+| `snapshot_ts` | `DATETIME` | Telemetry capture timestamp |
+| `ac_power_w` | `FLOAT` | Instantaneous AC power output (Watts) |
+| `dc_power_w` | `FLOAT` | Instantaneous DC power input (Watts) |
+| `temperature_c` | `FLOAT` | Inverter heatsink operating temperature (°C) |
+| `e_today_kwh` | `FLOAT` | Current day cumulative energy counter |
+| `fault_code` | `VARCHAR(32)` | Hardware diagnostic fault code (`0` = normal) |
+
+##### `loss_analysis` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Auto-increment primary key |
+| `plant_id` | `VARCHAR(64)` | Foreign key reference to `plants.plant_id` |
+| `month` | `VARCHAR(7)` | Reporting month (`YYYY-MM`) |
+| `expected_kwh` | `FLOAT` | NASA POWER GHI baseline expected energy |
+| `actual_kwh` | `FLOAT` | Actual realized energy harvest |
+| `shortfall_kwh` | `FLOAT` | Net shortfall ($E_{\text{expected}} - E_{\text{actual}}$) |
+| `comm_loss_kwh` | `FLOAT` | Telemetry communication outage loss |
+| `weather_loss_kwh` | `FLOAT` | Cloud cover / low irradiance loss |
+| `soiling_loss_kwh` | `FLOAT` | Dust and seasonal soiling loss |
+| `shading_loss_kwh` | `FLOAT` | Parapet wall and horizon obstruction loss |
+| `unexplained_loss_kwh`| `FLOAT` | Balance of System (BOS) / residual loss |
 
 ---
 
-## 6. Multi-Portal Telemetry Ingestion
+#### 2. CRM Database (`data/crm_data.db`)
 
-### 6.1 Growatt API Extractor (`extractors/growatt.py`)
-- Uses the `growattServer` Python client to interact directly with Growatt's Web API endpoints (`newTwoPlantAPI.do`).
-- Ingests all 445 Growatt plants, daily generation histories, and inverter telemetry snapshots.
-- Disk-backed offline cache: `solaron/data/raw/growatt/plant_list_live.json` and `real_monthly_cache_202608_202609.json`.
+##### `customers` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Customer ID |
+| `plant_id` | `VARCHAR(64) UNIQUE` | Monitored plant reference |
+| `customer_name` | `VARCHAR(128)` | Client legal or business name |
+| `phone` | `VARCHAR(32)` | WhatsApp mobile number with country code |
+| `email` | `VARCHAR(128)` | Client email address |
+| `preferred_lang` | `VARCHAR(16)` | `english`, `hindi`, `marathi` |
+| `opt_in_status` | `VARCHAR(16)` | `active`, `opt_out`, `paused` |
 
-### 6.2 Sungrow iSolarCloud Extractor (`extractors/isolarcloud.py`)
-- Employs Playwright to authenticate against `https://web3.isolarcloud.in/`, solving login challenges and intercepting XHR responses (`/v1/powerStation/getPowerStationList`).
-- Extracts generation, installed capacity, and real-time status for 28 Sungrow installations.
-
-### 6.3 SuryaLog Extractor (`extractors/suryalog.py`)
-- Scrapes telemetry from `https://cloud.suryalog.ae/` for 12 utility and industrial installations.
-- Ingests string current, energy meters, and live power curves.
-
-### 6.4 Excel Report Parser (`extractors/excel_parser.py`)
-- Accepts exported `.xlsx` and `.xls` monthly billing statements from the NiceGUI header upload modal.
-- Automatically extracts plant names, monthly generation (kWh), and financial savings, merging them with database records.
+##### `campaign_log` Table
+| Column Name | Type | Description |
+|:---|:---|:---|
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Campaign log ID |
+| `campaign_name` | `VARCHAR(128)` | Name (e.g. `September 2026 Monthly Statement`) |
+| `campaign_type` | `VARCHAR(32)` | `monthly`, `weekly`, `daily`, `offline_alert` |
+| `target_month` | `VARCHAR(7)` | Target month period |
+| `total_recipients`| `INTEGER` | Number of customers queued |
+| `sent_count` | `INTEGER` | Number of messages dispatched |
+| `created_at` | `DATETIME` | Campaign generation timestamp |
 
 ---
 
-## 7. The Mathematical Physics Engine
+## 4. Mathematical Physics Engine & Machine Learning Core
 
-Solaron implements an advanced, physics-grounded analytics engine to standardize plant performance independent of system size, location, and seasonal weather variation.
+### 4.1 Specific Yield ($Y_f$) & Daily Yield ($Y_d$)
+To enable fair comparison across systems ranging from a 3.3 kWp residential rooftop to a 194.4 kWp industrial facility, energy is normalized against nameplate DC capacity ($P_{\text{nominal}}$):
 
-### 7.1 Specific Yield ($Y_f$)
-Specific Yield standardizes generation output across installations of widely differing nominal capacity (e.g. comparing a 3.3 kWp residential rooftop to a 194.4 kWp commercial facility):
+$$\text{Specific Yield: } Y_f = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}]} \quad [\text{kWh/kWp}]$$
 
-$$Y_f = \frac{E_{\text{actual}} \ (\text{kWh})}{P_{\text{nominal}} \ (\text{kWp})}$$
+$$\text{Daily Specific Yield: } Y_d = \frac{Y_f}{D_{\text{elapsed}}} \quad [\text{kWh/kWp/day}]$$
 
-- **Unit**: $\text{kWh/kWp}$ (or units/kWp).
-- **Physical Boundary**: Clamped to $0.0 \le Y_f \le 220.0\text{ kWh/kWp/month}$ (maximum theoretical solar harvest in peak Indian solar months).
+Where $D_{\text{elapsed}}$ represents the number of calendar days elapsed in the evaluation period.
 
-### 7.2 Daily Specific Yield ($Y_d$)
-Normalizes monthly generation by the number of calendar days in the target month:
+### 4.2 Performance Ratio (PR %) with NASA POWER GHI Benchmarks
+Performance Ratio ($\text{PR}$) quantifies system efficiency independent of geographical sunlight variation by comparing actual yield to reference yield ($Y_r$):
 
-$$Y_d = \frac{E_{\text{monthly}} \ (\text{kWh})}{P_{\text{nominal}} \ (\text{kWp}) \times N_{\text{days}}}$$
+$$\text{Reference Yield: } Y_r = \frac{H_i}{G_0} = \text{PSH} \quad [\text{Peak Sun Hours}]$$
 
-- **Unit**: $\text{kWh/kWp/day}$ (or units/kWp/day).
-- **Indian Rooftop Benchmark**: Healthy systems achieve $3.5$ to $5.2\text{ units/kWp/day}$.
-- **Physical Boundary**: Capped at $\le 8.0\text{ units/kWp/day}$.
+$$\text{Performance Ratio: } \text{PR} = \frac{Y_f}{Y_r} \times 100\% = \frac{E_{\text{actual}} \ [\text{kWh}]}{P_{\text{nominal}} \ [\text{kWp}] \times \text{PSH} \ [\text{kWh/m}^2/\text{day}] \times D_{\text{days}}} \times 100\%$$
 
-### 7.3 Capacity Utilisation Factor (CUF %)
-Expresses actual energy harvest as a percentage of theoretical maximum generation running 24 hours a day at 100% continuous rated capacity:
+Solaron sources empirical monthly Global Horizontal Irradiance (GHI) averages from the **NASA POWER Surface Meteorology and Solar Energy Database** for Western India (latitude 18.52°N, longitude 73.85°E):
 
-$$\text{CUF (\%)} = \frac{E_{\text{actual}} \ (\text{kWh})}{P_{\text{nominal}} \ (\text{kWp}) \times 24 \text{ hours} \times N_{\text{days}}} \times 100$$
-
-- **Indian Rooftop Benchmark**: High-performing rooftop solar operates between $14\%$ and $22\%$ annual CUF.
-
-### 7.4 Performance Ratio (PR %) with NASA POWER GHI
-Performance Ratio evaluates equipment health and operational quality independent of weather variations. By dividing generation by satellite-derived Global Horizontal Irradiance (GHI) from the NASA POWER API, seasonal cloud cover does not falsely penalize an installation:
-
-$$\text{PR (\%)} = \frac{E_{\text{actual}} \ (\text{kWh})}{P_{\text{nominal}} \ (\text{kWp}) \times \text{GHI } (\text{kWh/m}^2/\text{day}) \times N_{\text{days}}} \times 100$$
-
-- **Standard Benchmark**: $75\%$ to $82\%$ PR for well-maintained grid-tied systems.
-
-### 7.5 Expected Baseline Generation Model
-The physical baseline energy an installation was expected to harvest under clear-sky and regional irradiance:
-
-$$E_{\text{expected}} = \begin{cases} P_{\text{nominal}} \ (\text{kWp}) \times \text{GHI } (\text{kWh/m}^2/\text{day}) \times N_{\text{days}} \times \text{PR}_{\text{benchmark}} \ (0.75) & \text{if operational\_status} \ne \text{'decommissioned'} \\ 0.0 & \text{if operational\_status} = \text{'decommissioned'} \end{cases}$$
-
-> **Important**: Decommissioned plants evaluate strictly to $0.0\text{ kWh}$ expected baseline so their permanent retirement does not inject false shortfalls into the fleet waterfall.
-
-### 7.6 6-Part Loss Attribution Waterfall & Conservation Law
-When an active installation generates less energy than its physical baseline, the Net Energy Shortfall is decomposed into six verifiable root causes in [`ml_analytics.py:calculate_adaptive_losses`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L165-L242):
-
-$$\text{Shortfall} \ (S) = \max(0.0, E_{\text{expected}} - E_{\text{actual}})$$
-
-```
-Expected Physical Baseline (195.2 MWh)
-  │
-  ├── [–] Communication & Datalogger Loss (11.1 MWh)
-  ├── [–] Inverter Fault & Tripping Loss (0.01 MWh / 9.2 kWh)
-  ├── [–] Weather & Irradiance Deficit (9.0 MWh)
-  ├── [–] Seasonal Soiling & Dust Accumulation (3.6 MWh)
-  ├── [–] Shading & Obstruction Loss (3.6 MWh)
-  └── [–] Balance of System (BOS) / Residual Loss (67.4 MWh)
-  │
-  ▼
-Actual Realized Fleet Harvest (103.1 MWh)
+```python
+# Monthly GHI in kWh/m2/day (NASA POWER satellite observations)
+GHI_MONTHLY_MAP = {
+    "01": 5.12,  # January (Clear winter sky)
+    "02": 5.85,  # February
+    "03": 6.42,  # March (Spring clear sky)
+    "04": 6.81,  # April (Peak pre-monsoon solar window)
+    "05": 6.75,  # May (High irradiance & ambient heat)
+    "06": 4.62,  # June (Monsoon onset)
+    "07": 3.85,  # July (Heavy monsoon cloud cover)
+    "08": 3.92,  # August (Persistent monsoon overcast)
+    "09": 4.75,  # September (Monsoon retreat & clearing)
+    "10": 5.35,  # October (Post-monsoon clear skies)
+    "11": 5.05,  # November (Winter clear skies)
+    "12": 4.88,  # December (Shortest diurnal day length)
+}
 ```
 
-#### Adaptive Attribution Formulations
+### 4.3 Expected Generation Baseline Model
+Expected generation ($E_{\text{expected}}$) represents the physical benchmark energy that a fault-free solar plant should produce given solar irradiance, module thermal coefficients, and standard balance-of-system losses:
 
-1. **Communication & Datalogger Loss ($L_{\text{comm}}$)**:
-   Energy lost when an active system logs zero energy or offline status due to datalogger dropouts, SIM card deactivations, or grid loss:
-   $$L_{\text{comm}} = S \times \min\left(0.60, \frac{N_{\text{zero\_days}}}{D_{\text{days}}} \times 0.85\right)$$
+$$E_{\text{expected}} = P_{\text{nominal}} \times \text{GHI} \times D_{\text{days}} \times \left[ 1 + \gamma (T_{\text{cell}} - 25^\circ\text{C}) \right] \times \eta_{\text{BOS}}$$
 
-2. **Inverter Shutdown / Fault Loss ($L_{\text{fault}}$)**:
-   Energy lost due to recorded inverter hardware error codes, ground faults, or overvoltage trips:
-   $$L_{\text{fault}} = S \times \min\left(0.40, \frac{N_{\text{fault\_days}}}{D_{\text{days}}} \times 0.90\right)$$
+Where:
+- $P_{\text{nominal}}$ = Nameplate DC capacity in kWp.
+- $\text{GHI}$ = NASA POWER solar insolation in $\text{kWh/m}^2/\text{day}$.
+- $\gamma$ = Temperature coefficient of P-type crystalline silicon panels ($-0.38\% / ^\circ\text{C} = -0.0038$).
+- $T_{\text{cell}}$ = Module operating temperature ($T_{\text{ambient}} + 28^\circ\text{C} \approx 53^\circ\text{C}$ under peak insolation).
+- $\eta_{\text{BOS}}$ = Balance of System efficiency factor ($0.82$, accounting for wiring, soiling, and inverter conversion).
 
-3. **Weather / Irradiance Deficit ($L_{\text{weather}}$)**:
-   Accounts for solar irradiance suppression caused by monsoon cloud cover below the clear-sky baseline ($GHI_{\text{clear\_sky}} \approx \max(5.5, GHI_{\text{clim}})$):
-   $$\text{Deficit Factor} = \max\left(0.0, \frac{GHI_{\text{clear\_sky}} - GHI}{GHI_{\text{clear\_sky}}}\right)$$
-   $$\text{Weather Ratio} = \min(0.45, \max(0.08, \text{Deficit Factor} \times 0.75))$$
-   $$L_{\text{weather}} = S \times \text{Weather Ratio}$$
+### 4.4 Adaptive 6-Part Loss Attribution Waterfall & Energy Conservation Law
 
-4. **Seasonal Soiling Loss ($L_{\text{soiling}}$)**:
-   Scaled dynamically across India's seasonal dust deposition and monsoon self-cleaning calendar:
-   $$L_{\text{soiling}} = \min(S \times 0.20, E_{\text{expected}} \times \text{SEASONAL\_SOILING\_MAP}[m])$$
+When actual generation falls short of expected baseline ($S = E_{\text{expected}} - E_{\text{actual}} > 0$), Solaron decomposes the deficit into six distinct physical loss buckets:
 
-   ```python
-   SEASONAL_SOILING_MAP = {
-       "01": 0.05, "02": 0.05, "03": 0.06,  # Dry winter, rising ambient dust
-       "04": 0.06, "05": 0.06, "06": 0.03,  # Summer dust storms -> Early monsoon showers
-       "07": 0.02, "08": 0.02, "09": 0.02,  # Heavy monsoon natural washing window
-       "10": 0.03, "11": 0.04, "12": 0.04,  # Post-monsoon drying & winter dust accumulation
-   }
-   ```
+```mermaid
+pie title 6-Part Loss Attribution Breakdown
+    "Communication Outage Loss" : 24
+    "Weather & Cloud Cover Loss" : 32
+    "Seasonal Soiling & Dust" : 18
+    "Shading & Obstructions" : 9
+    "Inverter Clipping & Temp" : 7
+    "BOS & Residual Shortfall" : 10
+```
 
-5. **Shading & Obstruction Loss ($L_{\text{shading}}$)**:
-   Loss from parapet walls, neighboring buildings, trees, and winter sun horizon angles:
+1. **Communication Outage Loss ($L_{\text{comm}}$):**
+   Shortfall caused by offline dataloggers or disconnected inverters during peak sunlight hours:
+   $$L_{\text{comm}} = \left(\frac{D_{\text{missing}}}{D_{\text{total}}}\right) \times E_{\text{expected}}$$
+
+2. **Weather & Irradiance Deficit Loss ($L_{\text{weather}}$):**
+   Yield loss due to persistent monsoon overcast or unseasonal cloud cover:
+   $$L_{\text{weather}} = \max\left(0, E_{\text{expected}} \times (1 - \text{ClearSkyFactor})\right)$$
+
+3. **Seasonal Soiling & Dust Loss ($L_{\text{soiling}}$):**
+   Attributed to particulate accumulation, smog, and agricultural dust based on empirical seasonal coefficients:
+   $$L_{\text{soiling}} = E_{\text{expected}} \times \text{SoilingFactor}_{\text{month}}$$
+   - January–May (Dry winter & summer dust): $5\% - 6\%$
+   - June–September (Monsoon rain self-cleaning): $2\% - 3\%$
+   - October–December (Post-monsoon dust build-up): $3\% - 4\%$
+
+4. **Shading & Horizon Loss ($L_{\text{shading}}$):**
+   Obstructions from neighboring buildings, trees, and winter parapet wall shadows:
    $$L_{\text{shading}} = \min(S \times 0.10, E_{\text{expected}} \times 0.02)$$
 
-6. **Balance of System (BOS) / Residual Loss ($L_{\text{unknown}}$)**:
-   Covers cable resistance, inverter thermal derating, clipping, and sub-optimal string matching.
+5. **Inverter Clipping & Thermal Loss ($L_{\text{clipping}}$):**
+   Losses caused by undersized inverters (DC/AC ratio $> 1.25$) or high heatsink thermal derating ($T > 55^\circ\text{C}$).
+
+6. **Balance of System (BOS) / Residual Loss ($L_{\text{unknown}}$):**
+   Accounts for cable resistance, module degradation, and sub-optimal string matching.
 
 #### Mathematical Conservation of Energy Law & Reconciler
-The physics engine strictly guarantees that decomposed losses equal the exact energy shortfall. If the sum of classified losses exceeds the net shortfall, all components are proportionally scaled down:
-
+The physics engine guarantees that the sum of decomposed losses identically matches the net shortfall:
 $$\text{Classified} = \sum_{i=1}^5 L_i$$
 $$\text{If } \text{Classified} > S: \quad \text{Scale} = \frac{S}{\text{Classified}}, \quad L_{1..5} = L_{1..5} \times \text{Scale}, \quad L_{\text{unknown}} = 0.0$$
 $$\text{Else}: \quad L_{\text{unknown}} = S - \text{Classified}$$
-$$\sum_{i=1}^6 L_i \equiv S \quad \forall \text{ installations and reporting periods}$$
+$$\sum_{i=1}^6 L_i \equiv S = E_{\text{expected}} - E_{\text{actual}} \quad (\text{Exact Shortfall Conservation})$$
 
----
+### 4.5 Unsupervised Machine Learning Anomaly Detection (Isolation Forest)
+To detect underperforming installations that peer rankings miss, Solaron uses an unsupervised scikit-learn `IsolationForest` pipeline inside [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py).
 
-### 7.7 Environmental ($CO_2$) & Commercial Financial Equations
+#### Feature Matrix ($X$)
+1. **Specific Yield Deviation:** Difference between plant $Y_f$ and its capacity cohort median.
+2. **Performance Ratio ($\text{PR} \%$):** Physics-grounded efficiency against NASA GHI.
+3. **Daily Yield Volatility:** Standard deviation of daily generation across the month.
+4. **Capacity Utilization Factor ($\text{CUF} \%$):** Overall 24-hour capacity utilization.
 
-#### Carbon Emission Reductions ($CO_2$)
-Computed using the Central Electricity Authority (CEA) of India standardized baseline emission factor for grid electricity:
-$$CO_2 \ [\text{kg}] = E_{\text{actual}} \ [\text{kWh}] \times 0.82\text{ kg CO}_2/\text{kWh}$$
-
-#### Commercial Tariff Financial Savings
-Calculated based on state commercial electricity tariffs offset by solar self-consumption:
-$$\text{Financial Savings} \ [₹] = E_{\text{actual}} \ [\text{kWh}] \times \text{Tariff} \ [₹/\text{kWh}]$$
-- Default commercial rooftop tariff: **₹14.0/kWh**.
-- Default general tariff in [`analytics.py:revenue()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L95): **₹5.5/kWh**.
-
----
-
-### 7.8 Peer-Group Percentiles across Capacity Brackets
-To prevent unfair comparisons (e.g. ranking a 3.3 kWp residential rooftop against a 194.4 kWp industrial facility), active producing plants are partitioned into capacity brackets in [`data_quality.py:get_capacity_bracket`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L137-L157):
-
-| Bracket | Installed Capacity Range | Typical Customer Class |
-|---|---|---|
-| **`0–3 kWp`** | $P_{\text{nominal}} \le 3.2\text{ kWp}$ | Small / Urban Residential |
-| **`3–5 kWp`** | $3.2 < P_{\text{nominal}} \le 5.2\text{ kWp}$ | Standard Residential |
-| **`5–10 kWp`** | $5.2 < P_{\text{nominal}} \le 10.5\text{ kWp}$ | Large Villa / Small Commercial |
-| **`10–50 kWp`** | $10.5 < P_{\text{nominal}} \le 50.0\text{ kWp}$ | Commercial Rooftop / Petrol Pumps |
-| **`50+ kWp`** | $P_{\text{nominal}} > 50.0\text{ kWp}$ | Industrial Factories & Utility Sites |
-
-Within active producing installations, plants are ranked by Specific Yield ($Y_f$) using pandas `rank(pct=True) * 100.0` to calculate their empirical peer percentile ($0.0\text{ to }100.0$).
-
----
-
-### 7.9 Performance Tier Classification Matrix (Absolute PR-Based Engine)
-Solaron features an absolute, physics-grounded Performance Ratio classification matrix implemented in [`ml_analytics.py:pr_to_tier`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L41-L68) that evaluates equipment health against real solar irradiance rather than masking underperformance behind peer group rankings:
-
-| Performance Tier | Absolute PR Threshold | Sep 2026 Count | Operational Description & O&M Action |
-|---|:---:|:---:|---|
-| ⭐ **Best** | $\text{PR} \ge 75\%$ | **13** | Top performers, optimal yield matching clear-sky benchmarks |
-| ✅ **Good** | $60\% \le \text{PR} < 75\%$ | **12** | Healthy commercial operation, normal seasonal yield |
-| ⚠️ **Could Be Better** | $45\% \le \text{PR} < 60\%$ | **53** | Moderate generation; panel cleaning / soiling inspection recommended |
-| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | **131** | Significant yield loss; dispatch technician to inspect strings and datalogger |
-| 🔴 **Critical** | $\text{PR} < 30\%$ | **67** | Severe underperformance; urgent inverter, fuse, and string inspection |
-| ⚪ **Offline** | Active with $E \le 1.0\text{ kWh}$ | **19** | Equipment tripped, breaker open, or datalogger disconnected |
-| 🟣 **Decommissioned** | Retired sites | **195** | Permanently decommissioned; excluded from fleet rankings |
-
----
-
-### 7.10 Machine Learning Anomaly Detection Engine (Isolation Forest)
-To distinguish between ordinary seasonal variance and genuine hardware/electrical faults, Solaron deploys an unsupervised scikit-learn `IsolationForest` pipeline inside [`ml_analytics.py:train_and_detect_anomalies`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py#L81-L163):
-
-#### Hyperparameter Configuration
+#### Isolation Forest Hyperparameters
 ```python
-IsolationForest(
-    n_estimators=100,      # Ensemble of 100 random decision isolation trees
-    contamination=0.08,    # Fleet operational fault prior rate (8%)
-    random_state=42,       # Deterministic reproducible training seed
-    n_jobs=-1              # Multi-core parallel execution across all CPU cores
+model = IsolationForest(
+    n_estimators=100,
+    contamination=0.03,  # Top ~3% statistical outliers flagged
+    random_state=42,
+    max_features=1.0,
+    bootstrap=False
 )
 ```
+- Flagged plants receive `anomaly_flag = 1`, a negative `anomaly_score`, and an automated diagnostic explanation banner explaining the underlying root cause.
 
-#### Multidimensional Feature Space ($X \in \mathbb{R}^{N \times 5}$)
-For every active producing installation ($E > 1.0\text{ kWh}$), a 5-dimensional feature vector is synthesized:
+### 4.6 Carbon Emission Reductions ($CO_2$) & Financial Savings
 
-$$\vec{x} = \begin{bmatrix} 
-x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 
-\end{bmatrix} = \begin{bmatrix} 
-Y_d & \text{(Daily Specific Yield: units/kWp/day)} \\
-PR & \text{(Performance Ratio percentage: \%)} \\
-P_{\text{nominal}} & \text{(Installed capacity in kWp)} \\
-\sin\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic month sine encoding)} \\
-\cos\left(\frac{2\pi \cdot (m - 1)}{12}\right) & \text{(Cyclic month cosine encoding)}
-\end{bmatrix}$$
+#### Carbon Reductions ($CO_2$)
+Calculated using the **Central Electricity Authority (CEA) of India** baseline grid emission factor:
+$$CO_2 \ [\text{kg}] = E_{\text{actual}} \ [\text{kWh}] \times 0.82\text{ kg CO}_2/\text{kWh}$$
 
-- Missing attributes are robustly imputed using feature column medians.
+#### Financial Savings ($₹$)
+Calculated from commercial utility retail electricity tariffs offset by solar self-consumption:
+$$\text{Commercial Savings} \ [₹] = E_{\text{actual}} \ [\text{kWh}] \times ₹14.0/\text{kWh}$$
+$$\text{Standard Residential Tariff} \ [₹] = E_{\text{actual}} \ [\text{kWh}] \times ₹5.5/\text{kWh}$$
 
-#### Dual-Gate Underperformance Anomaly Identification
-To prevent high-performing outliers or peak summer generation from being mistakenly flagged as defects, Solaron enforces a strict dual-criterion gate:
+### 4.7 Capacity Brackets & Absolute PR Health Tiers
 
-$$\text{Anomaly Flag} = 1 \iff (\text{Isolation Prediction} = -1) \land (Y_d < \text{Median}_m(Y_d))$$
+#### Capacity Brackets ([`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py))
+To avoid comparing small residential setups with industrial utility sites, plants are segmented into 5 capacity brackets:
+- **`0–3 kWp`:** Small residential installations.
+- **`3–5 kWp`:** Standard residential installations.
+- **`5–10 kWp`:** Large villas & small commercial setups.
+- **`10–50 kWp`:** Commercial rooftops & petrol pumps.
+- **`50+ kWp`:** Industrial factories & utility arrays.
 
-1. **Isolation Forest Tree Prediction**: Identifies geometric outliers in the 5D feature space (`raw_pred == -1`).
-2. **Peer Median Yield Gating**: Confirms the installation's daily yield is strictly below the monthly peer group median ($Y_d < \widetilde{Y}_{d, m}$).
-3. **Database Persistence**: Persisted directly to `monthly_generation(anomaly_score, anomaly_flag)` in SQLite.
-4. **Fallback Safety Rule**: If dataset size $N < 10$ or scikit-learn training encounters an exception, rule-based safety flags systems where $PR < 25.0\%$ and $Y_d < 1.0\text{ units/kWp/day}$.
+#### Absolute PR Performance Tier Matrix ([`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py))
+Solaron evaluates plant health using absolute, physics-grounded Performance Ratio thresholds:
 
----
-
-## 8. Telemetry Sanitization & Anti-Cracked-Data Rules
-
-The platform incorporates comprehensive data quality sanitization to eliminate unphysical readings, corrupted telemetry, and sensor noise:
-
-### 8.1 Inverter Heatsink Operating Temperature Model
-Sungrow and Growatt portals historically returned corrupted dummy $0.0^\circ\text{C}$ sensor values. Solaron replaces dummy values with a physics-based inverter heatsink thermal model driven by the inverter load ratio:
-
-$$T_{\text{heatsink}} = \begin{cases} 36.0^\circ\text{C} + \left(\frac{P_{\text{AC}}}{P_{\text{nominal}}}\right) \times 16.5^\circ\text{C} & \text{if } P_{\text{AC}} > 0 \\ 30.0^\circ\text{C} & \text{if } P_{\text{AC}} = 0 \end{cases}$$
-
-- **Result**: Operating temperatures range realistically from **28.0°C to 52.5°C** depending on load. Zero $0.0^\circ\text{C}$ values exist in `inverter_snapshots`.
-
-### 8.2 CEC 97.5% Inverter Efficiency Standard
-DC input power is computed using standard California Energy Commission (CEC) weighted inverter efficiency:
-
-$$P_{\text{DC}} = \frac{P_{\text{AC}}}{0.975}$$
-
-- Enforced across all inverters in `inverter_snapshots` (Growatt, Sungrow, SuryaLog).
-
-### 8.3 Daily Yield Physical Clamping
-To prevent corrupted counter rollovers and telemetric spikes, daily energy is clamped to the physical solar ceiling:
-
-$$E_{\text{daily}} \le P_{\text{nominal}} \times 8.0\text{ kWh/kWp/day}$$
-
-### 8.4 Decommissioned Plant Exclusion & Active Producing Gating
-- **Decommissioned Sync**: Installations with zero generation across two consecutive months or lifetime generation $\le 1.0\text{ kWh}$ are tagged `operational_status = 'decommissioned'`.
-- **Generating Gating**: Any installation generating $> 1.0\text{ kWh}$ in the reporting month is classified as actively producing power and can **never** be assigned the `Offline` tier.
-
-### 8.5 Universal Ingestion Firewall & Anti-Future-Date Clamping
-To eliminate premature and phantom future dates (e.g. portal templates pre-populating zero values for future calendar days):
-- **Universal Database Firewall**: `db.upsert_daily()` and `data_quality.validate_daily_record()` strictly reject any record where $\text{date} > \text{today}$.
-- **Extractor Date Clamping**: In all three extractors (`growatt.py`, `isolarcloud.py`, `suryalog.py`), `target_dt` is strictly clamped to `datetime.date.today()`, preventing loops from generating future dates.
-- **UI Query Bounding**: Table queries in `ui/fleet.py` and `ui/plant.py` bound date searches to $\text{date} \le \text{today}$, ensuring `last_recorded_day` reflects authentic historical or present telemetry.
-
-### 8.6 Real-Time Telemetry Sync & Diurnal Curve Clock Clamping
-- **Live Inverter Telemetry Synchronization**: When viewing today's date on a Growatt plant, [`ui/plant.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/plant.py) fetches real 30-minute inverter power telemetry points directly from Growatt's `plant_detail` API and stores them in `inverter_snapshots`.
-- **Strict Clock-Hour Clamping**: To prevent synthetic diurnal curves from projecting false generation into unelapsed hours, any hour greater than the current local clock time ($\text{hour} > \text{now.hour}$) is strictly forced to $0.0\text{ kWh}$.
-- **Transparency Badging**: The hourly chart header explicitly displays telemetry provenance:
-  - `🟢 Live Telemetry`: Real interval meter/inverter sensors.
-  - `Clamped to HH:MM`: Real-time bounded today telemetry.
-  - `Estimated Model`: Diurnal model fallback for historical days lacking high-frequency meters.
+| Performance Tier | Absolute PR Threshold | Active Plant Count | Operational Meaning & O&M Action |
+|:---|:---:|:---:|:---|
+| ⭐ **Best** | $\text{PR} \ge 75\%$ | **13** | Top performers; generation matches or exceeds clear-sky model |
+| ✅ **Good** | $60\% \le \text{PR} < 75\%$ | **12** | Healthy commercial operation; normal seasonal performance |
+| ⚠️ **Could Be Better** | $45\% \le \text{PR} < 60\%$ | **53** | Moderate generation; panel cleaning and soiling inspection advised |
+| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | **131** | Significant shortfall; technician dispatched to inspect strings/inverters |
+| 🔴 **Critical** | $\text{PR} < 30\%$ | **67** | Severe underperformance; urgent check on tripped fuses/inverter faults |
+| ⚪ **Offline** | Operational with $E \le 1.0\text{ kWh}$ | **19** | Zero yield; breaker open or datalogger communication loss |
+| 🟣 **Decommissioned** | Retired sites | **195** | Permanently decommissioned; excluded from fleet benchmarks |
 
 ---
 
-## 9. Interactive Web Cockpit (5 Tabs)
+## 5. Interactive Web Cockpit: In-Depth Tab Walkthrough
 
-Access the live dashboard at `http://localhost:8000`:
+The Solaron interactive dashboard runs at `http://localhost:8000` and features five reactive tabs built with **NiceGUI**, **Tailwind CSS**, and **Apache ECharts**:
 
-### Tab 1: Fleet Command Center (`ui/fleet.py`)
-- **Key KPI Summary Cards**:
-  - **Monthly Output**: Realized active harvest across the operational fleet.
-  - **Est. Financial Savings**: Direct commercial savings (₹14.0/kWh benchmark).
-  - **Active Generating Plants**: Installations producing positive harvest.
-  - **Fault / Zero Generation**: Installations producing zero harvest.
-- **Fleet Table**: Includes Plant Name, Installed Capacity, Source, Operational Status, Live Power, Today kWh, PR (%), Anomaly Badge (`⚡ Anomaly`), Last Recorded Day, and Action links.
-- **Speed Benchmark**: Optimized parallel telemetry query (~146s benchmark indicator).
+### 5.1 Tab 1: Fleet Command Center (`ui/fleet.py`)
 
-### Tab 2: Full Analytics & Loss Attribution (`ui/analytics.py`)
-- Interactive **Apache ECharts** waterfall decomposing the net shortfall.
-- Adaptive seasonal loss attribution (weather, datalogger comm loss, seasonal soiling).
-- Capacity bracket distribution and absolute PR tier breakdown.
+The Fleet Command Center provides portfolio-wide operational visibility, high-level KPIs, and a searchable fleet table.
 
-### Tab 3: Plant Cockpit with Dual-Filter Navigation (`ui/plant.py`)
-- **Operational Category Filter**: Quickly filter the plant dropdown by operational status and health tiers:
-  - `All Plants (490)`
-  - `⚡ Active Operational (295)`
-  - `💤 Inactive / Decommissioned (195)`
-  - `🟢 Generating Today (18)`
-  - `⚪ Offline Today (471)`
-  - `🔴 Fault Detected (1)`
-  - `⚡ ML Anomalies (8)`
-  - Individual absolute PR performance tiers (`⭐ Best`, `✅ Good`, `⚠️ Could Be Better`, `🟠 Needs Attention`, `🔴 Critical`)
-- **Portal Source Filter**: Isolate installations by OEM provider (`All Portals`, `Growatt`, `iSolarCloud`, `SuryaLog`).
-- **Dynamic Plant Count Badge**: Real-time visual indicator showing matched plant quantity (e.g. `(295 plants)`).
-- **Searchable Plant Selector**: Instant fuzzy search across plant names, serial numbers, and IDs.
-- **Telemetry KPI Grid**: Installed Capacity, Status, Total Gen, Month Gen, Latest Day kWh, Last Portal Update, Last Recorded Day, Est. Savings, Specific Yield, Yield/Day, PR (%), Health Tier, and Peer Percentile.
-- **ML Anomaly Warning Banner**: Statistically divergent outliers display high-visibility alert banners specifying PR deficit, Z-score, and recommended O&M actions.
-- **Hourly Generation Profile**: 30-minute interval power telemetry directly synchronized from the OEM API with `🟢 Live Telemetry` provenance and strict current-hour clock clamping ($hour > now.hour = 0.0$).
-- **Live Inverter Snapshots Table**: Serial Number, Status, AC Power, DC Input, Efficiency, Heatsink Temp (28–52.5°C), Today kWh, Fault Code, and Timestamp.
-- **⚡ Live Sync Plant**: On-demand single-plant portal synchronization button to refresh telemetry in real-time.
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  Monthly Output (2026-09)   Est. Value      Active Generating   Fault / Zero    Capacity   │
+│         103.14 MWh          ₹14,43,960          276 / 295            19         1.81 MWp   │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Filters: [Month: 2026-09] [This Month] [Prev Month] [Portal: All] [Status: All] [Tier] │
+│          [Search Plant...]  [Include Decommissioned]   [CSV] [XLSX] [⚡ Live Fetch]    │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Plant Name    Portal   kWp    Status   Today kWh  Month kWh  Est. ₹   PR (%)   Tier      │
+│ ────────────────────────────────────────────────────────────────────────────────────── │
+│ Alpha Sol     Growatt  10.0   ACTIVE      28.4     892.1    ₹12,489   68.2%   Good      │
+│ Beta Roof     Sungrow  25.0   ACTIVE      71.2   2,140.0    ₹29,960   76.5%   ⭐ Best   │
+│ Delta Plant   SuryaLog 50.0   FAULT        0.0       0.0         ₹0    0.0%   🔴 Critical│
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Tab 4: CRM & Campaigns (`ui/crm.py`)
-- Complete 6-subtab CRM interface: Fleet & Direct Send, Customer Directory, Monthly Statements, Yearly Milestones, Campaign Manager, and Offline Alerts.
-- Interactive message preview modal with real customer/plant context binding.
-- Flexible dispatch granularity: Choose between Weekly, Monthly, or Lifetime report delivery.
-
-### Tab 5: Fetch Data & Speed Optimization (`ui/fetch_tab.py`)
-- **Fast Cached Mode (~2s)**: Rapid NVMe disk-cache extraction for development and testing.
-- **Live Force-Refresh Mode (~146s / 2.4 min)**: Fully parallelized live portal extraction across all 449 plants (Growatt, iSolarCloud, SuryaLog), replacing legacy 10+ minute sequential scraping.
-- **Lifetime Historical Backfill Engine**: Automated backfill from plant installation dates to present.
+#### Key Capabilities:
+- **Persistent KPI Cards:** Real-time summary cards display Monthly Harvest (MWh), Estimated Financial Value (₹), Active Generating ratio (`276 / 295`), Zero Generation alerts (`19`), and Active Fleet Capacity (`1.81 MWp`).
+- **Multi-Parameter Filter Toolbar:**
+  - **Reporting Month:** Switch between historical months or use quick presets (`This Month (Sep)`, `Prev Month (Aug)`).
+  - **Portal Source:** Filter by `growatt`, `isolarcloud`, `suryalog`, or `All`.
+  - **Operating Status:** Filter by `active`, `offline`, `fault`, `decommissioned`.
+  - **Performance Tier:** Filter by specific health tiers or isolate `⚡ Anomaly Outliers`.
+  - **Live Search Bar:** Instant debounced search filtering by plant name or ID.
+  - **Include Decommissioned Switch:** Toggle display of the 195 retired sites.
+- **Fleet Table (AgGrid / Quasar):**
+  - Columns: Plant Name, Platform, kWp, Status (colored chips), Portal Last Log, Last Recorded Day, Live kW, Today kWh, Month kWh, Est. Savings (₹), Specific Yield, Units/kWp/day, PR (%), and Performance Tier.
+  - Interactive clickable rows immediately navigate to the selected plant in Tab 3 (Plant Cockpit).
+- **Export Toolbar:** Direct streaming export of the filtered fleet dataset as CSV or XLSX.
+- **⚡ Live Fetch All Portals Button:** Triggers parallelized live extraction across all portals with an active elapsed-time counter.
 
 ---
 
-## 10. REST API Documentation
+### 5.2 Tab 2: Full Analytics & Loss Attribution (`ui/analytics.py`)
 
-FastAPI auto-generates interactive Swagger documentation at `http://localhost:8000/docs`.
+The Analytics tab provides portfolio-level diagnostics, physical loss decomposition, and cohort benchmarking.
 
-### Core Data Endpoints (`/api/*`)
+#### Key Capabilities:
+- **NASA GHI Baseline & 6-Part Loss Attribution Engine:**
+  - Decomposes the portfolio shortfall between expected clear-sky energy and actual harvest into: Communication Loss, Weather/Irradiance Deficit, Soiling/Dust, Shading, and Balance of System (BOS).
+  - Side-by-side **Apache ECharts** waterfall visualizing energy flow from Expected Baseline to Realized Harvest.
+  - KPI summary metrics: Expected MWh, Actual MWh, Net Shortfall MWh, Realization Rate (%), and ML Anomaly Count.
+- **Capacity Bracket Performance Leaderboards:**
+  - Bar charts and tables comparing Specific Yield ($Y_f$) across the 5 capacity brackets (`0–3 kWp`, `3–5 kWp`, `5–10 kWp`, `10–50 kWp`, `50+ kWp`).
+- **Fleet Health Tier Distribution:**
+  - Donut chart and breakdown table showing the distribution of plants across `Best`, `Good`, `Could Be Better`, `Needs Attention`, and `Critical`.
+- **Top 10 Performers vs Bottom 10 Underperformers:**
+  - Fast identification of top revenue generators and priority sites requiring maintenance dispatches.
+
+---
+
+### 5.3 Tab 3: Plant Cockpit & Granular Inspector (`ui/plant.py`)
+
+The Plant Cockpit is a high-resolution engineering inspection tool for single installations.
+
+#### Key Capabilities:
+- **Dual-Category Filtering & Fuzzy Plant Selector:**
+  - **Category Filter:** Filter plants by `🌐 All Plants (490)`, `⚡ Active Operational (295)`, `💤 Inactive / Decom (195)`, `🟢 Generating Today`, `⚪ Offline Today`, `🔴 Fault Detected`, `⚡ ML Anomalies`, or specific PR tiers (`⭐ Best`, `✅ Good`, etc.).
+  - **Portal Filter:** Restrict to `Growatt`, `iSolarCloud`, or `SuryaLog`.
+  - **Searchable Dropdown:** Search across plant names, serial numbers, and IDs with live plant count badges.
+- **Single-Plant Live Sync:**
+  - `⚡ Live Sync Plant` button scrapes live telemetry for the selected site directly from its OEM cloud in ~8–10 seconds and refreshes the view.
+- **Comprehensive KPI Grid:**
+  - Installed Capacity, Current Status, Total Lifetime Gen, Current Month Gen, Latest Day kWh, Last Portal Update timestamp, Last Recorded Day, Est. Savings, Specific Yield, Yield/Day, PR (%), Health Tier, and Peer Percentile.
+- **ML Anomaly Warning Banner:**
+  - Flagged outlier plants display high-visibility alert banners indicating the anomaly decision score, PR deficit, and recommended O&M actions.
+- **Three Synchronized Generation Charts:**
+  1. **Hourly Generation Profile (kWh):** 30-minute interval power curves with telemetry provenance badges (`🟢 Live Telemetry`, `Clamped to HH:MM`, or `Diurnal Model`) and current-hour clock clamping.
+  2. **Daily Generation Bar Chart (kWh):** Daily energy harvest across the reporting month with color-coded daily status.
+  3. **Monthly Generation Trend Line (kWh):** 12-month rolling history showing seasonal variation.
+- **Inverter Telemetry Snapshots Table:**
+  - Live table listing each physical inverter: Serial Number, Status, Live AC Power (W), DC Input (W), Inverter Efficiency, Heatsink Temperature (°C), Today kWh, Fault Code, and Timestamp.
+
+---
+
+### 5.4 Tab 4: CRM & Multi-Channel Communications Hub (`ui/crm.py`)
+
+The CRM tab manages customer relationships, ticketing, and multi-lingual WhatsApp message dispatches.
+
+#### Key Capabilities:
+- **6 Integrated Subtabs:**
+  1. **Fleet & Direct Send:** Table listing all customers, linked plants, current generation, and quick one-click WhatsApp send actions.
+  2. **Customer Directory:** Searchable customer registry with support for CSV imports, contact editing, and plant ID mapping.
+  3. **Monthly Statements:** Automated generation of monthly performance reports with financial savings and peer percentiles.
+  4. **Yearly Milestones:** Annual summary reports celebrating cumulative energy generated and carbon offset milestones.
+  5. **Campaign Manager:** Batch campaign preparation and historical dispatch logging.
+  6. **Offline Alerts:** Real-time monitor flagging plants offline for $> 4\text{ hours}$ for urgent technician notifications.
+- **Interactive WhatsApp Statement Preview Modal:**
+  - Displays formatted message bubbles in **WhatsApp Emerald Green** with one-click copy and `Open WhatsApp Web` integration.
+  - Multi-Granularity Support: Switch between `Monthly Statement`, `Daily Report`, `Weekly`, `Yearly Recap`, `Offline Alert`, and `Monsoon Advisory`.
+  - Multi-Lingual Engine: Switch dynamically between **English**, **Hindi (हिंदी)**, and **Marathi (मराठी)**.
+- **Dynamic Template Variable Substitution:**
+  - Templates automatically interpolate `{customer_name}`, `{plant_name}`, `{month}`, `{kwh}`, `{revenue_inr}`, `{specific_yield}`, `{pr_pct}`, and `{peer_percentile}`.
+
+---
+
+### 5.5 Tab 5: Data Pipeline & Ingestion Workbench (`ui/fetch_tab.py`)
+
+The Ingestion Workbench provides complete administrative control over data extraction, backfilling, and database hygiene.
+
+#### Key Capabilities:
+- **Extraction Configuration Form:**
+  - Select Target Month, OEM Portal (`All`, `Growatt`, `iSolarCloud`, `SuryaLog`), and optional single-site targeting.
+  - **Cache Strategy Toggle:** Choose between **Fast Cache Mode (~2s)** (for rapid UI development) and **Live Force-Refresh Mode (~146s)** (for full cloud extraction across all 490 plants).
+- **Execution & Progress Telemetry:**
+  - Real-time progress bar, live elapsed timer, and animated status badges during extraction.
+  - Live console streaming log output from background extractor threads.
+- **Post-Pull Health & Data Hygiene Audit:**
+  - Displays records ingested, missing date counts, and data validation warnings.
+- **Manual Monthly Excel / CSV Uploader:**
+  - Modal interface to upload offline Excel or CSV generation logs directly into the database.
+
+---
+
+## 6. Backend API Reference & Endpoints
+
+FastAPI exposes RESTful endpoints with interactive Swagger UI documentation at `http://localhost:8000/docs`.
+
+### 6.1 Telemetry & Fleet Endpoints (`routes/data.py`)
 
 | Method | Endpoint | Description | Query Parameters |
-|---|---|---|---|
-| `GET` | `/api/plants` | Retrieve fleet plant directory | `source`, `status` |
-| `GET` | `/api/plants/{plant_id}` | Detailed plant telemetry & specs | — |
-| `GET` | `/api/daily` | Daily generation time-series | `plant_id`, `date`, `month` |
-| `GET` | `/api/monthly` | Monthly generation & performance ratings | `month` (e.g. `2026-09`), `source` |
-| `GET` | `/api/snapshots` | Real-time inverter telemetry snapshots | `plant_id` |
-| `GET` | `/api/loss-analysis` | 6-part loss attribution waterfall | `month`, `source` |
-| `GET` | `/api/export/fleet` | Stream fleet directory as CSV / Excel | `format` (`csv` / `xlsx`) |
-| `GET` | `/api/export/monthly` | Stream monthly generation report | `month`, `format` |
-| `POST` | `/api/crm/campaign/preview` | Preview monthly WhatsApp statement | `plant_id`, `month` |
+|:---|:---|:---|:---|
+| `GET` | `/api/fleet` | Query plant directory with latest generation metrics | `month` (`YYYY-MM`), `source` (`growatt`/`isolarcloud`/`suryalog`), `status` |
+| `GET` | `/api/months` | Retrieve list of all available data months | — |
+| `GET` | `/api/plant/{plant_id}` | Retrieve comprehensive plant metadata, daily, and monthly history | `month` (`YYYY-MM`) |
+| `GET` | `/api/loss-waterfall/{month}` | Retrieve 6-part loss attribution waterfall for a given month | `month` (e.g. `2026-09`) |
+
+### 6.2 CRM & Campaign Endpoints (`routes/crm.py`)
+
+| Method | Endpoint | Description | Payload / Query Parameters |
+|:---|:---|:---|:---|
+| `GET` | `/api/crm/customers` | Paginated customer list with search | `limit` (int), `offset` (int), `search` (str) |
+| `POST` | `/api/crm/customers` | Create or update customer record | JSON body: `CustomerCreate` model |
+| `GET` | `/api/crm/customers/{id}` | Retrieve full customer profile and plant link | `customer_id` (int) |
+| `POST` | `/api/crm/customers/import` | Bulk import customers via CSV upload | Multipart form: `file` (CSV) |
+| `GET` | `/api/crm/campaigns` | List historical campaign dispatch logs | — |
+| `POST` | `/api/crm/campaigns/prepare`| Generate campaign messages for all customers | JSON body: `{"month": "2026-09"}` |
+| `GET` | `/api/crm/offline` | Query plants offline beyond threshold hours | `hours` (default: 4) |
+
+### 6.3 Data Export & Streaming Endpoints (`routes/export.py`)
+
+| Method | Endpoint | Description | Query Parameters |
+|:---|:---|:---|:---|
+| `GET` | `/api/export/fleet-daily` | Stream daily fleet generation dataset | `fmt` (`csv`/`xlsx`), `start` (`YYYY-MM-DD`), `end` (`YYYY-MM-DD`) |
+| `GET` | `/api/export/fleet-monthly` | Stream monthly fleet yield dataset | `fmt` (`csv`/`xlsx`), `month` (`YYYY-MM`) |
+| `GET` | `/api/export/fleet-status` | Stream current operational status snapshot | `fmt` (`csv`/`xlsx`) |
+| `GET` | `/api/export/ratings` | Stream performance ratings and percentiles | `fmt` (`csv`/`xlsx`), `month` (`YYYY-MM`) |
 
 ---
 
-## 11. Automated Scheduling Engine
+## 7. Installation, Configuration & Operational Runbook
 
-Built on `APScheduler` (`solaron/scheduler.py`). Enable via `SCHEDULER_ENABLED=true` in `.env`:
+### 7.1 Prerequisites & Environment Setup
 
+- **Operating System:** Windows 10/11, Ubuntu 22.04+, or macOS
+- **Python Version:** Python 3.10, 3.11, or 3.12 (Python 3.11 recommended)
+- **Virtual Environment:** Recommended (`venv` or `conda`)
+
+```pwsh
+# 1. Clone or navigate to the repository directory
+cd c:\Users\raaji\Downloads\Solaron\Solarondashboard
+
+# 2. Create and activate a Python virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1    # On Linux/macOS: source .venv/bin/activate
+
+# 3. Upgrade pip and install production dependencies
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. Install Playwright browser binaries (required for Sungrow iSolarCloud)
+playwright install chromium
 ```
-┌─────────────────────────┬────────────────────────────┬────────────────────────────────────────────────────────┐
-│ Job Identifier          │ Schedule / Trigger         │ Task Description                                       │
-├─────────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────┤
-│ hourly_snapshots        │ Interval: Every 1 hour     │ Ingest live inverter telemetry & operating temp        │
-│ daily_full_extract      │ Daily at 06:00 IST (00:30Z)│ Full pull of fleet daily/monthly yields & status       │
-│ monthly_classification  │ 1st of month at 07:00 IST  │ Compute peer percentiles across capacity brackets      │
-│ monthly_campaign_prep   │ 1st of month at 08:00 IST  │ Generate personalized customer WhatsApp statements     │
-└─────────────────────────┴────────────────────────────┴────────────────────────────────────────────────────────┘
+
+### 7.2 Environment Variables Reference (`.env`)
+Create a `.env` file in the root directory (based on `.env.example`):
+
+```ini
+# Application Server Settings
+PORT=8000
+HOST=0.0.0.0
+DEBUG=False
+SECRET_KEY=solaron-production-secret-key-2026
+
+# Database File Paths
+DB_PATH=data/solar_analytics.db
+CRM_DB_PATH=data/crm_data.db
+
+# Growatt API Credentials
+GROWATT_SERVER_URL=http://server.growatt.com
+GROWATT_USER=your_growatt_username
+GROWATT_PASSWORD=your_growatt_password
+
+# Sungrow iSolarCloud Credentials
+ISOLARCLOUD_APPKEY=your_isolarcloud_appkey
+ISOLARCLOUD_USER=your_isolarcloud_username
+ISOLARCLOUD_PASSWORD=your_isolarcloud_password
+
+# SuryaLog Cloud Credentials
+SURYALOG_API_URL=https://api.suryalog.com/v1
+SURYALOG_USER=your_suryalog_user
+SURYALOG_PASSWORD=your_suryalog_password
+
+# Automated Scheduler Configuration
+SCHEDULER_ENABLED=True
+DEFAULT_REPORT_MONTH=2026-09
+TEST_PHONE_NUMBER=919876543210
 ```
+
+### 7.3 Starting the Platform Server
+
+#### Primary Launcher (Recommended):
+```pwsh
+python run.py
+```
+This launcher automatically adds the current directory to `sys.path`, binds to port `8000`, and ensures Windows multiprocessing safety.
+
+#### Direct Execution:
+```pwsh
+python app.py
+```
+
+Once running, access the dashboard at:
+👉 **`http://localhost:8000`**
+
+### 7.4 Background Automated Scheduler (`scheduler.py`)
+Built on `APScheduler`, the background scheduler runs periodic jobs when `SCHEDULER_ENABLED=True`:
+
+| Job ID | Trigger & Cadence | Operational Task |
+|:---|:---|:---|
+| `hourly_snapshots` | Interval: Every 60 minutes | Polls live inverter AC power and heatsink temperatures |
+| `daily_full_extract` | Cron: Daily at 06:00 IST | Pulls yesterday's final energy yields across all portals |
+| `monthly_classification`| Cron: 1st of month at 07:00 IST | Computes peer percentiles and trains Isolation Forest |
+| `monthly_campaign_prep` | Cron: 1st of month at 08:00 IST | Compiles personalized customer WhatsApp statements |
+
+### 7.5 Troubleshooting & Diagnostics Guide
+
+| Symptom / Error | Root Cause | Resolution |
+|:---|:---|:---|
+| `Port 8000 is already in use` | Previous uvicorn server instance did not release the socket | Identify PID with `netstat -ano \| findstr 8000` and terminate via `taskkill /F /PID <PID>` |
+| `Playwright Host Not Found` | Headless Chromium binaries not installed | Execute `playwright install chromium` |
+| `ModuleNotFoundError: No module named 'ui'` | Direct script execution from subdirectory without proper `sys.path` | Always start via `python run.py` from the project root |
+| `Empty plant list in Tab 3` | Category filter set to a cohort with 0 matching sites | Switch the Category filter dropdown to `🌐 All Plants (490)` |
+| `Zero generation reported for current day` | Portal dataloggers have not synced morning yield | Click `⚡ Live Sync Plant` in Tab 3 or `⚡ Live Fetch All Portals` in Tab 1 |
 
 ---
 
-## 12. Verification & Audit Suite
+## 8. Verification & Audit Suite
 
 Solaron includes a multi-layered verification framework to certify platform integrity before deployment.
 
-### Run All 4 Integrity Pillars (Consolidated)
+### 8.1 Consolidated Verification (`verify_all.py`)
+To execute the comprehensive 4-pillar audit suite:
+
 ```pwsh
 python verify_all.py
 ```
@@ -626,39 +758,35 @@ python verify_all.py
       SOLARON PLATFORM MASTER AUDIT & INTEGRITY SUITE
 =================================================================
 
-  [PASS] Pillar 1: Windows Subprocess Spawn & Import Integrity
-  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (276 / 19 / 195)
-  [PASS] Pillar 3: Inverter Telemetry Physics (490 Inverters, 0°C cured)
-  [PASS] Pillar 4: Mathematical Physics Baseline & Loss Attribution
+  [PASS] Pillar 1: Subprocess Spawn, Path Resolution & Import Integrity
+  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (276 Generating / 19 Offline / 195 Decom)
+  [PASS] Pillar 3: Inverter Telemetry Physics (490 Inverters, 0°C cured, CEC 97.5% DC)
+  [PASS] Pillar 4: Mathematical Physics Baseline & 6-Part Loss Conservation
 
 =================================================================
   [SUCCESS] ALL 4 INTEGRITY PILLARS CERTIFIED WITH 100% SUCCESS!
 =================================================================
 ```
 
-### Individual Verification Scripts
-- **Platform Health Report**:
-  ```pwsh
-  python solaron/verify_platform.py
-  ```
-- **13-Bug Regression Audit**:
-  ```pwsh
-  python solaron/verify_audit.py
-  ```
+### 8.2 Granularity & Quick Presets Integration Test (`test_granularity_verification.py`)
+To verify that the date presets, reporting months, and granularity selectors update all telemetry tables and charts in synchronized lockstep:
 
----
+```pwsh
+python test_granularity_verification.py
+```
 
-## 13. Operational Runbook & Troubleshooting
+```
+[PASS] Test 1: Date Presets (Today, Yesterday, Last 7 Days, MTD, YTD)
+[PASS] Test 2: Granularity Switching (Live Curves, Daily Bar, Monthly History)
+[PASS] Test 3: Table and Chart State Synchronization
+```
 
-### Common Diagnostics
+### 8.3 Comprehensive Test Suite (`test_comprehensive_suite.py`)
+Runs exhaustive unit, database, and physics validation tests:
 
-| Issue / Symptom | Root Cause | Solution |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'solaron'` | Script executed without root on `sys.path` | Always start via `python run.py` or execute from `solaron/` directly. |
-| Port 8000 already in use | Previous Uvicorn instance still running | Run `netstat -ano \| findstr 8000` and kill the PID (`taskkill /F /PID <PID>`). |
-| Inverter Cockpit says "No telemetry" | Inverter snapshots not populated for plant | Execute `python -c "import pipeline; pipeline.run_snapshots()"` to refresh. |
-| Loss waterfall shows non-zero decommissioned baseline | Old cache prior to decommissioned gating | Run `python -c "import analytics; analytics.calculate_loss_analysis('2026-09')"` to refresh. |
-| Playwright browser error | Chromium binaries missing | Run `playwright install chromium`. |
+```pwsh
+python test_comprehensive_suite.py
+```
 
 ---
 

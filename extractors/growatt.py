@@ -188,6 +188,7 @@ class GrowattExtractor(BaseExtractor):
     def fetch_fleet(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         raw_plants = self._get_raw_plant_list(force_refresh=force_refresh)
         plants = []
+        csv_updates = {}  # Track corrections to write back to CSV
 
         for p in raw_plants:
             raw_id = str(p.get("plantId") or p.get("id") or "")
@@ -232,11 +233,28 @@ class GrowattExtractor(BaseExtractor):
                 if set_date:
                     install_date = set_date
 
-            # 1. Check verified master metadata first for ground-truth capacity & coordinates
-            meta_match = self.master_metadata.get(raw_id) or self.master_metadata.get(p_name.lower())
+            # --- CAPACITY RESOLUTION (Live API is ALWAYS authoritative) ---
+            # 1. FIRST: Extract capacity from the LIVE API nominalPower (authoritative source)
             cap = 0.0
-            if meta_match:
+            nominal = self.safe_float(p.get("nominal_Power") or p.get("nominalPower") or 0.0) or 0.0
+            if nominal > 0:
+                cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
+
+            # 2. If API didn't provide capacity, try plant_settings / plant_info JSON files
+            if cap <= 0:
+                nominal = self.safe_float(plant_set.get("nominalPower") or 0.0) or 0.0
+                if nominal <= 0 and isinstance(info, dict):
+                    nominal = self.safe_float(info.get("nominal_Power") or info.get("nominalPower") or 0.0) or 0.0
+                if nominal > 0:
+                    cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
+
+            # 3. If still no capacity, fallback to CSV master metadata
+            meta_match = self.master_metadata.get(raw_id) or self.master_metadata.get(p_name.lower())
+            if cap <= 0 and meta_match:
                 cap = float(meta_match.get("capacity_kwp") or 0.0)
+
+            # Always use CSV metadata for coordinates/city/install_date/inverter if available
+            if meta_match:
                 lat = self.safe_float(meta_match.get("latitude") or lat)
                 lon = self.safe_float(meta_match.get("longitude") or lon)
                 city = str(meta_match.get("city") or city)
@@ -245,28 +263,24 @@ class GrowattExtractor(BaseExtractor):
                     install_date = meta_date
                 inv_model = str(meta_match.get("inverter_model") or inv_model)
 
-            # 2. Extract from plant_settings / plant_info if not in master metadata
-            if cap <= 0:
-                nominal = self.safe_float(plant_set.get("nominalPower") or 0.0) or 0.0
-                if nominal <= 0 and isinstance(info, dict):
-                    nominal = self.safe_float(info.get("nominal_Power") or info.get("nominalPower") or 0.0) or 0.0
-                if nominal <= 0:
-                    nominal = self.safe_float(p.get("nominal_Power") or p.get("nominalPower") or 0.0) or 0.0
-
-                # If nominal is in Watts (> 1000 W), convert to kWp; otherwise it is in kWp
-                cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
-
-            # 3. Fallback: Panel wattage * count
+            # 4. Fallback: Panel wattage * count
             if cap <= 0:
                 pw = self.safe_float(plant_set.get("panelWatt") or 0.0) or 0.0
                 pn = int(plant_set.get("panelNumber") or 0)
                 if pw > 0 and pn > 0:
                     cap = round((pw * pn) / 1000.0, 2)
 
-            # 4. Fallback: Heuristic based on realistic daily yield (~3.8 kWh/kWp/day) or standard residential 3.3 kWp
+            # 5. Fallback: Heuristic based on realistic daily yield (~3.8 kWh/kWp/day) or standard residential 3.3 kWp
             if cap <= 0:
                 today_kwh = self.safe_float(p.get("todayEnergy") or 0.0) or 0.0
                 cap = round(max(today_kwh / 3.8, 3.0), 1) if today_kwh > 0 else 3.3
+
+            # Track CSV corrections: if API capacity differs from CSV, log it for CSV update
+            if meta_match and cap > 0:
+                csv_cap = float(meta_match.get("capacity_kwp") or 0.0)
+                if csv_cap > 0 and abs(csv_cap - cap) / max(csv_cap, cap) > 0.05:
+                    csv_updates[raw_id] = cap
+                    logger.info(f"Capacity correction for {p_name} ({raw_id}): CSV had {csv_cap} kWp, API says {cap} kWp")
 
             self.plant_capacities[pid] = cap
             self.plant_capacities[raw_id] = cap
@@ -291,7 +305,106 @@ class GrowattExtractor(BaseExtractor):
                 "total_energy_kwh": self.safe_float(p.get("eTotal") or p.get("totalEnergy")),
             })
 
+        # Auto-correct the CSV master metadata file with live API capacities
+        if csv_updates and force_refresh:
+            self._update_csv_capacities(csv_updates)
+
         return plants
+
+    def _update_csv_capacities(self, updates: Dict[str, float]) -> None:
+        """Write corrected capacities back to fleet_all_plants_metadata.csv so future
+        cache-mode runs also use the correct values."""
+        candidates = [
+            self.raw_dir / "fleet_all_plants_metadata.csv",
+            self.raw_dir.parent / "fleet_all_plants_metadata.csv",
+        ]
+        for csv_path in candidates:
+            if csv_path.exists():
+                try:
+                    import pandas as pd
+                    df = pd.read_csv(csv_path)
+                    corrected = 0
+                    for pid_str, new_cap in updates.items():
+                        mask = df["plant_id"].astype(str).str.strip() == pid_str
+                        if mask.any():
+                            old_val = df.loc[mask, "capacity_kwp"].values[0]
+                            df.loc[mask, "capacity_kwp"] = new_cap
+                            df.loc[mask, "ac_capacity_kw"] = new_cap
+                            corrected += 1
+                            logger.info(f"CSV auto-corrected plant {pid_str}: {old_val} -> {new_cap} kWp")
+                    if corrected > 0:
+                        df.to_csv(csv_path, index=False)
+                        # Reload master metadata with corrected values
+                        self.master_metadata.clear()
+                        self._load_master_metadata()
+                        logger.info(f"Auto-corrected {corrected} plant capacities in {csv_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-correct CSV capacities: {e}")
+                break
+
+    def refresh_live_monthly_cache(self, target_date: Optional[datetime.date] = None) -> int:
+        """Fetch fresh monthly details for all plants and update disk cache to keep latest data."""
+        if not self.login():
+            return 0
+        if not target_date:
+            target_date = datetime.date.today()
+        year_month = target_date.strftime("%Y-%m")
+        plants = self._get_raw_plant_list(force_refresh=True)
+        if not plants:
+            return 0
+
+        cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
+        cache_data = {}
+        if cache_file.exists():
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cache_data = json.load(f)
+            except Exception:
+                cache_data = {}
+
+        import growattServer
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _fetch_one(p):
+            raw_id = str(p.get("plantId") or p.get("id") or "")
+            if not raw_id:
+                return raw_id, None, 0.0
+            try:
+                res = self.api.plant_detail(raw_id, growattServer.Timespan.month, target_date)
+                days_dict = res.get("data") or {}
+                tot = sum(float(v or 0.0) for v in days_dict.values())
+                return raw_id, days_dict, tot
+            except Exception:
+                return raw_id, None, 0.0
+
+        with ThreadPoolExecutor(max_workers=15) as pool:
+            results = list(pool.map(_fetch_one, plants))
+
+        updated_count = 0
+        for raw_id, days_dict, tot in results:
+            if not days_dict:
+                continue
+            k = f"{raw_id}_{year_month}"
+            if k not in cache_data:
+                cache_data[k] = {"plant_name": "", "monthly_kwh": 0.0, "daily_kwh": {}}
+            daily_map = {
+                f"{year_month}-{int(d_num):02d}": round(float(val or 0.0), 2)
+                for d_num, val in days_dict.items()
+            }
+            cache_data[k]["daily_kwh"] = daily_map
+            cache_data[k]["monthly_kwh"] = round(tot, 1)
+            updated_count += 1
+
+        if updated_count > 0:
+            try:
+                self.raw_dir.mkdir(parents=True, exist_ok=True)
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump(cache_data, f, indent=2)
+                logger.info(f"Updated Growatt monthly cache for {updated_count} plants up to {target_date.isoformat()}")
+            except Exception as e:
+                logger.error(f"Failed to save monthly cache: {e}")
+
+        return updated_count
 
     def fetch_daily(self, date_str: Optional[str] = None, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Extract multi-day daily generation for Growatt fleet."""
@@ -313,9 +426,25 @@ class GrowattExtractor(BaseExtractor):
         year_month = target_dt.strftime("%Y-%m")
         target_day = target_dt.day
 
+        # Live today telemetry map from plant list
+        live_today_map: Dict[str, float] = {}
+        live_pac_map: Dict[str, float] = {}
+        for p in self.cached_plants:
+            rid = str(p.get("plantId") or p.get("id") or "")
+            if rid:
+                et = self.safe_float(p.get("eToday") or p.get("todayEnergy")) or 0.0
+                pac = self.safe_float(p.get("currentPac")) or 0.0
+                live_today_map[rid] = et
+                live_pac_map[rid] = pac
+
         # 1. Check real monthly cache first (fastest & most complete)
         cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
-        if cache_file.exists() and not force_refresh:
+        
+        # If force_refresh requested, trigger live cache update
+        if force_refresh:
+            self.refresh_live_monthly_cache(today_date)
+
+        if cache_file.exists():
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
                     cached = json.load(f)
@@ -328,19 +457,28 @@ class GrowattExtractor(BaseExtractor):
                         pid = self.plant_id("growatt", raw_id)
                         cap = self.plant_capacities.get(pid, 3.3)
                         dkwh = v.get("daily_kwh") or {}
+                        live_etoday = live_today_map.get(raw_id, 0.0)
+                        live_pac_w = live_pac_map.get(raw_id, 0.0)
                         for d_str, kwh_val in dkwh.items():
                             if d_str > today_str:
                                 continue
                             kwh = self.safe_float(kwh_val) or 0.0
+                            # Always ensure today has the latest live eToday value
+                            if d_str == today_str and live_etoday > kwh:
+                                kwh = live_etoday
                             sy = round(kwh / cap, 3) if cap > 0 else 0.0
+                            
+                            pwr = round(live_pac_w / 1000.0, 3) if (d_str == today_str and live_pac_w > 0) else (round(cap * 0.75, 2) if kwh > 0 else 0.0)
+                            log_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M") if (d_str == today_str and (kwh > 0 or pwr > 0)) else ""
                             daily_out.append({
                                 "plant_id": pid,
                                 "date": d_str,
                                 "kwh": kwh,
                                 "revenue_inr": round(kwh * 14.0, 2),
                                 "specific_yield": sy,
-                                "live_power_kw": round(cap * 0.75, 2) if kwh > 0 else 0.0,
-                                "status": "active" if kwh > 0 else "offline",
+                                "live_power_kw": pwr,
+                                "status": "active" if (kwh > 0 or pwr > 0) else "offline",
+                                "last_log_time": log_time,
                             })
                     if daily_out:
                         return daily_out

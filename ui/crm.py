@@ -7,10 +7,140 @@ import db
 import crm
 import pandas as pd
 
+def fetch_fleet_send_data(
+    m: str = "2026-09",
+    mode: str = "monthly",
+    date_val: Optional[str] = None,
+    date_range: Optional[tuple] = None,
+    year_val: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    cust_df = db.query_df("SELECT id, plant_id, customer_name, phone, preferred_lang, opt_in_status FROM customers", db="crm")
+    if cust_df.empty:
+        return []
+    plants_df = db.query_df("SELECT plant_id, plant_name, source, capacity_kwp FROM plants", db="analytics")
+
+    if mode == "daily":
+        target_date = date_val or datetime.date.today().isoformat()
+        gen_df = db.query_df(
+            "SELECT plant_id, kwh, revenue_inr, status, specific_yield FROM daily_generation WHERE date = ?",
+            [target_date], db="analytics"
+        )
+        if not gen_df.empty:
+            def get_daily_tier(r):
+                kwh = float(r.get("kwh") or 0.0)
+                st = str(r.get("status") or "").lower()
+                if st == "offline" or kwh <= 0:
+                    return "Offline"
+                if st == "fault":
+                    return "Fault"
+                sy = float(r.get("specific_yield") or 0.0)
+                if sy >= 4.0:
+                    return "Best"
+                elif sy >= 3.0:
+                    return "Good"
+                elif sy >= 2.0:
+                    return "Could Be Better"
+                return "Critical"
+            gen_df["tier"] = gen_df.apply(get_daily_tier, axis=1)
+
+    elif mode == "weekly":
+        if date_range and date_range[0] and date_range[1]:
+            start_d, end_d = date_range[0], date_range[1]
+        else:
+            today = datetime.date.today()
+            start_week = today - datetime.timedelta(days=today.weekday())
+            start_d, end_d = start_week.isoformat(), today.isoformat()
+
+        gen_df = db.query_df(
+            """
+            SELECT plant_id, ROUND(SUM(kwh), 1) as kwh, ROUND(SUM(revenue_inr), 1) as revenue_inr,
+                   ROUND(AVG(specific_yield), 2) as specific_yield,
+                   CASE WHEN SUM(kwh) > 0 THEN 'active' ELSE 'offline' END as status
+            FROM daily_generation
+            WHERE date BETWEEN ? AND ?
+            GROUP BY plant_id
+            """,
+            [start_d, end_d], db="analytics"
+        )
+        if not gen_df.empty:
+            def get_weekly_tier(r):
+                kwh = float(r.get("kwh") or 0.0)
+                st = str(r.get("status") or "").lower()
+                if st == "offline" or kwh <= 0:
+                    return "Offline"
+                sy = float(r.get("specific_yield") or 0.0)
+                if sy >= 4.0:
+                    return "Best"
+                elif sy >= 3.0:
+                    return "Good"
+                elif sy >= 2.0:
+                    return "Could Be Better"
+                return "Critical"
+            gen_df["tier"] = gen_df.apply(get_weekly_tier, axis=1)
+
+    elif mode == "yearly":
+        target_year = year_val or "2026"
+        gen_df = db.query_df(
+            """
+            SELECT plant_id, ROUND(SUM(kwh), 1) as kwh, ROUND(SUM(revenue_inr), 1) as revenue_inr,
+                   ROUND(AVG(specific_yield), 2) as specific_yield,
+                   CASE WHEN SUM(kwh) > 0 THEN 'active' ELSE 'offline' END as status
+            FROM monthly_generation
+            WHERE month LIKE ?
+            GROUP BY plant_id
+            """,
+            [f"{target_year}%"], db="analytics"
+        )
+        if not gen_df.empty:
+            def get_yearly_tier(r):
+                kwh = float(r.get("kwh") or 0.0)
+                st = str(r.get("status") or "").lower()
+                if st == "offline" or kwh <= 0:
+                    return "Offline"
+                sy = float(r.get("specific_yield") or 0.0)
+                if sy >= 80.0:
+                    return "Best"
+                elif sy >= 60.0:
+                    return "Good"
+                elif sy >= 40.0:
+                    return "Could Be Better"
+                return "Critical"
+            gen_df["tier"] = gen_df.apply(get_yearly_tier, axis=1)
+
+    else:
+        # monthly
+        gen_df = db.query_df(
+            "SELECT plant_id, kwh, revenue_inr, tier, specific_yield FROM monthly_generation WHERE month = ?",
+            [m], db="analytics"
+        )
+
+    merged = cust_df.merge(plants_df, on="plant_id", how="left")
+    if not gen_df.empty:
+        merged = merged.merge(gen_df, on="plant_id", how="left")
+    else:
+        merged["kwh"] = 0.0
+        merged["revenue_inr"] = 0.0
+        merged["tier"] = "Offline"
+        merged["specific_yield"] = 0.0
+
+    merged["kwh"] = merged["kwh"].fillna(0.0).round(1)
+    merged["revenue_inr"] = merged["revenue_inr"].fillna(merged["kwh"] * 14.0).round(0)
+    if "tier" not in merged.columns:
+        merged["tier"] = "Good"
+    else:
+        merged["tier"] = merged["tier"].fillna("Good")
+    merged["granularity"] = mode
+    merged["selected"] = False
+    return merged.to_dict(orient="records")
+
+_fetch_fleet_send_data = fetch_fleet_send_data
+
+
 def build_crm_tab(app_state: dict):
     selected_month = {"val": app_state.get("month", "2026-09")}
     selected_view = {"mode": "monthly"}  # 'daily', 'weekly', 'monthly', 'yearly'
     selected_date = {"val": datetime.date.today().isoformat()}
+    selected_date_range = {"start": "", "end": ""}
     selected_year = {"val": "2026"}
 
     # WhatsApp Statement & Message Preview Dialog
@@ -23,32 +153,34 @@ def build_crm_tab(app_state: dict):
         "year": "2026",
     }
 
-    with preview_modal, ui.card().classes("w-[620px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white shadow-2xl rounded-2xl"):
+    with preview_modal, ui.card().classes("w-[660px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white shadow-2xl rounded-2xl"):
         with ui.row().classes("w-full items-center justify-between mb-2"):
             with ui.row().classes("items-center gap-2"):
                 ui.icon("chat").classes("text-emerald-400 text-2xl")
                 ui.label("WhatsApp Statement & Message Preview").classes("text-base font-bold text-white")
             ui.button(icon="close", on_click=preview_modal.close).props("flat round dense size=sm color=white")
 
-        ui.label("Select report granularity and language to preview message formatted for Solaron customers:").classes("text-xs text-gray-400 mb-3")
+        ui.label("Select report granularity/type and language to preview message formatted for Solaron customers:").classes("text-xs text-gray-400 mb-2")
 
-        # Granularity switcher tabs
+        # Granularity switcher tabs (programmatic string values)
         preview_granularity_tabs = ui.tabs().classes("w-full bg-gray-800 text-gray-300 rounded-lg mb-2")
         with preview_granularity_tabs:
-            vg_daily = ui.tab("Daily", icon="today")
-            vg_weekly = ui.tab("Weekly", icon="date_range")
-            vg_monthly = ui.tab("Monthly Statement", icon="calendar_month")
-            vg_yearly = ui.tab("Yearly Milestone", icon="emoji_events")
+            vg_monthly = ui.tab("monthly", label="Monthly Statement", icon="calendar_month")
+            vg_daily = ui.tab("daily", label="Daily Report", icon="today")
+            vg_weekly = ui.tab("weekly", label="Weekly", icon="date_range")
+            vg_yearly = ui.tab("yearly", label="Yearly Recap", icon="emoji_events")
+            vg_offline = ui.tab("offline", label="Offline Alert", icon="notifications_active")
+            vg_monsoon = ui.tab("monsoon", label="Monsoon Advisory", icon="cloudy_snowing")
 
-        # Language tabs
-        lang_tabs = ui.tabs().classes("w-full bg-gray-800/80 text-gray-300 rounded-lg mb-4")
+        # Language tabs (programmatic string values)
+        lang_tabs = ui.tabs().classes("w-full bg-gray-800/80 text-gray-300 rounded-lg mb-3")
         with lang_tabs:
-            t_en = ui.tab("English")
-            t_hi = ui.tab("हिंदी (Hindi)")
-            t_mr = ui.tab("मराठी (Marathi)")
+            t_en = ui.tab("english", label="English")
+            t_hi = ui.tab("hindi", label="हिंदी (Hindi)")
+            t_mr = ui.tab("marathi", label="मराठी (Marathi)")
 
         # WhatsApp Bubble Card (WhatsApp Emerald Green Styled, with message_label strictly nested INSIDE)
-        with ui.card().classes("w-full p-4 bg-[#075E54] text-white rounded-xl shadow-inner whitespace-pre-line font-sans text-xs leading-relaxed border border-emerald-600/40"):
+        with ui.card().classes("w-full p-4 bg-[#075E54] text-white rounded-xl shadow-inner whitespace-pre-line font-sans text-xs leading-relaxed border border-emerald-600/40 min-h-[160px]"):
             message_label = ui.label("Loading preview...").classes("text-emerald-50 select-all font-mono leading-relaxed")
 
         with ui.row().classes("w-full justify-between items-center mt-4 gap-2 flex-wrap"):
@@ -58,48 +190,201 @@ def build_crm_tab(app_state: dict):
 
             ui.button("Close", on_click=preview_modal.close).props("dense flat color=white")
 
+    # Solaron Test WhatsApp Dialog
+    test_modal = ui.dialog().classes("items-center justify-center")
+    test_state = {
+        "phone": getattr(crm.settings, "test_phone_number", "9619455207"),
+        "template": "monthly",
+        "lang": "english",
+    }
+    with test_modal, ui.card().classes("w-[620px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-2xl shadow-2xl"):
+        with ui.row().classes("w-full items-center justify-between mb-2"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("send_to_mobile").classes("text-emerald-400 text-2xl")
+                ui.label("Send Test WhatsApp Message").classes("text-base font-bold text-white")
+            ui.button(icon="close", on_click=test_modal.close).props("flat round dense size=sm color=white")
+
+        ui.label("Dispatch a live test using Solaron official templates directly to your personal or team number:").classes("text-xs text-gray-400 mb-3")
+
+        with ui.row().classes("w-full gap-3 mb-2 flex-wrap"):
+            test_phone_input = ui.input("Target Phone (with country code e.g. 919619455207)", value=test_state["phone"]).classes("flex-1 min-w-[220px]").props("dense outlined dark")
+            test_tmpl_select = ui.select(
+                options={
+                    "monthly": "Active Monthly Statement",
+                    "offline": "Offline Outage Alert",
+                    "monsoon": "Pre-Monsoon Advisory",
+                    "daily": "Daily Report",
+                    "weekly": "Weekly Summary",
+                    "yearly": "Yearly Milestone",
+                },
+                value="monthly",
+                label="Template Type"
+            ).classes("w-52").props("dense outlined dark options-dense")
+            test_lang_select = ui.select(
+                options={"english": "English", "hindi": "हिंदी (Hindi)", "marathi": "मराठी (Marathi)"},
+                value="english",
+                label="Language"
+            ).classes("w-36").props("dense outlined dark options-dense")
+
+        with ui.card().classes("w-full p-4 bg-[#075E54] text-white rounded-xl shadow-inner whitespace-pre-line font-sans text-xs leading-relaxed border border-emerald-600/40 min-h-[150px]"):
+            test_preview_label = ui.label("").classes("text-emerald-50 select-all font-mono leading-relaxed")
+
+        with ui.row().classes("w-full justify-between items-center mt-4 gap-2 flex-wrap"):
+            with ui.row().classes("items-center gap-2"):
+                test_send_btn = ui.button("Open WhatsApp Web", icon="open_in_new").props("dense unelevated color=emerald-7 text-color=white")
+                test_copy_btn = ui.button("Copy Message", icon="content_copy").props("dense outline color=emerald-4")
+            ui.button("Close", on_click=test_modal.close).props("dense flat color=white")
+
+    def render_test_preview():
+        tmpl = test_tmpl_select.value or "monthly"
+        lang = test_lang_select.value or "english"
+        s_phone = getattr(crm.settings, "support_phone", "+91 96194 55207")
+        if tmpl == "offline":
+            txt = crm.format_offline_whatsapp_message(
+                name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
+                support_phone=s_phone, lang=lang
+            )
+        elif tmpl == "monsoon":
+            txt = crm.format_monsoon_whatsapp_message(support_phone=s_phone, lang=lang)
+        elif tmpl == "daily":
+            txt = crm.format_daily_whatsapp_statement(
+                name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
+                kwh=16.8, revenue=235.0, date_str=datetime.date.today().strftime("%d %b %Y"), lang=lang
+            )
+        elif tmpl == "weekly":
+            txt = crm.format_weekly_whatsapp_statement(
+                name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
+                kwh=115.0, revenue=1610.0, lang=lang
+            )
+        elif tmpl == "yearly":
+            txt = crm.format_yearly_whatsapp_statement(
+                name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
+                kwh=5400.0, revenue=75600.0, year="2026", lang=lang
+            )
+        else:
+            txt = crm.format_rich_whatsapp_statement(
+                name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
+                kwh=485.5, revenue=6797.0, tier="Good", lang=lang, month=selected_month["val"]
+            )
+        test_preview_label.text = txt
+
+    test_tmpl_select.on("update:model-value", lambda e: render_test_preview())
+    test_lang_select.on("update:model-value", lambda e: render_test_preview())
+
+    def open_test_send_wa():
+        ph = (test_phone_input.value or "").strip().replace("+", "").replace("-", "").replace(" ", "")
+        if not ph:
+            ui.notify("Please enter a valid phone number.", type="warning")
+            return
+        txt = test_preview_label.text or ""
+        enc = urllib.parse.quote(txt)
+        url = f"https://web.whatsapp.com/send?phone={ph}&text={enc}"
+        ui.run_javascript(f"window.open({repr(url)}, '_blank');")
+        ui.notify(f"Launching WhatsApp Web for {ph}...", type="positive")
+
+    test_send_btn.on("click", open_test_send_wa)
+
+    def copy_test_text():
+        txt = test_preview_label.text or ""
+        js_code = f"""
+        (function() {{
+            const text = {repr(txt)};
+            if (navigator.clipboard && window.isSecureContext) {{
+                navigator.clipboard.writeText(text).catch(err => {{
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }});
+            }} else {{
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }}
+        }})();
+        """
+        ui.run_javascript(js_code)
+        ui.notify("Test message copied to clipboard!", type="positive")
+
+    test_copy_btn.on("click", copy_test_text)
+
+    def open_test_modal():
+        render_test_preview()
+        test_modal.open()
+
     def get_preview_rendered_text() -> str:
         c = modal_content["cust"]
         if not c:
             return "No customer selected."
-        lang = modal_content["lang"]
-        mode = modal_content["view"]
+        lang = str(modal_content.get("lang") or "english").lower()
+        mode = str(modal_content.get("view") or "monthly").lower()
         name = c.get("customer_name") or "Solar Customer"
         pid = c.get("plant_id") or ""
         pname = c.get("plant_name") or pid or "Solar Plant"
         kwh = float(c.get("kwh") or c.get("annual_kwh") or 0.0)
         rev = float(c.get("revenue_inr") or c.get("annual_savings") or (kwh * 14.0))
+        phone = str(c.get("phone") or "")
 
         if mode == "daily":
-            d_kwh = float(c.get("today_kwh") or c.get("kwh_daily") or (round(kwh / 30.0, 1) if kwh > 0 else 12.5))
-            d_rev = d_kwh * 14.0
+            if c.get("granularity") == "daily":
+                d_kwh = float(c.get("kwh") or 0.0)
+                d_rev = float(c.get("revenue_inr") or (d_kwh * 14.0))
+            else:
+                d_kwh = float(c.get("today_kwh") or c.get("kwh_daily") or (round(kwh / 30.0, 1) if kwh > 0 else 12.5))
+                d_rev = d_kwh * 14.0
             return crm.format_daily_whatsapp_statement(
                 name=name, plant_id=pid, plant_name=pname,
                 kwh=d_kwh, revenue=d_rev,
-                date_str=modal_content["date_str"], lang=lang
+                date_str=modal_content.get("date_str", ""), lang=lang
             )
         elif mode == "weekly":
-            w_kwh = float(c.get("week_kwh") or (round(kwh / 4.33, 1) if kwh > 0 else 85.0))
-            w_rev = w_kwh * 14.0
+            if c.get("granularity") == "weekly":
+                w_kwh = float(c.get("kwh") or 0.0)
+                w_rev = float(c.get("revenue_inr") or (w_kwh * 14.0))
+            else:
+                w_kwh = float(c.get("week_kwh") or (round(kwh / 4.33, 1) if kwh > 0 else 85.0))
+                w_rev = w_kwh * 14.0
             return crm.format_weekly_whatsapp_statement(
                 name=name, plant_id=pid, plant_name=pname,
                 kwh=w_kwh, revenue=w_rev, lang=lang
             )
         elif mode == "yearly":
-            y_kwh = float(c.get("annual_kwh") or (kwh * 12.0 if kwh > 0 else 4200.0))
-            y_rev = y_kwh * 14.0
+            if c.get("granularity") == "yearly":
+                y_kwh = float(c.get("kwh") or 0.0)
+                y_rev = float(c.get("revenue_inr") or (y_kwh * 14.0))
+            else:
+                y_kwh = float(c.get("annual_kwh") or (kwh * 12.0 if kwh > 0 else 4200.0))
+                y_rev = y_kwh * 14.0
             return crm.format_yearly_whatsapp_statement(
                 name=name, plant_id=pid, plant_name=pname,
                 kwh=y_kwh, revenue=y_rev,
-                year=modal_content["year"], lang=lang
+                year=modal_content.get("year", "2026"), lang=lang
+            )
+        elif mode == "offline":
+            return crm.format_offline_whatsapp_message(
+                name=name, plant_id=pid, plant_name=pname,
+                support_phone=phone or getattr(crm.settings, "support_phone", "+91 96194 55207"),
+                lang=lang
+            )
+        elif mode == "monsoon":
+            return crm.format_monsoon_whatsapp_message(
+                support_phone=phone or getattr(crm.settings, "support_phone", "+91 96194 55207"),
+                lang=lang
             )
         else:
             # Default monthly rich statement
             tier = c.get("tier") or "Good"
             m = selected_month["val"]
+            m_kwh = float(c.get("kwh") or 0.0) if c.get("granularity") == "monthly" else kwh
+            m_rev = float(c.get("revenue_inr") or (m_kwh * 14.0)) if c.get("granularity") == "monthly" else rev
             return crm.format_rich_whatsapp_statement(
                 name=name, plant_id=pid, plant_name=pname,
-                kwh=kwh, revenue=rev, tier=tier,
+                kwh=m_kwh, revenue=m_rev, tier=tier,
                 lang=lang, month=m
             )
 
@@ -109,38 +394,62 @@ def build_crm_tab(app_state: dict):
         c = modal_content["cust"] or {}
         raw_phone = str(c.get("phone") or "").strip().replace("+", "").replace("-", "").replace(" ", "")
         if raw_phone:
-            encoded = urllib.parse.quote(text)
-            wa_link_btn.props(f'href="https://web.whatsapp.com/send?phone={raw_phone}&text={encoded}" target="_blank"')
             wa_link_btn.enable()
+            wa_link_btn.props("color=emerald-7 text-color=white")
         else:
-            wa_link_btn.props(remove="href")
-            wa_link_btn.disable()
+            wa_link_btn.props("color=grey-7 text-color=grey-3")
+
+    def open_wa_web():
+        c = modal_content["cust"] or {}
+        raw_phone = str(c.get("phone") or "").strip().replace("+", "").replace("-", "").replace(" ", "")
+        txt = message_label.text or get_preview_rendered_text()
+        if not raw_phone:
+            ui.notify("No customer phone number available. Please edit customer or test with admin phone.", type="warning")
+            return
+        encoded = urllib.parse.quote(txt)
+        url = f"https://web.whatsapp.com/send?phone={raw_phone}&text={encoded}"
+        ui.run_javascript(f"window.open({repr(url)}, '_blank');")
+        ui.notify(f"Opening WhatsApp Web for {c.get('customer_name') or raw_phone}...", type="positive")
+
+    wa_link_btn.on("click", open_wa_web)
 
     def do_copy():
-        ui.run_javascript(f"navigator.clipboard.writeText({repr(message_label.text)});")
+        txt = message_label.text or get_preview_rendered_text()
+        js_code = f"""
+        (function() {{
+            const text = {repr(txt)};
+            if (navigator.clipboard && window.isSecureContext) {{
+                navigator.clipboard.writeText(text).catch(err => {{
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }});
+            }} else {{
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }}
+        }})();
+        """
+        ui.run_javascript(js_code)
         ui.notify("WhatsApp message copied to clipboard!", type="positive")
-    copy_btn.on_click(do_copy)
 
-    def on_preview_granularity_change():
-        val = preview_granularity_tabs.value
-        if val == vg_daily:
-            modal_content["view"] = "daily"
-        elif val == vg_weekly:
-            modal_content["view"] = "weekly"
-        elif val == vg_yearly:
-            modal_content["view"] = "yearly"
-        else:
-            modal_content["view"] = "monthly"
+    copy_btn.on("click", do_copy)
+
+    def on_preview_granularity_change(e=None):
+        val = str(preview_granularity_tabs.value or (e.args if hasattr(e, "args") else "") or "monthly").lower()
+        modal_content["view"] = val
         refresh_preview_dialog()
 
-    def on_preview_lang_change():
-        val = lang_tabs.value
-        if val == t_hi:
-            modal_content["lang"] = "hindi"
-        elif val == t_mr:
-            modal_content["lang"] = "marathi"
-        else:
-            modal_content["lang"] = "english"
+    def on_preview_lang_change(e=None):
+        val = str(lang_tabs.value or (e.args if hasattr(e, "args") else "") or "english").lower()
+        modal_content["lang"] = val
         refresh_preview_dialog()
 
     preview_granularity_tabs.on("update:model-value", on_preview_granularity_change)
@@ -148,26 +457,22 @@ def build_crm_tab(app_state: dict):
 
     def open_preview(cust_row: dict, default_view: str = "monthly"):
         modal_content["cust"] = cust_row
-        modal_content["view"] = default_view
+        modal_content["view"] = default_view.lower()
         pref_lang = str(cust_row.get("preferred_lang") or "english").lower()
+        if pref_lang not in ("english", "hindi", "marathi"):
+            pref_lang = "english"
         modal_content["lang"] = pref_lang
-        
-        # Set tab active states
-        if default_view == "daily":
-            preview_granularity_tabs.value = vg_daily
-        elif default_view == "weekly":
-            preview_granularity_tabs.value = vg_weekly
-        elif default_view == "yearly":
-            preview_granularity_tabs.value = vg_yearly
-        else:
-            preview_granularity_tabs.value = vg_monthly
 
-        if pref_lang == "hindi":
-            lang_tabs.value = t_hi
-        elif pref_lang == "marathi":
-            lang_tabs.value = t_mr
-        else:
-            lang_tabs.value = t_en
+        try:
+            d_obj = datetime.date.fromisoformat(str(selected_date.get("val", "")))
+            modal_content["date_str"] = d_obj.strftime("%d %b %Y")
+        except Exception:
+            modal_content["date_str"] = datetime.date.today().strftime("%d %b %Y")
+        modal_content["year"] = selected_year.get("val", "2026")
+
+        # Set tab active states
+        preview_granularity_tabs.value = modal_content["view"]
+        lang_tabs.value = modal_content["lang"]
 
         refresh_preview_dialog()
         preview_modal.open()
@@ -210,20 +515,20 @@ def build_crm_tab(app_state: dict):
                         with ui.row().classes("items-center gap-3"):
                             ui.label("Report Granularity:").classes("text-xs font-bold text-gray-400 uppercase tracking-wider")
                             with ui.button_group().props("dense outline"):
-                                bg_d = ui.button("📅 Daily", on_click=lambda: set_view_granularity("daily")).props("dense text-color=white")
-                                bg_w = ui.button("📊 Weekly", on_click=lambda: set_view_granularity("weekly")).props("dense text-color=white")
-                                bg_m = ui.button("🗓️ Monthly", on_click=lambda: set_view_granularity("monthly")).props("dense color=primary text-color=white")
-                                bg_y = ui.button("🏆 Yearly", on_click=lambda: set_view_granularity("yearly")).props("dense text-color=white")
+                                bg_d = ui.button("📅 Daily", on_click=lambda: asyncio.create_task(set_view_granularity("daily"))).props("dense text-color=white")
+                                bg_w = ui.button("📊 Weekly", on_click=lambda: asyncio.create_task(set_view_granularity("weekly"))).props("dense text-color=white")
+                                bg_m = ui.button("🗓️ Monthly", on_click=lambda: asyncio.create_task(set_view_granularity("monthly"))).props("dense color=primary text-color=white")
+                                bg_y = ui.button("🏆 Yearly", on_click=lambda: asyncio.create_task(set_view_granularity("yearly"))).props("dense text-color=white")
 
                         with ui.row().classes("items-center gap-2"):
                             ui.label("⚡ Quick Presets:").classes("text-xs font-semibold text-gray-400")
                             with ui.button_group().props("dense outline"):
-                                ui.button("Today", on_click=lambda: apply_preset("today")).props("dense text-color=white")
-                                ui.button("Yesterday", on_click=lambda: apply_preset("yesterday")).props("dense text-color=white")
-                                ui.button("This Week", on_click=lambda: apply_preset("this_week")).props("dense text-color=white")
-                                ui.button("This Month", on_click=lambda: apply_preset("this_month")).props("dense text-color=white")
-                                ui.button("Last Month", on_click=lambda: apply_preset("last_month")).props("dense text-color=white")
-                                ui.button("2026", on_click=lambda: apply_preset("2026")).props("dense text-color=white")
+                                ui.button("Today", on_click=lambda: asyncio.create_task(apply_preset("today"))).props("dense text-color=white")
+                                ui.button("Yesterday", on_click=lambda: asyncio.create_task(apply_preset("yesterday"))).props("dense text-color=white")
+                                ui.button("This Week", on_click=lambda: asyncio.create_task(apply_preset("this_week"))).props("dense text-color=white")
+                                ui.button("This Month", on_click=lambda: asyncio.create_task(apply_preset("this_month"))).props("dense text-color=white")
+                                ui.button("Last Month", on_click=lambda: asyncio.create_task(apply_preset("last_month"))).props("dense text-color=white")
+                                ui.button("2026", on_click=lambda: asyncio.create_task(apply_preset("2026"))).props("dense text-color=white")
 
                     # Filters and Bulk Action Toolbar
                     with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pt-2"):
@@ -243,6 +548,7 @@ def build_crm_tab(app_state: dict):
                             ).classes("w-48").props("dense outlined dark")
 
                             bulk_send_btn = ui.button("✉ Send Selected (0)", icon="send").props("dense unelevated color=primary")
+                            ui.button("📱 Test Send", icon="send_to_mobile", on_click=lambda: open_test_modal()).props("dense outline color=emerald")
 
                     # Helper selection buttons
                     with ui.row().classes("w-full items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-800/60"):
@@ -252,6 +558,8 @@ def build_crm_tab(app_state: dict):
                             ui.button("⚠️ Phone + Not Working", on_click=lambda: select_helper("fault_phone")).props("dense outline size=sm color=warning")
                             ui.button("🔴 Phone + Offline", on_click=lambda: select_helper("offline_phone")).props("dense outline size=sm color=negative")
                             ui.button("📉 Phone + Deviated", on_click=lambda: select_helper("deviated_phone")).props("dense outline size=sm color=amber")
+                            ui.button("⚡ All Active", on_click=lambda: select_helper("all_active")).props("dense outline size=sm color=teal")
+                            ui.button("⚠️ All Offline", on_click=lambda: select_helper("all_offline")).props("dense outline size=sm color=deep-orange")
                             ui.button("Select All", on_click=lambda: select_helper("all")).props("dense flat size=sm color=white")
                             ui.button("Clear", on_click=lambda: select_helper("none")).props("dense flat size=sm color=gray-4")
 
@@ -286,7 +594,7 @@ def build_crm_tab(app_state: dict):
                 """)
                 telemetry_table.add_slot("body-cell-select", """
                     <q-td :props="props">
-                        <q-checkbox v-model="props.row.selected" dense @update:model-value="() => $parent.$emit('row-select')" />
+                        <q-checkbox :model-value="props.row.selected" dense @update:model-value="(val) => $parent.$emit('row-select', {id: props.row.id || props.row.plant_id, val: val})" />
                     </q-td>
                 """)
                 telemetry_table.add_slot("body-cell-actions", """
@@ -505,6 +813,7 @@ def build_crm_tab(app_state: dict):
                             ui.button("📥 Export Campaign CSV", icon="download", on_click=lambda: ui.download("/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
                             dry_run_btn = ui.button("🧪 Run Dry-Run Simulation", icon="science").props("dense unelevated color=indigo-7")
                             ui.button("⚡ Quick Weekly Campaign", icon="date_range", on_click=lambda: run_prepare_weekly()).props("dense outline color=emerald")
+                            ui.button("🌧️ Pre-Monsoon Campaign", icon="cloudy_snowing", on_click=lambda: run_prepare_monsoon()).props("dense outline color=teal")
 
                     # Campaign Summary & Progress Track
                     with ui.column().classes("w-full gap-2 mt-3 p-4 bg-gray-950 border border-gray-800 rounded-lg"):
@@ -614,41 +923,63 @@ def build_crm_tab(app_state: dict):
 
     cached_telemetry_rows: List[Dict[str, Any]] = []
 
-    def set_view_granularity(mode: str):
+    async def set_view_granularity(mode: str):
         selected_view["mode"] = mode
         bg_d.props(f"dense {'color=primary' if mode=='daily' else 'outline'} text-color=white")
         bg_w.props(f"dense {'color=primary' if mode=='weekly' else 'outline'} text-color=white")
         bg_m.props(f"dense {'color=primary' if mode=='monthly' else 'outline'} text-color=white")
         bg_y.props(f"dense {'color=primary' if mode=='yearly' else 'outline'} text-color=white")
+
+        col_labels = {
+            "daily": "Daily Gen (kWh)",
+            "weekly": "Weekly Gen (kWh)",
+            "monthly": "Monthly Gen (kWh)",
+            "yearly": "Yearly Gen (kWh)",
+        }
+        for c in telemetry_cols:
+            if c["name"] == "kwh":
+                c["label"] = col_labels.get(mode, "Generation (kWh)")
+        telemetry_table.columns = list(telemetry_cols)
+
+        nonlocal cached_telemetry_rows
+        d_val = selected_date.get("val") or datetime.date.today().isoformat()
+        d_rng = (selected_date_range.get("start"), selected_date_range.get("end")) if selected_date_range.get("start") else None
+        y_val = selected_year.get("val", "2026")
+        m_val = selected_month.get("val", "2026-09")
+
+        cached_telemetry_rows = await asyncio.to_thread(
+            _fetch_fleet_send_data, m_val, mode, d_val, d_rng, y_val
+        )
         filter_and_render_telemetry()
 
-    def apply_preset(p: str):
+    async def apply_preset(p: str):
+        today = datetime.date.today()
         if p == "today":
-            set_view_granularity("daily")
+            selected_date["val"] = today.isoformat()
+            await set_view_granularity("daily")
         elif p == "yesterday":
-            set_view_granularity("daily")
+            selected_date["val"] = (today - datetime.timedelta(days=1)).isoformat()
+            await set_view_granularity("daily")
         elif p == "this_week":
-            set_view_granularity("weekly")
+            start_week = today - datetime.timedelta(days=today.weekday())
+            selected_date_range["start"] = start_week.isoformat()
+            selected_date_range["end"] = today.isoformat()
+            await set_view_granularity("weekly")
         elif p == "this_month":
-            set_view_granularity("monthly")
+            selected_month["val"] = today.strftime("%Y-%m")
+            await set_view_granularity("monthly")
         elif p == "last_month":
-            set_view_granularity("monthly")
+            first = today.replace(day=1)
+            last_m = first - datetime.timedelta(days=1)
+            selected_month["val"] = last_m.strftime("%Y-%m")
+            await set_view_granularity("monthly")
         elif p == "2026":
-            set_view_granularity("yearly")
+            selected_year["val"] = "2026"
+            await set_view_granularity("yearly")
 
-    def _fetch_fleet_send_data(m: str) -> List[Dict[str, Any]]:
-        cust_df = db.query_df("SELECT id, plant_id, customer_name, phone, preferred_lang, opt_in_status FROM customers", db="crm")
-        if cust_df.empty:
-            return []
-        plants_df = db.query_df("SELECT plant_id, plant_name, source, capacity_kwp FROM plants", db="analytics")
-        monthly_df = db.query_df("SELECT plant_id, kwh, revenue_inr, tier, specific_yield FROM monthly_generation WHERE month = ?", [m], db="analytics")
-        
-        merged = cust_df.merge(plants_df, on="plant_id", how="left").merge(monthly_df, on="plant_id", how="left")
-        merged["kwh"] = merged["kwh"].fillna(0.0).round(1)
-        merged["revenue_inr"] = merged["revenue_inr"].fillna(merged["kwh"] * 14.0).round(0)
-        merged["tier"] = merged["tier"].fillna("Good")
-        merged["selected"] = False
-        return merged.to_dict(orient="records")
+    _fetch_fleet_send_data = fetch_fleet_send_data
+
+    selected_pids = set()
 
     def filter_and_render_telemetry():
         q = (search_input.value or "").strip().lower()
@@ -657,11 +988,12 @@ def build_crm_tab(app_state: dict):
         
         filtered = []
         for r in cached_telemetry_rows:
+            pid = str(r.get("id") or r.get("plant_id"))
+            r["selected"] = pid in selected_pids
             if q:
                 cname = str(r.get("customer_name", "")).lower()
                 pname = str(r.get("plant_name", "")).lower()
-                pid = str(r.get("plant_id", "")).lower()
-                if q not in cname and q not in pname and q not in pid:
+                if q not in cname and q not in pname and q not in pid.lower():
                     continue
             if src != "All" and str(r.get("source", "")).lower() != src.lower():
                 continue
@@ -671,6 +1003,8 @@ def build_crm_tab(app_state: dict):
                 continue
             if st == "Not Working / Fault" and r.get("tier") != "Fault":
                 continue
+            if st == "Underperforming (< -15%)" and r.get("tier") not in ("Could Be Better", "Critical", "Needs Attention"):
+                continue
             if st == "Phone Verified" and not r.get("phone"):
                 continue
             filtered.append(r)
@@ -679,27 +1013,57 @@ def build_crm_tab(app_state: dict):
         update_selected_count_badge()
 
     def update_selected_count_badge():
-        sel_count = sum(1 for r in telemetry_table.rows if r.get("selected"))
+        sel_count = len(selected_pids)
         bulk_send_btn.text = f"✉ Send Selected ({sel_count})"
 
-    telemetry_table.on("row-select", update_selected_count_badge)
+    def on_row_select(e):
+        data = e.args
+        if isinstance(data, dict):
+            pid = str(data.get("id"))
+            is_sel = bool(data.get("val"))
+            if is_sel:
+                selected_pids.add(pid)
+            else:
+                selected_pids.discard(pid)
+            for r in telemetry_table.rows:
+                if str(r.get("id") or r.get("plant_id")) == pid:
+                    r["selected"] = is_sel
+                    break
+        update_selected_count_badge()
+
+    telemetry_table.on("row-select", on_row_select)
 
     def select_helper(action: str):
+        selected_pids.clear()
         for r in telemetry_table.rows:
-            phone_ok = bool(r.get("phone"))
+            pid = str(r.get("id") or r.get("plant_id"))
+            raw_phone = str(r.get("phone") or "").strip()
+            phone_ok = bool(raw_phone and raw_phone not in ("None", "—", "nan"))
+            tier = str(r.get("tier") or "")
+            kwh = float(r.get("kwh") or 0.0)
+            
+            sel = False
             if action == "all":
-                r["selected"] = True
+                sel = True
             elif action == "none":
-                r["selected"] = False
+                sel = False
             elif action == "active_phone":
-                r["selected"] = phone_ok and float(r.get("kwh") or 0) > 0
+                sel = phone_ok and kwh > 0 and tier not in ("Offline", "Fault")
             elif action == "fault_phone":
-                r["selected"] = phone_ok and str(r.get("tier")) == "Fault"
+                sel = phone_ok and tier == "Fault"
             elif action == "offline_phone":
-                r["selected"] = phone_ok and str(r.get("tier")) == "Offline"
+                sel = phone_ok and (tier == "Offline" or kwh == 0)
             elif action == "deviated_phone":
-                r["selected"] = phone_ok and str(r.get("tier")) in ("Could Be Better", "Critical", "Needs Attention")
-        telemetry_table.update()
+                sel = phone_ok and tier in ("Could Be Better", "Critical", "Needs Attention")
+            elif action == "all_active":
+                sel = kwh > 0 and tier not in ("Offline", "Fault")
+            elif action == "all_offline":
+                sel = tier == "Offline" or kwh == 0
+
+            r["selected"] = sel
+            if sel:
+                selected_pids.add(pid)
+        telemetry_table.rows = list(telemetry_table.rows)
         update_selected_count_badge()
 
     search_input.on("update:model-value", lambda e: filter_and_render_telemetry())
@@ -708,34 +1072,65 @@ def build_crm_tab(app_state: dict):
 
     # Bulk Send Handler
     def on_bulk_send():
-        selected = [r for r in telemetry_table.rows if r.get("selected")]
+        selected = [r for r in telemetry_table.rows if str(r.get("id") or r.get("plant_id")) in selected_pids]
         if not selected:
-            ui.notify("Please select at least one customer to send.", type="warning")
+            ui.notify("Please select at least one customer using the checkboxes or helpers.", type="warning")
             return
         
         mode = send_mode_select.value
         if "Manual" in mode:
-            # Open WhatsApp Web for the first selected customer
-            first = selected[0]
-            phone = str(first.get("phone") or "").strip().replace("+", "")
-            if phone:
+            # Find first selected customer with a verified phone
+            valid_with_phone = [r for r in selected if str(r.get("phone") or "").strip() not in ("", "None", "—", "nan")]
+            if not valid_with_phone:
+                ui.notify(f"None of the {len(selected)} selected customer(s) have a phone number.", type="warning")
+                return
+            first = valid_with_phone[0]
+            phone = str(first.get("phone") or "").strip().replace("+", "").replace("-", "").replace(" ", "")
+            cur_mode = selected_view.get("mode", "monthly")
+            k_val = float(first.get("kwh") or 0.0)
+            r_val = float(first.get("revenue_inr") or (k_val * 14.0))
+            p_lang = str(first.get("preferred_lang", "english")).lower()
+            if cur_mode == "daily":
+                d_str = selected_date.get("val", datetime.date.today().strftime("%d %b %Y"))
+                txt = crm.format_daily_whatsapp_statement(
+                    name=first.get("customer_name", "Customer"),
+                    plant_id=first.get("plant_id", ""),
+                    plant_name=first.get("plant_name", ""),
+                    kwh=k_val, revenue=r_val, date_str=d_str, lang=p_lang
+                )
+            elif cur_mode == "weekly":
+                txt = crm.format_weekly_whatsapp_statement(
+                    name=first.get("customer_name", "Customer"),
+                    plant_id=first.get("plant_id", ""),
+                    plant_name=first.get("plant_name", ""),
+                    kwh=k_val, revenue=r_val, lang=p_lang
+                )
+            elif cur_mode == "yearly":
+                txt = crm.format_yearly_whatsapp_statement(
+                    name=first.get("customer_name", "Customer"),
+                    plant_id=first.get("plant_id", ""),
+                    plant_name=first.get("plant_name", ""),
+                    kwh=k_val, revenue=r_val, year=selected_year.get("val", "2026"), lang=p_lang
+                )
+            else:
                 txt = crm.format_rich_whatsapp_statement(
                     name=first.get("customer_name", "Customer"),
                     plant_id=first.get("plant_id", ""),
                     plant_name=first.get("plant_name", ""),
-                    kwh=float(first.get("kwh") or 0.0),
-                    revenue=float(first.get("revenue_inr") or 0.0),
+                    kwh=k_val, revenue=r_val,
                     tier=first.get("tier", "Good"),
-                    lang=str(first.get("preferred_lang", "english")).lower(),
-                    month=selected_month["val"]
+                    lang=p_lang, month=selected_month["val"]
                 )
-                enc = urllib.parse.quote(txt)
-                ui.run_javascript(f"window.open('https://web.whatsapp.com/send?phone={phone}&text={enc}', '_blank');")
-                ui.notify(f"Opening WhatsApp Web for {first.get('customer_name')} ({len(selected)} total selected)", type="positive")
-            else:
-                ui.notify("Selected customer has no phone number.", type="warning")
+            enc = urllib.parse.quote(txt)
+            ui.run_javascript(f"window.open('https://web.whatsapp.com/send?phone={phone}&text={enc}', '_blank');")
+            ui.notify(f"Opening WhatsApp Web for {first.get('customer_name')} ({len(selected)} selected)", type="positive")
         else:
-            ui.notify(f"Simulating dispatch of {len(selected)} WhatsApp messages...", type="info")
+            ui.notify(f"Dispatched simulation for {len(selected)} customer statements!", type="positive")
+            for r in selected:
+                r["selected"] = False
+            selected_pids.clear()
+            telemetry_table.rows = list(telemetry_table.rows)
+            update_selected_count_badge()
 
     bulk_send_btn.on("click", on_bulk_send)
 
@@ -906,6 +1301,12 @@ def build_crm_tab(app_state: dict):
         sub_tabs.value = st_campaigns
         await load_campaigns()
 
+    async def run_prepare_monsoon():
+        res = await asyncio.to_thread(crm.prepare_monsoon_campaign)
+        ui.notify(f"Prepared Pre-Monsoon Advisory Campaign #{res['campaign_id']}: {res['queued']} advisories queued!", type="positive")
+        sub_tabs.value = st_campaigns
+        await load_campaigns()
+
     # Dry-Run Simulation
     async def do_dry_run():
         cid = campaign_select.value
@@ -944,13 +1345,13 @@ def build_crm_tab(app_state: dict):
         ui.notify(f"Queued {res['alerts_queued']} offline alert messages (checked {res['offline_found']} plants)", type="info")
         await load_offline_alerts()
 
-    offline_table.on("preview-alert", lambda e: open_preview(e.args, "monthly"))
+    offline_table.on("preview-alert", lambda e: open_preview(e.args, "offline"))
 
     # Initial Master Table Load
     async def load_all_crm_data():
         nonlocal cached_telemetry_rows
         m = selected_month["val"]
-        cached_telemetry_rows = await asyncio.to_thread(_fetch_fleet_send_data, m)
+        cached_telemetry_rows = await asyncio.to_thread(_fetch_fleet_send_data, m, selected_view["mode"])
         filter_and_render_telemetry()
         await load_directory_data()
         await load_monthly_statements()

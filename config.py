@@ -19,11 +19,21 @@ class Settings(BaseSettings):
     aisensy_api_key: str = ""
     freshworks_api_key: str = ""
     gupshup_api_key: str = ""
-    support_phone: str = ""
+    support_phone: str = "9619455207"
+    test_phone_number: str = "9619455207"
+    price_per_unit: float = 14.0
     scheduler_enabled: bool = False
     playwright_headless: bool = True
     app_port: int = 8000
     export_api_key: str = ""
+
+    # --- Message Templates ---
+    msg_active: str = ""
+    msg_offline: str = ""
+    msg_monsoon: str = ""
+    msg_daily: str = ""
+    msg_weekly: str = ""
+    msg_yearly: str = ""
 
     @property
     def resolved_solar_analytics_db_path(self) -> str:

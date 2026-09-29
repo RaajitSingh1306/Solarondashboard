@@ -52,73 +52,305 @@ MARKETING_CTAS = {
     }
 }
 
+# --- Solaron Official Message Templates ---
+MONTH_NAMES = {
+    "english": {
+        "01": "January", "02": "February", "03": "March", "04": "April",
+        "05": "May", "06": "June", "07": "July", "08": "August",
+        "09": "September", "10": "October", "11": "November", "12": "December",
+    },
+    "hindi": {
+        "01": "जनवरी", "02": "फरवरी", "03": "मार्च", "04": "अप्रैल",
+        "05": "मई", "06": "जून", "07": "जुलाई", "08": "अगस्त",
+        "09": "सितंबर", "10": "अक्टूबर", "11": "नवंबर", "12": "दिसंबर",
+    },
+    "marathi": {
+        "01": "जानेवारी", "02": "फेब्रुवारी", "03": "मार्च", "04": "एप्रिल",
+        "05": "मे", "06": "जून", "07": "जुलै", "08": "ऑगस्ट",
+        "09": "सप्टेंबर", "10": "ऑक्टोबर", "11": "नोव्हेंबर", "12": "डिसेंबर",
+    }
+}
+
+MSG_ACTIVE_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "Your solar plant generated {energy} units in the previous month {month_name} {year}\n"
+    "You have saved approximately ₹{savings}\n"
+    "Kindly ensure regular cleaning of your plant maximizes your savings.\n"
+    "If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us.\n\n"
+    "Thank You,\n"
+    "Team Solaron"
+)
+
+MSG_ACTIVE_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपके सोलर प्लांट ने पिछले महीने {month_name} {year} में {energy} यूनिट बिजली बनाई।\n"
+    "आपने लगभग ₹{savings} की बचत की है।\n"
+    "कृपया ध्यान दें कि प्लांट की नियमित सफाई से आपकी बचत अधिकतम होती है।\n"
+    "यदि आप टेलीस्कोपिक पोल जैसे सफाई उपकरण खरीदना चाहते हैं, या कोई अन्य प्रश्न है, तो कृपया हमसे संपर्क करें।\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_ACTIVE_MR = (
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "आपल्या सोलर प्लांटने मागील महिन्यात {month_name} {year} मध्ये {energy} युनिट्स वीज निर्मिती केली.\n"
+    "आपली अंदाजे बचत ₹{savings} झाली आहे.\n"
+    "कृपया लक्षात ठेवा की प्लांटची नियमित स्वच्छता आपल्या बचतीत वाढ करते.\n"
+    "आपण टेलिस्कोपिक पोलसारखी स्वच्छता उपकरणे खरेदी करू इच्छित असल्यास, किंवा इतर कोणतीही शंका असल्यास, कृपया आमच्याशी संपर्क साधा.\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_OFFLINE_DEFAULT = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "your solar plant is offline. please check once physically...\n\n"
+    "If any queries, please connect with our team at {support_phone}\n\n"
+    "Team solaron,\n\n"
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें...\n\n"
+    "यदि कोई प्रश्न हैं, तो कृपया हमारी टीम को कॉल कीजिए {support_phone}\n\n"
+    "टीम सोलरॉन"
+)
+
+MSG_OFFLINE_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "your solar plant is offline. please check once physically...\n\n"
+    "If any queries, please connect with our team at {support_phone}\n\n"
+    "Team solaron"
+)
+
+MSG_OFFLINE_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें...\n\n"
+    "यदि कोई प्रश्न हैं, तो कृपया हमारी टीम को कॉल कीजिए {support_phone}\n\n"
+    "टीम सोलरॉन"
+)
+
+MSG_OFFLINE_MR = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "your solar plant is offline. please check once physically...\n\n"
+    "If any queries, please connect with our team at {support_phone}\n\n"
+    "Team solaron,\n\n"
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "आपला सोलर प्लांट ऑफलाइन आहे. कृपया एकदा प्रत्यक्ष तपासणी करा...\n\n"
+    "काही शंका असल्यास, कृपया आमच्या टीमशी संपर्क साधा {support_phone}\n\n"
+    "टीम सोलरॉन"
+)
+
+MSG_MONSOON_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "The monsoon season is going to start soon. We advise a thorough check of your solar plant's earthing and wiring.\n"
+    "Ensure there is no water accumulation near the electrical panels.\n\n"
+    "Thank You,\n"
+    "Team Solaron"
+)
+
+MSG_MONSOON_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "मानसून का मौसम जल्द ही शुरू होने वाला है। हम आपके सोलर प्लांट के अर्थिंग और वायरिंग की गहन जांच की सलाह देते हैं।\n"
+    "सुनिश्चित करें कि इलेक्ट्रिकल पैनलों के पास पानी जमा न हो।\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_MONSOON_MR = (
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "पावसाळा लवकरच सुरू होत आहे. आम्ही आपल्या सोलर प्लांटचे अर्थिंग आणि वायरिंग नीट तपासण्याचा सल्ला देतो.\n"
+    "इलेक्ट्रिकल पॅनेलजवळ पाणी साचणार नाही याची काळजी घ्या.\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_DAILY_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "Your solar plant generated {energy} units today ({date}).\n"
+    "You have saved approximately ₹{savings}.\n"
+    "Kindly ensure regular cleaning of your plant maximizes your savings.\n"
+    "If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us.\n\n"
+    "Thank You,\n"
+    "Team Solaron"
+)
+
+MSG_DAILY_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपके सोलर प्लांट ने आज ({date}) {energy} यूनिट बिजली बनाई।\n"
+    "आपने लगभग ₹{savings} की बचत की है।\n"
+    "कृपया ध्यान दें कि प्लांट की नियमित सफाई से आपकी बचत अधिकतम होती है।\n"
+    "यदि आप टेलीस्कोपिक पोल जैसे सफाई उपकरण खरीदना चाहते हैं, या कोई अन्य प्रश्न है, तो कृपया हमसे संपर्क करें।\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_DAILY_MR = (
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "आपल्या सोलर प्लांटने आज ({date}) {energy} युनिट्स वीज निर्मिती केली.\n"
+    "आपली अंदाजे बचत ₹{savings} झाली आहे.\n"
+    "कृपया लक्षात ठेवा की प्लांटची नियमित स्वच्छता आपल्या बचतीत वाढ करते.\n"
+    "आपण टेलिस्कोपिक पोलसारखी स्वच्छता उपकरणे खरेदी करू इच्छित असल्यास, किंवा इतर कोणतीही शंका असल्यास, कृपया आमच्याशी संपर्क साधा.\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_WEEKLY_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "Your solar plant generated approximately {energy} units this week.\n"
+    "You have saved approximately ₹{savings}.\n"
+    "Kindly ensure regular cleaning of your plant maximizes your savings.\n"
+    "If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us.\n\n"
+    "Thank You,\n"
+    "Team Solaron"
+)
+
+MSG_WEEKLY_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपके सोलर प्लांट ने इस सप्ताह लगभग {energy} यूनिट बिजली बनाई।\n"
+    "आपने लगभग ₹{savings} की बचत की है।\n"
+    "कृपया ध्यान दें कि प्लांट की नियमित सफाई से आपकी बचत अधिकतम होती है।\n"
+    "यदि आप टेलीस्कोपिक पोल जैसे सफाई उपकरण खरीदना चाहते हैं, या कोई अन्य प्रश्न है, तो कृपया हमसे संपर्क करें।\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_WEEKLY_MR = (
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "आपल्या सोलर प्लांटने या आठवड्यात अंदाजे {energy} युनिट्स वीज निर्माण केली.\n"
+    "आपली अंदाजे बचत ₹{savings} झाली आहे.\n"
+    "कृपया लक्षात ठेवा की प्लांटची नियमित स्वच्छता आपल्या बचतीत वाढ करते.\n"
+    "आपण टेलिस्कोपिक पोलसारखी स्वच्छता उपकरणे खरेदी करू इच्छित असल्यास, किंवा इतर कोणतीही शंका असल्यास, कृपया आमच्याशी संपर्क साधा.\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_YEARLY_EN = (
+    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "Dear Sir/Madam,\n"
+    "Your solar plant generated {energy} units in the year {year}.\n"
+    "You have saved approximately ₹{savings}.\n"
+    "Thank you for choosing Solaron as your solar partner!\n"
+    "For annual maintenance contracts, panel cleaning, or queries, please reach out to us.\n\n"
+    "Thank You,\n"
+    "Team Solaron"
+)
+
+MSG_YEARLY_HI = (
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपके सोलर प्लांट ने वर्ष {year} में कुल {energy} यूनिट बिजली बनाई।\n"
+    "आपने लगभग ₹{savings} की बचत की है।\n"
+    "सोलरॉन को अपना सोलर पार्टनर चुनने के लिए धन्यवाद!\n"
+    "वार्षिक रखरखाव (AMC), पैनल सफाई या अन्य सेवा के लिए हमसे संपर्क करें।\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+MSG_YEARLY_MR = (
+    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
+    "प्रिय महोदय/मॅडम,\n"
+    "आपल्या सोलर प्लांटने वर्ष {year} मध्ये एकूण {energy} युनिट्स वीज निर्मिती केली.\n"
+    "आपली अंदाजे बचत ₹{savings} झाली आहे.\n"
+    "सोलरॉन सोबत भागीदारी केल्याबद्दल धन्यवाद!\n"
+    "वार्षिक देखभाल (AMC), पॅनेल स्वच्छता किंवा चौकशीसाठी आमच्याशी संपर्क साधा.\n\n"
+    "धन्यवाद,\n"
+    "टीम सोलरॉन"
+)
+
+def _resolve_lang(lang: str) -> str:
+    l = (lang or "english").lower().strip()
+    if "mr" in l or "marathi" in l:
+        return "marathi"
+    elif "hi" in l or "hindi" in l:
+        return "hindi"
+    return "english"
+
 def format_rich_whatsapp_statement(
     name: str,
     plant_id: str,
     plant_name: str,
     kwh: float,
     revenue: float,
-    tier: str,
+    tier: str = "Good",
     lang: str = "english",
     month: str = "2026-09"
 ) -> str:
-    lang = lang.lower() if lang else "english"
-    if lang not in MARKETING_CTAS:
-        lang = "english"
+    resolved_lang = _resolve_lang(lang)
+    energy_str = f"{kwh:,.1f}" if (kwh % 1 != 0) else f"{round(kwh):,}"
+    savings_str = f"{round(revenue):,}" if revenue else f"{round(kwh * 14.0):,}"
 
-    tier_clean = tier if tier in MARKETING_CTAS[lang] else "Good"
-    cta = MARKETING_CTAS[lang].get(tier_clean, MARKETING_CTAS[lang]["Good"])
-    co2 = round(kwh * 0.82, 1)
-    days_powered = max(1, round(kwh / 10.5))
+    parts = month.split("-") if month and "-" in month else ["2026", "09"]
+    yr = parts[0]
+    m_num = parts[1] if len(parts) > 1 else "09"
+    m_name_en = MONTH_NAMES["english"].get(m_num, "September")
 
-    if lang == "hindi":
-        return f"""☀️ *सोलरऑन मासिक प्रदर्शन विवरण* ☀️
-📅 माह: *{month}*
-👤 ग्राहक: *{name}*
-📍 सोलर प्लांट: *{plant_name}* (`{plant_id}`)
-
-📊 *बिजली उत्पादन व बचत:*
-⚡ कुल उत्पादन: *{kwh:,.1f} kWh*
-💰 अनुमानित बिजली बचत: *₹{revenue:,.0f}*
-🏆 परफॉरमेंस टियर: *{tier}*
-🌱 CO₂ बचाव: *{co2} किलोग्राम*
-💡 घरेलू उपयोग समतुल्य: *{days_powered} दिन*
-
-{cta}
-
-📞 किसी भी प्रश्न के लिए सोलरऑन केयर से संपर्क करें या इस संदेश का उत्तर दें।"""
-    elif lang == "marathi":
-        return f"""☀️ *सोलरऑन मासिक कार्यक्षमता अहवाल* ☀️
-📅 कालावधी: *{month}*
-👤 ग्राहक: *{name}*
-📍 प्रकल्प: *{plant_name}* (`{plant_id}`)
-
-📊 *ऊर्जा व बचत तपशील:*
-⚡ एकूण निर्मिती: *{kwh:,.1f} kWh*
-💰 अंदाजे आर्थिक बचत: *₹{revenue:,.0f}*
-🏆 कार्यक्षमता श्रेणी: *{tier}*
-🌱 कार्बन उत्सर्जन घट: *{co2} kg*
-💡 घरगुती वीज समतुल्य: *{days_powered} दिवस*
-
-{cta}
-
-📞 अधिक माहितीसाठी सोलरऑन ग्राहक सेवेशी संपर्क साधा."""
+    if resolved_lang == "marathi":
+        m_name = MONTH_NAMES["marathi"].get(m_num, m_name_en)
+        return MSG_ACTIVE_MR.format(
+            energy=energy_str,
+            month_name=m_name,
+            year=yr,
+            savings=savings_str
+        )
+    elif resolved_lang == "hindi":
+        m_name = MONTH_NAMES["hindi"].get(m_num, m_name_en)
+        return MSG_ACTIVE_HI.format(
+            energy=energy_str,
+            month_name=m_name,
+            year=yr,
+            savings=savings_str
+        )
     else:
-        return f"""☀️ *SolarOn Monthly Solar Statement* ☀️
-📅 Period: *{month}*
-👤 Customer: *{name}*
-📍 Plant: *{plant_name}* (`{plant_id}`)
+        return MSG_ACTIVE_EN.format(
+            energy=energy_str,
+            month_name=m_name_en,
+            year=yr,
+            savings=savings_str
+        )
 
-📊 *Energy Harvest & Financial Return:*
-⚡ Total Generation: *{kwh:,.1f} kWh*
-💰 Estimated Savings: *₹{revenue:,.0f}*
-🏆 Performance Tier: *{tier}*
-🌱 Carbon Offset: *{co2:,.1f} kg CO₂*
-💡 Home Energy Equivalent: *{days_powered} Days Powered*
+def format_offline_whatsapp_message(
+    name: str = "",
+    plant_id: str = "",
+    plant_name: str = "",
+    support_phone: str = "",
+    lang: str = "english"
+) -> str:
+    resolved_lang = _resolve_lang(lang)
+    phone = support_phone or getattr(settings, "support_phone", "") or "+91 96194 55207"
+    if "bilingual" in (lang or "").lower():
+        return MSG_OFFLINE_DEFAULT.format(support_phone=phone)
+    if resolved_lang == "marathi":
+        return MSG_OFFLINE_MR.format(support_phone=phone)
+    elif resolved_lang == "hindi":
+        return MSG_OFFLINE_HI.format(support_phone=phone)
+    else:
+        return MSG_OFFLINE_EN.format(support_phone=phone)
 
-{cta}
-
-📞 Questions? Contact SolarOn Care at +91 98200 12345 or reply to this message."""
+def format_monsoon_whatsapp_message(
+    support_phone: str = "",
+    lang: str = "english"
+) -> str:
+    resolved_lang = _resolve_lang(lang)
+    if resolved_lang == "marathi":
+        return MSG_MONSOON_MR
+    elif resolved_lang == "hindi":
+        return MSG_MONSOON_HI
+    return MSG_MONSOON_EN
 
 def format_daily_whatsapp_statement(
     name: str,
@@ -129,44 +361,17 @@ def format_daily_whatsapp_statement(
     date_str: str = "",
     lang: str = "english"
 ) -> str:
-    lang = (lang or "english").lower()
+    resolved_lang = _resolve_lang(lang)
     date_display = date_str or datetime.date.today().strftime("%d %b %Y")
-    energy = round(kwh, 1)
-    savings = round(revenue or (kwh * 14.0))
+    energy_str = f"{kwh:,.1f}" if (kwh % 1 != 0) else f"{round(kwh):,}"
+    savings_str = f"{round(revenue or (kwh * 14.0)):,}"
 
-    if lang == "hindi":
-        return f"""सोलरॉन होम्स की ओर से नमस्कार,
-
-प्रिय महोदय/मैम,
-आपके सोलर प्लांट ({plant_name}) ने आज ({date_display}) कुल {energy} यूनिट बिजली बनाई।
-आपने लगभग ₹{savings:,.0f} की बचत की है।
-प्लांट की नियमित सफाई से अधिकतम बिजली उत्पादन व बचत सुनिश्चित करें।
-सफाई उपकरण या किसी भी प्रश्न के लिए हमसे संपर्क करें।
-
-धन्यवाद,
-टीम सोलरॉन"""
-    elif lang == "marathi":
-        return f"""सोलरॉन होम्स कडून सस्नेह नमस्कार,
-
-प्रिय महोदय/मॅडम,
-आपल्या सोलर प्लांटने ({plant_name}) आज ({date_display}) {energy} युनिट्स वीज निर्मिती केली.
-आपली अंदाजे बचत ₹{savings:,.0f} झाली आहे.
-सोलर पॅनेल्सची वेळेवर स्वच्छता जास्तीत जास्त वीज निर्मितीसाठी आवश्यक आहे.
-स्वच्छता उपकरणे किंवा इतर माहितीसाठी आमच्याशी संपर्क साधा.
-
-धन्यवाद,
-टीम सोलरॉन"""
+    if resolved_lang == "marathi":
+        return MSG_DAILY_MR.format(energy=energy_str, date=date_display, savings=savings_str)
+    elif resolved_lang == "hindi":
+        return MSG_DAILY_HI.format(energy=energy_str, date=date_display, savings=savings_str)
     else:
-        return f"""Greetings From Solaron Homes Pvt Ltd,
-
-Dear Sir/Madam,
-Your solar plant ({plant_name}) generated {energy} units today ({date_display}).
-You have saved approximately ₹{savings:,.0f}.
-Kindly ensure regular cleaning of your plant maximizes your savings.
-If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us at +91 98200 12345.
-
-Thank You,
-Team Solaron"""
+        return MSG_DAILY_EN.format(energy=energy_str, date=date_display, savings=savings_str)
 
 def format_weekly_whatsapp_statement(
     name: str,
@@ -176,43 +381,16 @@ def format_weekly_whatsapp_statement(
     revenue: float = 0.0,
     lang: str = "english"
 ) -> str:
-    lang = (lang or "english").lower()
-    energy = round(kwh, 1)
-    savings = round(revenue or (kwh * 14.0))
+    resolved_lang = _resolve_lang(lang)
+    energy_str = f"{kwh:,.1f}" if (kwh % 1 != 0) else f"{round(kwh):,}"
+    savings_str = f"{round(revenue or (kwh * 14.0)):,}"
 
-    if lang == "hindi":
-        return f"""सोलरॉन होम्स की ओर से नमस्कार,
-
-प्रिय महोदय/मैम,
-आपके सोलर प्लांट ({plant_name}) ने इस सप्ताह लगभग {energy} यूनिट बिजली बनाई।
-आपने लगभग ₹{savings:,.0f} की बचत की है।
-प्लांट की नियमित सफाई बनाए रखें जिससे उत्पादन उत्कृष्ट रहे।
-किसी भी सहायता के लिए सोलरॉन केयर से संपर्क करें।
-
-धन्यवाद,
-टीम सोलरॉन"""
-    elif lang == "marathi":
-        return f"""सोलरॉन होम्स कडून सस्नेह नमस्कार,
-
-प्रिय महोदय/मॅडम,
-आपल्या सोलर प्लांटने ({plant_name}) या आठवड्यात अंदाजे {energy} युनिट्स वीज निर्माण केली.
-आपली अंदाजे बचत ₹{savings:,.0f} झाली आहे.
-नियमित स्वच्छतेने आपल्या प्लांटची कार्यक्षमता उच्चतम ठेवा.
-अधिक माहितीसाठी आमच्याशी संपर्क साधा.
-
-धन्यवाद,
-टीम सोलरॉन"""
+    if resolved_lang == "marathi":
+        return MSG_WEEKLY_MR.format(energy=energy_str, savings=savings_str)
+    elif resolved_lang == "hindi":
+        return MSG_WEEKLY_HI.format(energy=energy_str, savings=savings_str)
     else:
-        return f"""Greetings From Solaron Homes Pvt Ltd,
-
-Dear Sir/Madam,
-Your solar plant ({plant_name}) generated approximately {energy} units this week.
-You have saved approximately ₹{savings:,.0f}.
-Kindly ensure regular cleaning of your plant maximizes your savings.
-If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us at +91 98200 12345.
-
-Thank You,
-Team Solaron"""
+        return MSG_WEEKLY_EN.format(energy=energy_str, savings=savings_str)
 
 def format_yearly_whatsapp_statement(
     name: str,
@@ -223,44 +401,16 @@ def format_yearly_whatsapp_statement(
     year: str = "2026",
     lang: str = "english"
 ) -> str:
-    lang = (lang or "english").lower()
-    energy = round(kwh, 1)
-    savings = round(revenue or (kwh * 14.0))
-    days_powered = max(1, round(kwh / 30.0))
+    resolved_lang = _resolve_lang(lang)
+    energy_str = f"{kwh:,.1f}" if (kwh % 1 != 0) else f"{round(kwh):,}"
+    savings_str = f"{round(revenue or (kwh * 14.0)):,}"
 
-    if lang == "hindi":
-        return f"""☀️ *सोलरॉन वार्षिक माइलस्टोन विवरण ({year})* ☀️
-
-प्रिय महोदय/मैम ({name}),
-आपके सोलर प्लांट ({plant_name}) ने वर्ष {year} में कुल *{energy:,.0f} यूनिट* बिजली बनाई!
-आपने लगभग *₹{savings:,.0f}* की आर्थिक बचत की और ~{days_powered} दिनों की घरेलू बिजली बनाई।
-सोलरॉन को अपना सोलर पार्टनर चुनने के लिए धन्यवाद!
-वार्षिक रखरखाव (AMC), पैनल सफाई या अन्य सेवा के लिए हमसे संपर्क करें।
-
-धन्यवाद,
-टीम सोलरॉन केयर"""
-    elif lang == "marathi":
-        return f"""☀️ *सोलरॉन वार्षिक कामगिरी अहवाल ({year})* ☀️
-
-प्रिय महोदय/मॅडम ({name}),
-आपल्या सोलर प्लांटने ({plant_name}) वर्ष {year} मध्ये तब्बल *{energy:,.0f} युनिट्स* वीज निर्मिती केली!
-आपली अंदाजे आर्थिक बचत *₹{savings:,.0f}* झाली आहे (~{days_powered} दिवस घरगुती वीज समतुल्य).
-सोलरॉन सोबत भागीदारी केल्याबद्दल धन्यवाद!
-वार्षिक देखभाल (AMC) किंवा पॅनेल स्वच्छतेसाठी आमच्याशी संपर्क साधा.
-
-धन्यवाद,
-टीम सोलरॉन केयर"""
+    if resolved_lang == "marathi":
+        return MSG_YEARLY_MR.format(energy=energy_str, year=year, savings=savings_str)
+    elif resolved_lang == "hindi":
+        return MSG_YEARLY_HI.format(energy=energy_str, year=year, savings=savings_str)
     else:
-        return f"""☀️ *Solaron Annual Milestone Summary ({year})* ☀️
-
-Dear Sir/Madam ({name}),
-Your solar plant ({plant_name}) generated *{energy:,.0f} units* in the year {year}.
-You have saved approximately *₹{savings:,.0f}* (~{days_powered} days of residential energy equivalent)!
-Thank you for choosing Solaron as your solar partner!
-For annual maintenance contracts (AMC), panel cleaning, or queries, please reach out to us at +91 98200 12345.
-
-Thank You,
-Team Solaron"""
+        return MSG_YEARLY_EN.format(energy=energy_str, year=year, savings=savings_str)
 
 def get_customers(limit: int = 100, offset: int = 0, search: Optional[str] = None) -> List[Dict[str, Any]]:
     sql = "SELECT id, plant_id, customer_name, phone, email, preferred_lang, opt_in_status FROM customers"
@@ -392,17 +542,53 @@ def prepare_monthly_campaign(month: Optional[str] = None) -> Dict[str, Any]:
     merged = pd.merge(cust_df, plants_df, on="plant_id", how="inner")
     queue_rows = []
 
+    plants_meta = db.query_df("SELECT plant_id, plant_name FROM plants", db="analytics")
+    pname_map = dict(zip(plants_meta["plant_id"], plants_meta["plant_name"])) if not plants_meta.empty else {}
+
     for _, row in merged.iterrows():
         lang = str(row["preferred_lang"]).lower()
-        tmpl_group = TEMPLATES.get(lang, TEMPLATES["english"])
-        tmpl = tmpl_group["monthly_summary"]
-        msg = tmpl.format(
-            name=row["customer_name"],
-            plant_id=row["plant_id"],
-            kwh=row["kwh"] or 0,
-            tier=row["tier"] or "Good",
-            revenue=row["revenue_inr"] or 0
+        pid = str(row["plant_id"])
+        msg = format_rich_whatsapp_statement(
+            name=str(row.get("customer_name") or "Solar Customer"),
+            plant_id=pid,
+            plant_name=pname_map.get(pid, pid),
+            kwh=float(row.get("kwh") or 0.0),
+            revenue=float(row.get("revenue_inr") or 0.0),
+            tier=str(row.get("tier") or "Good"),
+            lang=lang,
+            month=month
         )
+        queue_rows.append((campaign_id, row["id"], row["phone"], msg, lang, "PENDING"))
+
+    if queue_rows:
+        with db.crm_conn() as conn:
+            cur = conn.cursor()
+            cur.executemany(
+                "INSERT INTO message_queue (campaign_id, customer_id, phone, message_text, language, status) VALUES (?, ?, ?, ?, ?, ?)",
+                queue_rows
+            )
+            cur.execute("UPDATE campaign_log SET total_messages = ? WHERE id = ?", (len(queue_rows), campaign_id))
+
+    return {"campaign_id": campaign_id, "queued": len(queue_rows)}
+
+def prepare_monsoon_campaign() -> Dict[str, Any]:
+    with db.crm_conn() as conn:
+        cur = conn.cursor()
+        now_str = datetime.date.today().strftime("%Y-%m-%d")
+        cur.execute(
+            "INSERT INTO campaign_log (campaign_name, month, status, total_messages) VALUES (?, ?, 'PENDING', 0)",
+            (f"Monsoon Alert - {now_str}", now_str[:7])
+        )
+        campaign_id = cur.lastrowid
+
+    cust_df = db.query_df("SELECT id, plant_id, customer_name, phone, preferred_lang FROM customers WHERE opt_in_status = 'active' AND phone IS NOT NULL AND trim(phone) != ''", db="crm")
+    if cust_df.empty:
+        return {"campaign_id": campaign_id, "queued": 0}
+
+    queue_rows = []
+    for _, row in cust_df.iterrows():
+        lang = str(row.get("preferred_lang", "english")).lower()
+        msg = format_monsoon_whatsapp_message(support_phone=settings.support_phone, lang=lang)
         queue_rows.append((campaign_id, row["id"], row["phone"], msg, lang, "PENDING"))
 
     if queue_rows:
@@ -557,10 +743,11 @@ def prepare_offline_alerts(hours: int = 4) -> Dict[str, Any]:
         if not cust_df.empty:
             c = cust_df.iloc[0]
             lang = str(c["preferred_lang"]).lower()
-            tmpl_group = TEMPLATES.get(lang, TEMPLATES["english"])
-            msg = tmpl_group["offline_alert"].format(
+            msg = format_offline_whatsapp_message(
+                name=c["customer_name"],
                 plant_id=pid,
-                hours=hours
+                support_phone=getattr(settings, "support_phone", "+91 96194 55207"),
+                lang=lang
             )
             with db.crm_conn() as conn:
                 cur = conn.cursor()

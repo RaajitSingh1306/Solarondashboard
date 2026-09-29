@@ -141,19 +141,26 @@ def sync_decommissioned_plants() -> int:
     if df.empty:
         return 0
 
+    import data_quality
     decom_ids = []
     reactivate_ids = []
     for _, row in df.iterrows():
         cur_kwh = float(row["current_month_kwh"] or 0.0)
         prev_kwh = float(row["prev_month_kwh"] or 0.0)
 
-        if cur_kwh > 1.0:
+        if data_quality.is_decommissioned(row["plant_id"]):
+            decom_ids.append(row["plant_id"])
+        elif cur_kwh > 1.0:
             # Plant generated this month — ensure it's active, not decommissioned
             if row["operational_status"] == "decommissioned":
                 reactivate_ids.append(row["plant_id"])
         elif cur_kwh <= 1.0 and prev_kwh <= 1.0:
             # Zero in both current and previous month
             decom_ids.append(row["plant_id"])
+
+    # De-duplicate
+    decom_ids = list(set(decom_ids))
+    reactivate_ids = [pid for pid in reactivate_ids if not data_quality.is_decommissioned(pid)]
 
     if reactivate_ids:
         placeholders = ",".join(["?"] * len(reactivate_ids))
@@ -230,7 +237,7 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
 
     # Split active vs non-active
     kwh_vals = pd.to_numeric(df["kwh"], errors="coerce").fillna(0.0)
-    active_mask = (kwh_vals > 1.0)
+    active_mask = (kwh_vals > 1.0) & (df["operational_status"] != "decommissioned")
     non_active_df = df[~active_mask]
     active_df = df[active_mask].copy()
 
@@ -266,6 +273,7 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
             kwh = float(row["kwh"] or 0.0)
             theoretical = ghi * days_in_month * cap
             pr = round((kwh / theoretical) * 100.0, 1) if theoretical > 0 else 0.0
+            pr = min(150.0, max(0.0, pr))
             pr_list.append(pr)
 
         active_df["pr_pct"] = pr_list
@@ -488,6 +496,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         # Performance Ratio & Realization Rate
         theoretical_energy = ghi * days_in_month * cap
         pr = round((actual_kwh / theoretical_energy) * 100.0, 1) if theoretical_energy > 0 else 0.0
+        pr = min(150.0, max(0.0, pr))
         realization = round((actual_kwh / expected_kwh) * 100.0, 1) if expected_kwh > 0 else 0.0
 
         pr_updates.append({
