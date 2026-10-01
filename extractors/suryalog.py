@@ -41,8 +41,8 @@ class SuryaLogExtractor(BaseExtractor):
     def login(self) -> bool:
         return bool(settings.suryalog_user and settings.suryalog_password)
 
-    def _load_cached_records(self) -> List[Dict[str, Any]]:
-        if self.cached_plants:
+    def _load_cached_records(self, force_reload: bool = False) -> List[Dict[str, Any]]:
+        if self.cached_plants and not force_reload:
             return self.cached_plants
         if self.raw_file.exists():
             try:
@@ -78,16 +78,16 @@ class SuryaLogExtractor(BaseExtractor):
         days[0] = round(days[0] + diff, 2)
         return days
 
-    def scrape_live_portal(self, target_plant_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    def scrape_live_portal(self, target_plant_name: Optional[str] = None, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Log into cloud.suryalog.ae and scrape live telemetry for commercial plants."""
         global _LAST_LIVE_SCRAPE_TS, _LAST_LIVE_SCRAPE_CACHE
-        if not target_plant_name and (time.time() - _LAST_LIVE_SCRAPE_TS < 180.0) and _LAST_LIVE_SCRAPE_CACHE:
+        if not force_refresh and not target_plant_name and (time.time() - _LAST_LIVE_SCRAPE_TS < 180.0) and _LAST_LIVE_SCRAPE_CACHE:
             logger.info("Using fresh live scrape from %.1fs ago.", time.time() - _LAST_LIVE_SCRAPE_TS)
             return _LAST_LIVE_SCRAPE_CACHE
 
         if not self.login():
             logger.warning("SuryaLog credentials not configured in .env, reading cached data.")
-            return self._load_cached_records()
+            return self._load_cached_records(force_reload=force_refresh)
 
         try:
             if sys.platform == "win32":
@@ -266,9 +266,9 @@ class SuryaLogExtractor(BaseExtractor):
     def fetch_fleet(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Fetch all 12 commercial SuryaLog plants."""
         if force_refresh and self.login():
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
-            raw_list = self._load_cached_records()
+            raw_list = self._load_cached_records(force_reload=force_refresh)
 
         plants = []
         if raw_list:
@@ -291,6 +291,7 @@ class SuryaLogExtractor(BaseExtractor):
                     "inverter_model": str(p.get("inverter_model") or "Commercial"),
                     "panel_model": str(p.get("panel_model") or "Mono PERC 540W"),
                     "last_log_time": str(p.get("last_log_time") or ""),
+                    "status": str(p.get("status") or "Normal"),
                     "total_energy_kwh": self.safe_float(p.get("total_energy_kwh")),
                 })
             return plants
@@ -310,9 +311,9 @@ class SuryaLogExtractor(BaseExtractor):
         target_day = target_dt.day
 
         if force_refresh and self.login():
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
-            raw_list = self._load_cached_records()
+            raw_list = self._load_cached_records(force_reload=force_refresh)
 
         results = []
         chitra_d1_21 = self._get_chitra_days_1_to_21()
@@ -428,9 +429,9 @@ class SuryaLogExtractor(BaseExtractor):
             month_str = datetime.date.today().strftime("%Y-%m")
 
         if force_refresh and self.login():
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
-            raw_list = self._load_cached_records()
+            raw_list = self._load_cached_records(force_reload=force_refresh)
 
         results = []
 
@@ -540,9 +541,9 @@ class SuryaLogExtractor(BaseExtractor):
     def fetch_snapshots(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Fetch inverter snapshots for SuryaLog fleet."""
         if force_refresh and self.login():
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
-            raw_list = self._load_cached_records()
+            raw_list = self._load_cached_records(force_reload=force_refresh)
 
         snapshots = []
         now_ts = datetime.datetime.now().isoformat()

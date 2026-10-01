@@ -193,7 +193,7 @@ def build_crm_tab(app_state: dict):
     # Solaron Test WhatsApp Dialog
     test_modal = ui.dialog().classes("items-center justify-center")
     test_state = {
-        "phone": getattr(crm.settings, "test_phone_number", "9619455207"),
+        "phone": getattr(crm.settings, "test_phone_number", "") or "919999999999",
         "template": "monthly",
         "lang": "english",
     }
@@ -207,7 +207,7 @@ def build_crm_tab(app_state: dict):
         ui.label("Dispatch a live test using Solaron official templates directly to your personal or team number:").classes("text-xs text-gray-400 mb-3")
 
         with ui.row().classes("w-full gap-3 mb-2 flex-wrap"):
-            test_phone_input = ui.input("Target Phone (with country code e.g. 919619455207)", value=test_state["phone"]).classes("flex-1 min-w-[220px]").props("dense outlined dark")
+            test_phone_input = ui.input("Target Phone (with country code e.g. 919999999999)", value=test_state["phone"]).classes("flex-1 min-w-[220px]").props("dense outlined dark")
             test_tmpl_select = ui.select(
                 options={
                     "monthly": "Active Monthly Statement",
@@ -238,7 +238,7 @@ def build_crm_tab(app_state: dict):
     def render_test_preview():
         tmpl = test_tmpl_select.value or "monthly"
         lang = test_lang_select.value or "english"
-        s_phone = getattr(crm.settings, "support_phone", "+91 96194 55207")
+        s_phone = getattr(crm.settings, "support_phone", "") or "+91 00000 00000"
         if tmpl == "offline":
             txt = crm.format_offline_whatsapp_message(
                 name="Solar Customer", plant_id="SAMPLE-PLANT", plant_name="Sample Solar Plant",
@@ -368,12 +368,12 @@ def build_crm_tab(app_state: dict):
         elif mode == "offline":
             return crm.format_offline_whatsapp_message(
                 name=name, plant_id=pid, plant_name=pname,
-                support_phone=phone or getattr(crm.settings, "support_phone", "+91 96194 55207"),
+                support_phone=phone or getattr(crm.settings, "support_phone", "") or "+91 00000 00000",
                 lang=lang
             )
         elif mode == "monsoon":
             return crm.format_monsoon_whatsapp_message(
-                support_phone=phone or getattr(crm.settings, "support_phone", "+91 96194 55207"),
+                support_phone=phone or getattr(crm.settings, "support_phone", "") or "+91 00000 00000",
                 lang=lang
             )
         else:

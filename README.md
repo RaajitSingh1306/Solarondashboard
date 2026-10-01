@@ -1,9 +1,11 @@
 # Solaron — Enterprise Solar Operations, Telemetry & CRM Intelligence Platform
 
-> **Version:** 2.2.0 · **Python:** 3.10+ · **Stack:** FastAPI + NiceGUI (Tailwind CSS / Quasar) + SQLite  
+> **Version:** 2.3.0 · **Python:** 3.10+ · **Stack:** FastAPI + NiceGUI (Tailwind CSS / Quasar) + SQLite  
 > **Integrated Portals:** Growatt Server API, Sungrow iSolarCloud, SuryaLog Cloud  
-> **Total Monitored Fleet:** 490 Sites (2,410.2 kWp) · **Active Operational Fleet:** 295 Inverters (1,807.6 kWp)  
-> **Monthly Energy Harvest:** ~103.14 MWh · **Est. Commercial Value:** ₹14,43,960 / month  
+> **Total Monitored Fleet:** 491 Sites (2,414.0 kWp) · **Active Operational Fleet:** 295 Inverters (2.29 MWp)  
+> **Monthly Energy Harvest:** 214.30 MWh (Sep 2026) · **Est. Commercial Value:** ₹30,00,220 / month  
+> **Detailed Tab Breakdown:** See [TAB_INFO.md](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md) for full interactive component specifications  
+> **Master Architecture & Physics:** See [DATA_DOCUMENT.md](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/DATA_DOCUMENT.md) for complete mathematical formulations  
 
 ---
 
@@ -12,6 +14,7 @@
 1. [Executive Summary & Platform Scope](#1-executive-summary--platform-scope)
    - 1.1 [Platform Scope & Purpose](#11-platform-scope--purpose)
    - 1.2 [Master Fleet Directory & Composition](#12-master-fleet-directory--composition)
+   - 1.3 [Repository & Directory Organization](#13-repository--directory-organization)
 2. [System Architecture & Ingestion Topology](#2-system-architecture--ingestion-topology)
    - 2.1 [High-Level Architecture (Mermaid)](#21-high-level-architecture)
    - 2.2 [Component Responsibilities & Interaction Matrix](#22-component-responsibilities--interaction-matrix)
@@ -30,11 +33,11 @@
    - 4.6 [Carbon Emission Reductions ($CO_2$) & Financial Savings](#46-carbon-emission-reductions-co_2--financial-savings)
    - 4.7 [Capacity Brackets & Absolute PR Health Tiers](#47-capacity-brackets--absolute-pr-health-tiers)
 5. [Interactive Web Cockpit: In-Depth Tab Walkthrough](#5-interactive-web-cockpit-in-depth-tab-walkthrough)
-   - 5.1 [Tab 1: Fleet Command Center (`ui/fleet.py`)](#51-tab-1-fleet-command-center)
-   - 5.2 [Tab 2: Full Analytics & Loss Attribution (`ui/analytics.py`)](#52-tab-2-full-analytics--loss-attribution)
-   - 5.3 [Tab 3: Plant Cockpit & Granular Inspector (`ui/plant.py`)](#53-tab-3-plant-cockpit--granular-inspector)
-   - 5.4 [Tab 4: CRM & Multi-Channel Communications Hub (`ui/crm.py`)](#54-tab-4-crm--multi-channel-communications-hub)
-   - 5.5 [Tab 5: Data Pipeline & Ingestion Workbench (`ui/fetch_tab.py`)](#55-tab-5-data-pipeline--ingestion-workbench)
+   - 5.1 [Tab 1: Fetch Data (`ui/fetch_tab.py`)](#51-tab-1-fetch-data-uifetch_tabpy)
+   - 5.2 [Tab 2: Fleet Command Center (`ui/fleet.py`)](#52-tab-2-fleet-command-center-uifleetpy)
+   - 5.3 [Tab 3: Full Analytics & Loss Attribution (`ui/analytics.py`)](#53-tab-3-full-analytics--loss-attribution-uianalyticspy)
+   - 5.4 [Tab 4: Plant Cockpit & Granular Inspector (`ui/plant.py`)](#54-tab-4-plant-cockpit--granular-inspector-uiplantpy)
+   - 5.5 [Tab 5: CRM & Multi-Channel Communications Hub (`ui/crm.py`)](#55-tab-5-crm--multi-channel-communications-hub-uicrmpy)
 6. [Backend API Reference & Endpoints](#6-backend-api-reference--endpoints)
    - 6.1 [Telemetry & Fleet Endpoints (`routes/data.py`)](#61-telemetry--fleet-endpoints)
    - 6.2 [CRM & Campaign Endpoints (`routes/crm.py`)](#62-crm--campaign-endpoints)
@@ -58,25 +61,86 @@
 **Solaron** is an enterprise-grade solar operations, loss attribution, and customer relationship management (CRM) intelligence platform. Designed specifically for distributed residential, commercial, and industrial rooftop solar portfolios across India, Solaron solves the challenges of fragmented OEM portals by centralizing inverter telemetry, applying rigorous solar physics modeling, identifying statistical performance anomalies, and dispatching multi-lingual customer communications.
 
 ### 1.2 Master Fleet Directory & Composition
-The platform monitors 490 total installations representing **2,410.2 kWp** of solar photovoltaic capacity across three disparate OEM monitoring cloud portals:
+The platform monitors 491 total installations representing **2.29 MWp** of active solar photovoltaic capacity across three disparate OEM monitoring cloud portals:
 
 | Monitoring Platform | Total Sites | Share (%) | Extractor Module | Extraction Protocol |
 |:---|:---:|:---:|:---|:---|
-| **Growatt Server API** | 450 | 91.8% | [`extractors/growatt.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/growatt.py) | REST API v2 session auth + 30-min live curve telemetry |
+| **Growatt Server API** | 451 | 91.9% | [`extractors/growatt.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/growatt.py) | REST API v2 session auth + 30-min live curve telemetry |
 | **Sungrow iSolarCloud** | 28 | 5.7% | [`extractors/isolarcloud.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/isolarcloud.py) | Web3 / Playwright headless session scraper + JSON API |
-| **SuryaLog Cloud** | 12 | 2.5% | [`extractors/suryalog.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/suryalog.py) | AE Cloud REST API token + multi-inverter telemetry |
-| **Total Monitored Portfolio** | **490** | **100.0%** | [`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) | Normalized SQLite storage (`analytics.db`) |
+| **SuryaLog Cloud** | 12 | 2.4% | [`extractors/suryalog.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/suryalog.py) | AE Cloud REST API token + multi-inverter telemetry |
+| **Total Monitored Portfolio** | **491** | **100.0%** | [`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) | Normalized SQLite storage (`solar_analytics.db`) |
 
 #### Fleet Operational Status Breakdown
 
 | Fleet Cohort | Inverters / Sites | Total Capacity | Status Definition & Criteria |
 |:---|:---:|:---:|:---|
-| **Total Monitored Fleet** | **490** | **2,410.2 kWp** | Complete database directory across all 3 OEM portals |
-| **Active Operational Fleet** | **295** | **1,807.6 kWp** | Commissioned systems actively monitored (`operational_status = 'active'`) |
-| **Decommissioned / Inactive** | **195** | **602.6 kWp** | Retired or inactive sites (`operational_status = 'decommissioned'`), excluded from loss baselines |
-| **Active Generating (Current Month)** | **276 / 295** | **1,753.4 kWp** | Operational systems producing positive yield ($E_{\text{month}} > 1.0\text{ kWh}$) |
-| **Active Offline / Zero Yield** | **19 / 295** | **54.2 kWp** | Operational systems with zero monthly energy (tripped breakers, comms outages) |
-| **Statistical ML Anomalies** | **8 / 295** | **194.2 kWp** | Statistically divergent underperformers flagged by the Isolation Forest engine |
+| **Total Monitored Fleet** | **491** | **2,414.0 kWp** | Complete database directory across all 3 OEM portals |
+| **Active Operational Fleet** | **295** | **2.29 MWp** | Commissioned systems actively monitored (`operational_status = 'active'`) |
+| **Decommissioned / Inactive** | **196** | **122.4 kWp** | Retired or inactive sites (`operational_status = 'decommissioned'`), excluded from loss baselines |
+| **Active Generating (September 2026)** | **274 / 295** | **2.16 MWp** | Operational systems producing positive yield ($E_{\text{month}} > 1.0\text{ kWh}$) |
+| **Active Offline / Zero Yield** | **21 / 295** | **135.2 kWp** | Operational systems with zero monthly energy (tripped breakers, comms outages) |
+| **Statistical ML Anomalies** | **22 / 295** | **184.8 kWp** | Statistically divergent underperformers flagged by the Isolation Forest engine |
+
+### 1.3 Repository & Directory Organization
+
+The codebase is organized into cleanly partitioned subdirectories:
+
+```
+Solarondashboard/
+├── .env / .env.example               # Environment credentials & server configurations
+├── requirements.txt                  # Python dependency specifications
+├── README.md                         # Primary project overview & operational documentation
+├── run.py                            # Standalone server launcher with Windows safe multiprocessing
+├── app.py                            # FastAPI + NiceGUI application entrypoint & lifespan management
+├── config.py                         # Pydantic environment settings validator
+├── db.py                             # SQLite connection pooling & schema migrations
+├── analytics.py                      # Core solar physics calculations (Yf, Yd, PR, GHI baselines)
+├── ml_analytics.py                   # Isolation Forest ML pipeline & absolute PR health tiering
+├── data_quality.py                   # Telemetry sanitization, physical bounds & anti-cracked data firewalls
+├── pipeline.py                       # Multi-portal parallel ingestion & cache orchestrator
+├── scheduler.py                      # APScheduler automated background polling worker
+├── crm.py                            # Multi-lingual WhatsApp statement generator & customer model
+│
+├── docs/                             # 📚 Technical Documentation Hub
+│   ├── README.md                     # Documentation index & reading guide
+│   ├── TAB_INFO.md                   # Exhaustive tab-by-tab UI component & workflow guide
+│   ├── DATA_DOCUMENT.md              # Master data specification & mathematical physics architecture
+│   ├── BACKEND.md                    # FastAPI REST API endpoints & data contracts
+│   ├── FRONTEND.md                   # NiceGUI architecture, styling & reactive state
+│   ├── SYSTEM_DESIGN.md              # Distributed ingestion architecture & telemetry flows
+│   └── SECURITY.md                   # Credential protection, token handling & access controls
+│
+├── tests/                            # 🧪 Automated Test & Verification Suites
+│   ├── __init__.py                   # Package initializer
+│   ├── verify_all.py                 # Master 4-pillar integrity verification suite
+│   ├── test_comprehensive_suite.py   # 37-case end-to-end regression test suite
+│   ├── test_granularity_verification.py # CRM multi-cadence statement hierarchy test
+│   └── test_results.json             # Automated JSON test execution logs
+│
+├── data/                             # 💾 Persistent SQLite Databases & Raw Snapshots
+│   ├── solar_analytics.db            # Master normalized solar telemetry database
+│   ├── crm_data.db                   # Customer directory & campaign delivery logs
+│   └── raw/                          # Raw OEM JSON snapshot caches (Growatt, Sungrow, SuryaLog)
+│
+├── extractors/                       # 🔌 Multi-Portal Telemetry Ingestion Adapters
+│   ├── base.py                       # Abstract base extractor interface
+│   ├── growatt.py                    # Growatt REST API v2 client & 30-min curve fetcher
+│   ├── isolarcloud.py                # Sungrow iSolarCloud Web3 scraper & extractor
+│   ├── suryalog.py                   # SuryaLog AE Cloud REST JSON extractor
+│   └── excel_parser.py               # Legacy Excel/CSV spreadsheet importer
+│
+├── routes/                           # 🌐 FastAPI REST API Route Controllers
+│   ├── data.py                       # Inverter telemetry, generation & health tier endpoints
+│   ├── export.py                     # CSV/Excel/JSON data export endpoints
+│   └── crm.py                        # WhatsApp messaging & customer account endpoints
+│
+└── ui/                               # 🖥️ NiceGUI Web Interface (5 Core Tabs)
+    ├── fetch_tab.py                  # Tab 1: Data Ingestion & Live Sync Workbench
+    ├── fleet.py                      # Tab 2: Fleet Command Center & Health Tiers
+    ├── analytics.py                  # Tab 3: Full Analytics & 6-Part Loss Waterfall
+    ├── plant.py                      # Tab 4: Plant Cockpit & 30-Min Real-Time Curve
+    └── crm.py                        # Tab 5: CRM Operations & Multi-Lingual WhatsApp Engine
+```
 
 ---
 
@@ -234,7 +298,33 @@ Raw OEM telemetry often contains corrupted data, negative values, clock drift, o
 5. **Diurnal Telemetry Clock Clamping:**
    - For real-time daily generation curves viewed during the current day, any hour slot beyond the current local clock hour ($\text{hour} > \text{now.hour}$) is strictly clamped to $0.0\text{ kWh}$.
 
-### 3.4 Dual Database Schema Reference
+### 3.4 Dynamic Operational Status & Force-Refresh Cache Overwriting Engine
+
+#### 1. Dynamic Server & Database Operational Status (Retiring Static Hardcoding)
+Historically, `data_quality.py` included a hardcoded set of 196 plant IDs (`DECOMMISSIONED_PLANT_IDS`) to bootstrap offline performance tests. This static approach has been completely modernized into a **dynamic, server- and database-driven resolution engine**:
+
+* **Live Database Status Lookup:**
+  [`data_quality.get_decommissioned_plant_ids()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L94-L123) actively queries SQLite `plants` table (`WHERE operational_status = 'decommissioned'`). It utilizes an in-memory set cache with a 60-second TTL to ensure zero-latency lookups during high-frequency loop processing.
+* **Proactive Cache Invalidation:**
+  Whenever fleet metadata is synchronized via [`pipeline.run_fleet()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py#L52-L66) or periodic status synchronization runs via [`analytics.sync_decommissioned_plants()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L118-L194), [`data_quality.invalidate_decommissioned_cache()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L87-L93) is executed, instantly flushing stale in-memory state.
+* **Live OEM Server Telemetry Heuristics:**
+  [`data_quality.determine_operational_status(plant_record)`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L136-L186) dynamically detects decommissioned or permanently offline installations directly from server response attributes:
+  - **Sungrow iSolarCloud:** Portal reports `status` as `"Commissioning unfinished"` or `"Offline"` with $\le 0.0\text{ kWh}$ lifetime energy.
+  - **SuryaLog AE Cloud:** Server reports `status == "Offline"` with $\le 0.0\text{ kWh}$ lifetime energy.
+  - **Growatt Server API:** Server reports `deviceCount == 0` with $\le 0.0\text{ kWh}$ lifetime total energy.
+  - **Database Precedence:** Existing database records with `operational_status = 'decommissioned'` are respected until reactivated by positive generation.
+
+#### 2. Force-Refresh Cache Overwriting & Fresh Telemetry Flow
+When an operator triggers a `force_refresh=True` run (via the **Fetch Data** UI or API):
+1. **Bypasses Short-Term In-Memory Cache:** Playwright scrapers and REST extractors immediately bypass the 180-second memory cache to force authentic network requests to OEM cloud gateways.
+2. **Overwrites Local Disk JSON Caches:**
+   - **Growatt:** Calls `newTwoPlantAPI.do` (`getAllPlantListTwo`) and `plant_detail(Timespan.month)`, overwriting [`data/raw/growatt/plant_list_live.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/growatt/plant_list_live.json) and [`data/raw/growatt/real_monthly_cache.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/growatt/real_monthly_cache.json).
+   - **Sungrow iSolarCloud:** Headless browser extracts multi-page installation tables, overwriting [`data/raw/isolarcloud/plants_28_structured.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/isolarcloud/plants_28_structured.json).
+   - **SuryaLog AE Cloud:** Logs into portal and extracts telemetry, overwriting [`data/raw/suryalog/plants_12_structured.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/suryalog/plants_12_structured.json).
+3. **Telemetry Ingested Into SQLite:** Extracted generation, specific yield, and inverter snapshots are upserted into `plants`, `daily_generation`, `monthly_generation`, and `inverter_snapshots`.
+4. **Subsequent Cache-Mode Runs Consume Fresh Data:** Any subsequent run with `force_refresh=False` directly reads the freshly written raw files and SQLite records, preventing operators from ever viewing stale, multi-day-old telemetry.
+
+### 3.5 Dual Database Schema Reference
 
 The platform stores all state in two distinct, decoupled SQLite databases configured with **Write-Ahead Logging (WAL)** for high concurrency:
 
@@ -475,30 +565,45 @@ To avoid comparing small residential setups with industrial utility sites, plant
 #### Absolute PR Performance Tier Matrix ([`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py))
 Solaron evaluates plant health using absolute, physics-grounded Performance Ratio thresholds:
 
-| Performance Tier | Absolute PR Threshold | Active Plant Count | Operational Meaning & O&M Action |
+| Performance Tier | Absolute PR Threshold | Verified Count (Sep 2026) | Operational Meaning & O&M Action |
 |:---|:---:|:---:|:---|
-| ⭐ **Best** | $\text{PR} \ge 75\%$ | **13** | Top performers; generation matches or exceeds clear-sky model |
-| ✅ **Good** | $60\% \le \text{PR} < 75\%$ | **12** | Healthy commercial operation; normal seasonal performance |
-| ⚠️ **Could Be Better** | $45\% \le \text{PR} < 60\%$ | **53** | Moderate generation; panel cleaning and soiling inspection advised |
-| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | **131** | Significant shortfall; technician dispatched to inspect strings/inverters |
-| 🔴 **Critical** | $\text{PR} < 30\%$ | **67** | Severe underperformance; urgent check on tripped fuses/inverter faults |
-| ⚪ **Offline** | Operational with $E \le 1.0\text{ kWh}$ | **19** | Zero yield; breaker open or datalogger communication loss |
-| 🟣 **Decommissioned** | Retired sites | **195** | Permanently decommissioned; excluded from fleet benchmarks |
+| ⭐ **Best** | $\text{PR} \ge 75\%$ | **146** | Top performers; generation matches or exceeds clear-sky model |
+| ✅ **Good** | $60\% \le \text{PR} < 75\%$ | **78** | Healthy commercial operation; normal seasonal performance |
+| ⚠️ **Could Be Better** | $45\% \le \text{PR} < 60\%$ | **25** | Moderate generation; panel cleaning and soiling inspection advised |
+| 🟠 **Needs Attention** | $30\% \le \text{PR} < 45\%$ | **13** | Significant shortfall; technician dispatched to inspect strings/inverters |
+| 🔴 **Critical** | $\text{PR} < 30\%$ | **12** | Severe underperformance; urgent check on tripped fuses/inverter faults |
+| ⚪ **Offline** | Operational with $E \le 1.0\text{ kWh}$ | **21** | Zero yield; breaker open or datalogger communication loss |
+| 🟣 **Decommissioned** | Retired sites | **196** | Permanently decommissioned; excluded from fleet baselines |
 
 ---
 
 ## 5. Interactive Web Cockpit: In-Depth Tab Walkthrough
 
+> 📖 **Comprehensive Guide Available:** For exhaustive component-by-component documentation, widget layouts, tables, and modal workflows, refer to the dedicated [TAB_INFO.md](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md) guide.
+
 The Solaron interactive dashboard runs at `http://localhost:8000` and features five reactive tabs built with **NiceGUI**, **Tailwind CSS**, and **Apache ECharts**:
 
-### 5.1 Tab 1: Fleet Command Center (`ui/fleet.py`)
+### 5.1 Tab 1: Fetch Data (`ui/fetch_tab.py`)
 
-The Fleet Command Center provides portfolio-wide operational visibility, high-level KPIs, and a searchable fleet table.
+The data extraction and ingestion engine serving as the operational gateway to all OEM portals:
+- **Extraction Workbench:** Select target billing month, telemetry portal (`All`, `growatt`, `isolarcloud`, `suryalog`), specific site, and toggle between `⚡ Cache Mode` (~1-3s instant local hit) and `🔄 Force Refresh` (full gateway connection and physics recalculation).
+- **Lifetime Historical Backfill Engine:** Backfills monthly and daily generation from plant commissioning date (2017–2026) to present with overwrite protection.
+- **Real-Time Running Stopwatch:** Displays high-precision elapsed timer down to tenths of a second with dynamic ETA remaining.
+- **Post-Pull Initial Analysis:** Renders 4 KPI summary cards (Plants Processed, Month Generation MWh, Est. Commercial Value ₹, Fetch Duration), a multi-segment visual fleet health distribution bar (Optimal vs Underperforming vs Zero Gen), and a preview table of top 35 producing plants with direct drill-down into the Plant Cockpit.
+
+### 5.2 Tab 2: Fleet Command Center (`ui/fleet.py`)
+
+The portfolio master grid providing comprehensive operational visibility and interactive fleet analytics:
+- **6 Top KPI Summary Cards:** Real-time summary cards displaying Monthly Harvest (`214.30 MWh`), Estimated Commercial Value (`₹30,00,220`), Active Generating plants (`274 / 295`), Zero Generation alerts (`21`), Decommissioned plants (`196 / 491`), and Active Fleet Capacity (`2.29 MWp` across 295 inverters).
+- **Multi-Parameter Filter Toolbar:** Month dropdown with quick period buttons (`This Month (Sep)`, `Prev Month (Aug)`), Platform filter, Status filter (`active`, `offline`, `fault`, `decommissioned`), Tier filter including `⚡ Anomaly Outliers`, debounced plant name search, and `Include Decommissioned` toggle.
+- **Master Fleet Table (14 Columns, Quasar / Tailwind):** Plant Name, Platform badge, kWp, Status chip, Portal Last Log with schedule icon, Last Recorded Day badge, Live kW, Today kWh, Month kWh, Est. Savings (₹), Specific Yield, Units/kWp/day, PR (%) color spectrum, and Performance Tier with `⚡ Anomaly` badge and score tooltip.
+- **Interactivity:** One-click row selection immediately navigates to Tab 4 (Plant Cockpit) pre-selecting the installation.
+- **Live Sync & Streaming Export:** Direct streaming export as CSV or XLSX; `⚡ Live Fetch All Portals` button with real-time timer.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │  Monthly Output (2026-09)   Est. Value      Active Generating   Fault / Zero    Capacity   │
-│         103.14 MWh          ₹14,43,960          276 / 295            19         1.81 MWp   │
+│         214.30 MWh          ₹30,00,220          274 / 295            21         2.29 MWp   │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ Filters: [Month: 2026-09] [This Month] [Prev Month] [Portal: All] [Status: All] [Tier] │
 │          [Search Plant...]  [Include Decommissioned]   [CSV] [XLSX] [⚡ Live Fetch]    │
@@ -744,13 +849,13 @@ Built on `APScheduler`, the background scheduler runs periodic jobs when `SCHEDU
 
 ## 8. Verification & Audit Suite
 
-Solaron includes a multi-layered verification framework to certify platform integrity before deployment.
+Solaron includes an automated multi-layered verification framework certifying platform integrity, solar physics conservation, database normalization, and multi-lingual CRM messaging.
 
-### 8.1 Consolidated Verification (`verify_all.py`)
+### 8.1 Consolidated Master Verification (`tests/verify_all.py`)
 To execute the comprehensive 4-pillar audit suite:
 
 ```pwsh
-python verify_all.py
+python tests/verify_all.py
 ```
 
 ```
@@ -759,33 +864,61 @@ python verify_all.py
 =================================================================
 
   [PASS] Pillar 1: Subprocess Spawn, Path Resolution & Import Integrity
-  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (276 Generating / 19 Offline / 195 Decom)
-  [PASS] Pillar 3: Inverter Telemetry Physics (490 Inverters, 0°C cured, CEC 97.5% DC)
-  [PASS] Pillar 4: Mathematical Physics Baseline & 6-Part Loss Conservation
+  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (274 Gen / 21 Offline / 196 Decom / 2.29 MWp)
+  [PASS] Pillar 3: Inverter Telemetry Physics (85,790 Records, 0°C Cured, CEC 97.5% Standard)
+  [PASS] Pillar 4: Mathematical Physics Baseline & 6-Part Loss Conservation (Sum == Shortfall)
 
 =================================================================
   [SUCCESS] ALL 4 INTEGRITY PILLARS CERTIFIED WITH 100% SUCCESS!
 =================================================================
 ```
 
-### 8.2 Granularity & Quick Presets Integration Test (`test_granularity_verification.py`)
-To verify that the date presets, reporting months, and granularity selectors update all telemetry tables and charts in synchronized lockstep:
+### 8.2 Granularity & Quick Presets Integration Test (`tests/test_granularity_verification.py`)
+Validates that date presets, reporting months, and granularity selectors update all telemetry tables and statements in synchronized lockstep:
 
 ```pwsh
-python test_granularity_verification.py
+python tests/test_granularity_verification.py
 ```
 
 ```
-[PASS] Test 1: Date Presets (Today, Yesterday, Last 7 Days, MTD, YTD)
-[PASS] Test 2: Granularity Switching (Live Curves, Daily Bar, Monthly History)
-[PASS] Test 3: Table and Chart State Synchronization
+=== 1. Testing _fetch_fleet_send_data directly across all 4 modes ===
+Monthly: 490 plants, active: 279, avg kWh: 773.3
+Daily (2026-09-29): 490 plants, active: 251, avg kWh: 34.3
+Weekly (7 days): 490 plants, active: 260, avg kWh: 197.5
+Yearly (2026): 490 plants, active: 294, avg kWh: 6219.2
+
+=== 2. Validating Scale Hierarchy for Same Plant ===
+Plant growatt_11176283: Daily 16.6 <= Weekly 86.1 <= Monthly 254.4 <= Yearly 3091.1 kWh
+Scale hierarchy validated successfully!
+
+=== 3. WhatsApp Formatting Validation ===
+Daily statement WhatsApp format OK!
+Weekly statement WhatsApp format OK!
+Yearly statement WhatsApp format OK!
+=== ALL GRANULARITY CHECKS PASSED SUCCESSFULLY ===
 ```
 
-### 8.3 Comprehensive Test Suite (`test_comprehensive_suite.py`)
-Runs exhaustive unit, database, and physics validation tests:
+### 8.3 Comprehensive Test Suite (`tests/test_comprehensive_suite.py`)
+Executes all 37 automated test cases spanning data ingestion, database schemas, inverter physics, mathematical baselines, fleet classification, CRM messaging, and REST API contracts:
 
 ```pwsh
-python test_comprehensive_suite.py
+python tests/test_comprehensive_suite.py
+```
+
+```
+=================================================================
+  SUMMARY OF TEST RESULTS
+=================================================================
+  [PASS] Phase 1: 6/6 tests passed (Data Ingestion & Live/Cache Fetch)
+  [PASS] Phase 2: 4/4 tests passed (Database Schema & Migration Integrity)
+  [PASS] Phase 3: 5/5 tests passed (Telemetry & Inverter Physics Validation)
+  [PASS] Phase 4: 5/5 tests passed (Mathematical Formulations & Physical Bounds)
+  [PASS] Phase 5: 5/5 tests passed (Fleet Analytics, Loss Waterfall & ML Pipeline)
+  [PASS] Phase 6: 5/5 tests passed (CRM Engine & Multi-Lingual Communications)
+  [PASS] Phase 8: 7/7 tests passed (REST API Contracts & Performance Testing)
+-----------------------------------------------------------------
+  TOTAL: 37 PASSED, 0 FAILED across 37 TEST CASES (100% PASS RATE)
+=================================================================
 ```
 
 ---

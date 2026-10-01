@@ -331,7 +331,7 @@ def format_offline_whatsapp_message(
     lang: str = "english"
 ) -> str:
     resolved_lang = _resolve_lang(lang)
-    phone = support_phone or getattr(settings, "support_phone", "") or "+91 96194 55207"
+    phone = support_phone or getattr(settings, "support_phone", "") or "+91 00000 00000"
     if "bilingual" in (lang or "").lower():
         return MSG_OFFLINE_DEFAULT.format(support_phone=phone)
     if resolved_lang == "marathi":
@@ -746,7 +746,7 @@ def prepare_offline_alerts(hours: int = 4) -> Dict[str, Any]:
             msg = format_offline_whatsapp_message(
                 name=c["customer_name"],
                 plant_id=pid,
-                support_phone=getattr(settings, "support_phone", "+91 96194 55207"),
+                support_phone=getattr(settings, "support_phone", "") or "+91 00000 00000",
                 lang=lang
             )
             with db.crm_conn() as conn:

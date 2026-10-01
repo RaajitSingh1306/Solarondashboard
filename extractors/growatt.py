@@ -306,6 +306,9 @@ class GrowattExtractor(BaseExtractor):
                 "panel_model": str(plant_set.get("panelModel") or ""),
                 "last_log_time": log_time,
                 "total_energy_kwh": self.safe_float(p.get("eTotal") or p.get("totalEnergy")),
+                "deviceCount": p.get("deviceCount"),
+                "status": str(p.get("status") or ""),
+                "hasDeviceOnLine": p.get("hasDeviceOnLine"),
             })
 
         # Auto-correct the CSV master metadata file with live API capacities
@@ -356,11 +359,13 @@ class GrowattExtractor(BaseExtractor):
         if not plants:
             return 0
 
-        cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
+        cache_file = self.raw_dir / "real_monthly_cache.json"
+        legacy_cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
         cache_data = {}
-        if cache_file.exists():
+        target_read_file = cache_file if cache_file.exists() else legacy_cache_file
+        if target_read_file.exists():
             try:
-                with open(cache_file, "r", encoding="utf-8") as f:
+                with open(target_read_file, "r", encoding="utf-8") as f:
                     cache_data = json.load(f)
             except Exception:
                 cache_data = {}
@@ -401,8 +406,9 @@ class GrowattExtractor(BaseExtractor):
         if updated_count > 0:
             try:
                 self.raw_dir.mkdir(parents=True, exist_ok=True)
-                with open(cache_file, "w", encoding="utf-8") as f:
-                    json.dump(cache_data, f, indent=2)
+                for out_f in (cache_file, legacy_cache_file):
+                    with open(out_f, "w", encoding="utf-8") as f:
+                        json.dump(cache_data, f, indent=2)
                 logger.info(f"Updated Growatt monthly cache for {updated_count} plants up to {target_date.isoformat()}")
             except Exception as e:
                 logger.error(f"Failed to save monthly cache: {e}")
@@ -441,7 +447,9 @@ class GrowattExtractor(BaseExtractor):
                 live_pac_map[rid] = pac
 
         # 1. Check real monthly cache first (fastest & most complete)
-        cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
+        cache_file = self.raw_dir / "real_monthly_cache.json"
+        if not cache_file.exists():
+            cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
         
         # If force_refresh requested, trigger live cache update
         if force_refresh:
@@ -617,7 +625,9 @@ class GrowattExtractor(BaseExtractor):
                 logger.debug(f"Error refreshing live monthly cache: {e}")
 
         # Check for real monthly cache file
-        cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
+        cache_file = self.raw_dir / "real_monthly_cache.json"
+        if not cache_file.exists():
+            cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
         if cache_file.exists():
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:

@@ -29,7 +29,9 @@ MIN_MONTHLY_YIELD_KWH_KWP = 0.0
 NOISE_FLOOR_DAILY_KWH = 0.05
 NOISE_FLOOR_MONTHLY_KWH = 1.0
 
-DECOMMISSIONED_PLANT_IDS = {
+# Bootstrap seed set used strictly for initial database provisioning when plants table is empty.
+# In production, operational status is dynamically fetched from servers & stored in SQLite.
+BOOTSTRAP_DECOMMISSIONED_PLANT_IDS = {
     'growatt_10016308', 'growatt_10067274', 'growatt_100699', 'growatt_10074506', 'growatt_10085629',
     'growatt_10133666', 'growatt_10137127', 'growatt_10169390', 'growatt_10179736', 'growatt_10200210',
     'growatt_10241129', 'growatt_102732', 'growatt_10273523', 'growatt_10371862', 'growatt_10377849',
@@ -45,7 +47,7 @@ DECOMMISSIONED_PLANT_IDS = {
     'growatt_10950151', 'growatt_10955172', 'growatt_11022463', 'growatt_11038083', 'growatt_11040520',
     'growatt_11061765', 'growatt_11063863', 'growatt_11073618', 'growatt_11097958', 'growatt_11115804',
     'growatt_11115963', 'growatt_11120267', 'growatt_11120425', 'growatt_11136038', 'growatt_11151904',
-    'growatt_11176283', 'growatt_11176497', 'growatt_11187649', 'growatt_11189560', 'growatt_112461',
+    'growatt_11176283', 'growatt_11176497', 'growatt_11187649', 'growatt_11189560', 'growatt_11199467', 'growatt_112461',
     'growatt_116506', 'growatt_118819', 'growatt_125955', 'growatt_125974', 'growatt_148593',
     'growatt_152294', 'growatt_152554', 'growatt_1551079', 'growatt_1574691', 'growatt_159167',
     'growatt_159282', 'growatt_163413', 'growatt_164727', 'growatt_166151', 'growatt_1692484',
@@ -72,8 +74,115 @@ DECOMMISSIONED_PLANT_IDS = {
     'suryalog_SL-004', 'suryalog_SL-005', 'suryalog_SL-009'
 }
 
+# Backward compatibility alias
+DECOMMISSIONED_PLANT_IDS = BOOTSTRAP_DECOMMISSIONED_PLANT_IDS
+DECOMMISSIONED_PLANT_IDS_LOWER = {p.lower() for p in BOOTSTRAP_DECOMMISSIONED_PLANT_IDS}
+
+# Dynamic in-memory cache for operational status retrieved from servers / SQLite
+_DECOMMISSIONED_CACHE: Optional[set] = None
+_DECOMMISSIONED_CACHE_TS: float = 0.0
+_CACHE_TTL_SEC: float = 60.0
+
+
+def invalidate_decommissioned_cache() -> None:
+    """Clear in-memory decommissioned plant cache to force fresh DB/server resolution."""
+    global _DECOMMISSIONED_CACHE, _DECOMMISSIONED_CACHE_TS
+    _DECOMMISSIONED_CACHE = None
+    _DECOMMISSIONED_CACHE_TS = 0.0
+
+
+def get_decommissioned_plant_ids(force_reload: bool = False) -> set:
+    """
+    Dynamically retrieve decommissioned plant IDs from the SQLite database
+    (operational_status = 'decommissioned').
+    Falls back to bootstrap seed set if the database is uninitialized.
+    """
+    global _DECOMMISSIONED_CACHE, _DECOMMISSIONED_CACHE_TS
+    import time
+    now = time.time()
+    if _DECOMMISSIONED_CACHE is not None and not force_reload and (now - _DECOMMISSIONED_CACHE_TS < _CACHE_TTL_SEC):
+        return _DECOMMISSIONED_CACHE
+
+    try:
+        import db
+        with db.analytics_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT lower(plant_id) FROM plants WHERE operational_status = 'decommissioned'")
+            rows = cur.fetchall()
+            if rows:
+                _DECOMMISSIONED_CACHE = {r[0] for r in rows}
+                _DECOMMISSIONED_CACHE_TS = now
+                return _DECOMMISSIONED_CACHE
+    except Exception as e:
+        logger.debug(f"Could not load decommissioned plants dynamically from DB: {e}")
+
+    # Fallback to bootstrap seed set during initial database provisioning
+    _DECOMMISSIONED_CACHE = set(DECOMMISSIONED_PLANT_IDS_LOWER)
+    _DECOMMISSIONED_CACHE_TS = now
+    return _DECOMMISSIONED_CACHE
+
+
 def is_decommissioned(plant_id: str) -> bool:
-    return str(plant_id).lower() in DECOMMISSIONED_PLANT_IDS
+    """
+    Dynamically check if a plant is decommissioned by querying the live
+    operational_status recorded in the database, with in-memory caching.
+    """
+    if not plant_id:
+        return False
+    pid_clean = str(plant_id).lower().strip()
+    return pid_clean in get_decommissioned_plant_ids()
+
+
+def determine_operational_status(plant_record: Dict[str, Any]) -> str:
+    """
+    Determine a plant's operational status dynamically from live server attributes.
+    Returns 'decommissioned' if:
+      - Explicitly flagged as decommissioned by server
+      - Reported as 'Commissioning unfinished' or 'Offline' with 0 lifetime energy
+      - Reported with 0 connected devices and 0 lifetime energy
+      - Pre-existing database record has operational_status = 'decommissioned'
+    Otherwise returns 'active'.
+    """
+    if not plant_record:
+        return "active"
+
+    # 1. Explicit status passed in record
+    op = str(plant_record.get("operational_status", "")).lower().strip()
+    if op in ("decommissioned", "retired", "inactive"):
+        return "decommissioned"
+
+    source = str(plant_record.get("source", "")).lower().strip()
+    status_raw = str(plant_record.get("status", "")).lower().strip()
+    tot_energy = plant_record.get("total_energy_kwh")
+    try:
+        tot_kwh = float(tot_energy) if tot_energy is not None else None
+    except (ValueError, TypeError):
+        tot_kwh = None
+
+    # 2. Portal-specific live server heuristics
+    if "isolarcloud" in source:
+        if status_raw in ("commissioning unfinished", "offline") and (tot_kwh is None or tot_kwh <= 0.0):
+            return "decommissioned"
+
+    if "suryalog" in source:
+        if status_raw == "offline" and (tot_kwh is None or tot_kwh <= 0.0):
+            return "decommissioned"
+
+    if "growatt" in source:
+        dev_count = plant_record.get("deviceCount")
+        try:
+            dev_cnt = int(dev_count) if dev_count is not None else None
+        except (ValueError, TypeError):
+            dev_cnt = None
+        if dev_cnt == 0 and (tot_kwh is None or tot_kwh <= 0.0):
+            return "decommissioned"
+
+    # 3. Dynamic lookup from database
+    pid = str(plant_record.get("plant_id", ""))
+    if is_decommissioned(pid):
+        return "decommissioned"
+
+    return "active"
 
 
 def clean_plant_name(name: Any) -> str:

@@ -153,17 +153,20 @@ def sync_decommissioned_plants(month: Optional[str] = None) -> int:
     decom_ids = []
     reactivate_ids = []
     for _, row in df.iterrows():
+        pid = row["plant_id"]
         cur_kwh = float(row["current_month_kwh"] or 0.0)
         prev_kwh = float(row["prev_month_kwh"] or 0.0)
 
-        if data_quality.is_decommissioned(row["plant_id"]):
-            decom_ids.append(row["plant_id"])
+        if data_quality.is_decommissioned(pid):
+            decom_ids.append(pid)
+        elif cur_kwh <= 0.0 and prev_kwh <= 0.0 and str(row.get("operational_status", "")).lower() == "decommissioned":
+            decom_ids.append(pid)
         else:
-            reactivate_ids.append(row["plant_id"])
+            reactivate_ids.append(pid)
 
     # De-duplicate
     decom_ids = list(set(decom_ids))
-    reactivate_ids = list(set([pid for pid in reactivate_ids if not data_quality.is_decommissioned(pid)]))
+    reactivate_ids = list(set([pid for pid in reactivate_ids if pid not in decom_ids]))
 
     if reactivate_ids:
         placeholders = ",".join(["?"] * len(reactivate_ids))
@@ -190,6 +193,8 @@ def sync_decommissioned_plants(month: Optional[str] = None) -> int:
             decom_ids,
             db="analytics"
         )
+
+    data_quality.invalidate_decommissioned_cache()
     return len(decom_ids)
 
 def classify_all(month: Optional[str] = None) -> Dict[str, Any]:

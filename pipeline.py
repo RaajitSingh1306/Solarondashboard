@@ -38,7 +38,7 @@ def normalize_plant_record(p: Dict[str, Any]) -> Dict[str, Any]:
         "install_date": p.get("install_date", ""),
         "inverter_model": p.get("inverter_model", ""),
         "panel_model": p.get("panel_model", ""),
-        "operational_status": "decommissioned" if (data_quality.is_decommissioned(str(p.get("plant_id"))) or p.get("operational_status") == "decommissioned") else "active",
+        "operational_status": data_quality.determine_operational_status(p),
         "last_log_time": p.get("last_log_time"),
         "total_energy_kwh": p.get("total_energy_kwh"),
     }
@@ -62,6 +62,7 @@ def run_fleet(sources: Optional[List[str]] = None, force_refresh: bool = False) 
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error in run_fleet for {ext.source}: {e}")
+    data_quality.invalidate_decommissioned_cache()
     return count
 
 def run_daily(date_str: Optional[str] = None, sources: Optional[List[str]] = None, force_refresh: bool = False) -> int:

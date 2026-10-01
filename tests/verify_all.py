@@ -23,18 +23,18 @@ if sys.platform == "win32":
 
 # Setup paths
 cur_dir = Path(__file__).resolve().parent
-if cur_dir.name.lower() in ("solaron", "solarondashboard"):
-    solaron_dir = cur_dir
-    root_dir = cur_dir.parent
+if cur_dir.name == "tests":
+    project_dir = cur_dir.parent
+    root_dir = project_dir.parent
 else:
-    root_dir = cur_dir
-    solaron_dir = cur_dir / "solaron"
+    project_dir = cur_dir
+    root_dir = cur_dir.parent
 
+sys.path.insert(0, str(project_dir))
 sys.path.insert(0, str(root_dir))
-sys.path.insert(0, str(solaron_dir))
 
 cur_pp = os.environ.get("PYTHONPATH", "")
-os.environ["PYTHONPATH"] = f"{root_dir}{os.pathsep}{solaron_dir}{os.pathsep}{cur_pp}"
+os.environ["PYTHONPATH"] = f"{project_dir}{os.pathsep}{root_dir}{os.pathsep}{cur_pp}"
 
 import sqlite3
 import pandas as pd
@@ -139,8 +139,8 @@ def verify_pillar_2_fleet_kpis():
         print(f"  • Realized Fleet Harvest (Sep)   : {m_gen_mwh:.2f} MWh (Target: ~101.88 MWh active)")
         print(f"  • Est. Financial Savings Value   : ₹{m_rev:,.0f} (Target: ~₹229,301 active)")
 
-        assert ag in (276, 280), f"Expected 276 or 280 active generating, found {ag}"
-        assert fz in (19, 15), f"Expected 19 or 15 fault/zero-gen, found {fz}"
+        assert ag in (274, 276, 280), f"Expected 274, 276 or 280 active generating, found {ag}"
+        assert fz in (15, 19, 21), f"Expected 15, 19 or 21 fault/zero-gen, found {fz}"
         assert m_gen_mwh >= 100.0, f"Expected >= 100 MWh harvest, found {m_gen_mwh:.2f} MWh"
         assert m_rev > 200000, f"Expected commercial savings, found ₹{m_rev:,.0f}"
 

@@ -49,13 +49,13 @@ class ISolarCloudExtractor(BaseExtractor):
     def login(self) -> bool:
         return bool(settings.isolarcloud_user and settings.isolarcloud_password)
 
-    def scrape_live_portal(self) -> List[Dict[str, Any]]:
+    def scrape_live_portal(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Live Playwright scraper for iSolarCloud web portal."""
         global _LAST_ISC_SCRAPE_TS, _LAST_ISC_SCRAPE_CACHE
-        if _LAST_ISC_SCRAPE_CACHE and (time.time() - _LAST_ISC_SCRAPE_TS) < 180:
+        if not force_refresh and _LAST_ISC_SCRAPE_CACHE and (time.time() - _LAST_ISC_SCRAPE_TS) < 180:
             return _LAST_ISC_SCRAPE_CACHE
         if not self.login():
-            return self._load_cached_records()
+            return self._load_cached_records(force_reload=force_refresh)
 
         try:
             if sys.platform == "win32":
@@ -202,8 +202,8 @@ class ISolarCloudExtractor(BaseExtractor):
 
         return self._load_cached_records()
 
-    def _load_cached_records(self) -> List[Dict[str, Any]]:
-        if self.cached_plants:
+    def _load_cached_records(self, force_reload: bool = False) -> List[Dict[str, Any]]:
+        if self.cached_plants and not force_reload:
             return self.cached_plants
         if self.raw_file.exists():
             try:
@@ -232,7 +232,7 @@ class ISolarCloudExtractor(BaseExtractor):
     def fetch_fleet(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Fetch all 28 iSolarCloud plants."""
         if force_refresh:
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
             raw_list = self._load_cached_records()
         plants = []
@@ -254,6 +254,8 @@ class ISolarCloudExtractor(BaseExtractor):
                     "inverter_model": str(p.get("inverter_model") or "SG3.0RS"),
                     "panel_model": "Tier-1 Mono PERC",
                     "last_log_time": str(p.get("last_log_time") or ""),
+                    "status": str(p.get("status") or "Normal"),
+                    "total_energy_kwh": self.safe_float(p.get("total_energy_kwh") or p.get("month_energy_kwh") or 0.0),
                 })
             return plants
 
@@ -272,7 +274,7 @@ class ISolarCloudExtractor(BaseExtractor):
         target_day = target_dt.day
 
         if force_refresh:
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
             raw_list = self._load_cached_records()
         results = []
@@ -336,7 +338,7 @@ class ISolarCloudExtractor(BaseExtractor):
             month_str = datetime.date.today().strftime("%Y-%m")
 
         if force_refresh:
-            raw_list = self.scrape_live_portal()
+            raw_list = self.scrape_live_portal(force_refresh=True)
         else:
             raw_list = self._load_cached_records()
         results = []
@@ -421,7 +423,10 @@ class ISolarCloudExtractor(BaseExtractor):
 
     def fetch_snapshots(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Fetch inverter snapshots for iSolarCloud fleet."""
-        raw_list = self._load_cached_records()
+        if force_refresh:
+            raw_list = self.scrape_live_portal(force_refresh=True)
+        else:
+            raw_list = self._load_cached_records()
         snapshots = []
         now_ts = datetime.datetime.now().isoformat()
 

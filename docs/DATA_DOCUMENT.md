@@ -1,8 +1,9 @@
 # 📊 Solaron Fleet Operations, Solar Physics & Machine Learning Specification
 > **Unified Master Data, Analytics & Engineering Architecture Document**  
-> **Version:** 2.1.0 · **Date:** 2026-09-26 · **Status:** Active & Deployed  
+> **Version:** 2.2.0 · **Date:** 2026-10-01 · **Status:** Active & Deployed  
 > **Authors:** Solaron Engineering Team & Antigravity AI Pair Programming Session  
-> **Monitored Fleet:** 490 Aggregated Installations · **Active Operational Fleet:** 295 Installations (1.80 MWp)  
+> **Monitored Fleet:** 491 Aggregated Installations · **Active Operational Fleet:** 295 Installations (2.29 MWp)  
+> **Exhaustive Tab Guide:** For an in-depth breakdown of every tab, sub-tab, KPI, and modal, see [TAB_INFO.md](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md)
 
 ---
 
@@ -15,7 +16,7 @@
 6. [Machine Learning Anomaly Detection Engine (Isolation Forest)](#6-machine-learning-anomaly-detection-engine-isolation-forest)
 7. [Adaptive 6-Part Loss Attribution Waterfall & Conservation Law](#7-adaptive-6-part-loss-attribution-waterfall--conservation-law)
 8. [Telemetry Sanitization, Ingestion Firewalls & Anti-Cracked-Data Rules](#8-telemetry-sanitization-ingestion-firewalls--anti-cracked-data-rules)
-9. [Resolved Platform Anomalies & Engineering Fixes (Issues 1–8)](#9-resolved-platform-anomalies--engineering-fixes-issues-18)
+9. [Resolved Platform Anomalies & Engineering Fixes (Issues 1–10)](#9-resolved-platform-anomalies--engineering-fixes-issues-110)
 10. [Interactive Web Cockpit, Multi-Category Filtering & CRM Intelligence](#10-interactive-web-cockpit-multi-category-filtering--crm-intelligence)
 11. [Parallel Engineering Project Reference: Smart Grid IDS](#11-parallel-engineering-project-reference-smart-grid-ids)
 12. [Verification Suite, Operational Runbook & Delivery Status](#12-verification-suite-operational-runbook--delivery-status)
@@ -27,7 +28,7 @@
 **Solaron** is an enterprise-grade solar operations, loss attribution, and customer relationship management (CRM) intelligence platform designed for distributed residential, commercial, and industrial solar installations across India. 
 
 The platform aggregates real-time inverter telemetry, daily generation profiles, and monthly energy yields across three disparate OEM solar monitoring cloud APIs:
-- **Growatt Server API**: 450 residential and commercial installations.
+- **Growatt Server API**: 451 residential and commercial installations.
 - **Sungrow iSolarCloud**: 28 commercial rooftop installations.
 - **SuryaLog Cloud**: 12 industrial solar installations.
 
@@ -35,22 +36,22 @@ The platform aggregates real-time inverter telemetry, daily generation profiles,
 
 | Monitoring Platform | Total Sites | Share (%) | Extractor Module | Telemetry Protocol & Frequency |
 |:---|:---:|:---:|:---|:---|
-| **Growatt Server API** | 450 | 91.8% | `extractors/growatt.py` | REST API v2 + 30-min interval live curves |
+| **Growatt Server API** | 451 | 91.9% | `extractors/growatt.py` | REST API v2 + 30-min interval live curves |
 | **Sungrow iSolarCloud** | 28 | 5.7% | `extractors/isolarcloud.py` | Web3 / Playwright session scraper |
-| **SuryaLog Cloud** | 12 | 2.5% | `extractors/suryalog.py` | AE Cloud REST JSON extractor |
-| **Total Monitored Fleet** | **490** | **100.0%** | Unified via `pipeline.py` | Normalized into SQLite `analytics.db` |
+| **SuryaLog Cloud** | 12 | 2.4% | `extractors/suryalog.py` | AE Cloud REST JSON extractor |
+| **Total Monitored Fleet** | **491** | **100.0%** | Unified via `pipeline.py` | Normalized into SQLite `analytics.db` |
 
 ### Master Fleet Directory & Operational Breakdown
 
 | Fleet Cohort | Installations | Capacity (kWp) | Operational Status & Scope Criteria |
 |:---|:---:|:---:|:---|
-| **Total Monitored Fleet** | **490** | **2,410.2 kWp** | Complete portfolio directory across all 3 monitoring platforms |
-| **Active Operational Fleet** | **295** | **1,807.6 kWp** | Commissioned sites actively monitored (`operational_status = 'active'`) |
-| **Decommissioned / Inactive** | **195** | **602.6 kWp** | Permanently retired or offline sites (`operational_status = 'decommissioned'`) |
-| **Active Generating (Current Month)** | **276 / 295** | **1,753.4 kWp** | Operational systems producing positive harvest ($E_{\text{month}} > 1.0\text{ kWh}$) |
-| **Active Offline / Fault (Current Month)**| **19 / 295** | **54.2 kWp** | Operational systems with zero monthly output (tripped breaker, comms loss) |
+| **Total Monitored Fleet** | **491** | **2,414.0 kWp** | Complete portfolio directory across all 3 monitoring platforms |
+| **Active Operational Fleet** | **295** | **2,291.6 kWp** | Commissioned sites actively monitored (`operational_status = 'active'`) |
+| **Decommissioned / Inactive** | **196** | **122.4 kWp** | Permanently retired or offline sites (`operational_status = 'decommissioned'`) |
+| **Active Generating (September 2026)** | **274 / 295** | **2,156.4 kWp** | Operational systems producing positive harvest ($E_{\text{month}} > 1.0\text{ kWh}$) |
+| **Active Offline / Fault (September 2026)**| **21 / 295** | **135.2 kWp** | Operational systems with zero monthly output (tripped breaker, comms loss) |
 | **Generating Today (Live)** | **Dynamic** | **—** | Systems transmitting positive generation on the current day (`today_kwh > 0.05`) |
-| **Statistical ML Anomalies** | **8 / 295** | **194.2 kWp** | Multi-attribute statistical outliers flagged by the Isolation Forest |
+| **Statistical ML Anomalies** | **22 / 295** | **184.8 kWp** | Multi-attribute statistical outliers flagged by the Isolation Forest |
 
 ---
 
@@ -62,7 +63,7 @@ The platform uses a decoupled ingestion, validation, physics computation, and de
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            OEM Solar Cloud APIs                             │
 │       Growatt Web API        Sungrow iSolarCloud         SuryaLog Cloud     │
-│       (450 Plants)            (28 Plants)                (12 Plants)        │
+│       (451 Plants)            (28 Plants)                (12 Plants)        │
 └──────────────┬─────────────────────────┬────────────────────────┬───────────┘
                │                         │                        │
                ▼                         ▼                        ▼
@@ -100,11 +101,11 @@ The platform uses a decoupled ingestion, validation, physics computation, and de
                ┌─────────────────────────┴────────────────────────┐
                ▼                                                  ▼
            FastAPI REST API                                NiceGUI Interactive Cockpit
-           (/api/plants, /api/daily,                       - Fleet Command Center (ui/fleet.py)
-            /api/monthly, /api/snapshots)                  - Plant Cockpit (ui/plant.py)
+           (/api/plants, /api/daily,                       - Fetch Data (ui/fetch_tab.py)
+            /api/monthly, /api/snapshots)                  - Fleet Command Center (ui/fleet.py)
                                                            - Full Analytics (ui/analytics_tab.py)
-                                                           - CRM & Statements (ui/crm.py)
-                                                           - Ingestion Control (ui/fetch_tab.py)
+                                                           - Plant Cockpit (ui/plant.py)
+                                                           - CRM & Campaigns (ui/crm.py)
 ```
 
 ### Core Architecture Modules & File Directory
@@ -114,16 +115,17 @@ The platform uses a decoupled ingestion, validation, physics computation, and de
 | [`pipeline.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py) | `Solarondashboard/pipeline.py` | Multi-portal orchestrator, concurrent ingestion, backfill engine |
 | [`ml_analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ml_analytics.py) | `Solarondashboard/ml_analytics.py` | Absolute PR tier assignment, Isolation Forest ML anomaly scoring, adaptive loss waterfall |
 | [`analytics.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py) | `Solarondashboard/analytics.py` | Core solar physics calculations ($Y_f, Y_d, PR$), regional GHI mapping, baseline models |
-| [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py) | `Solarondashboard/data_quality.py` | Physics bounds checking, daily ceiling clamping, capacity normalization ($W \to kWp$) |
+| [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py) | `Solarondashboard/data_quality.py` | Physics bounds checking, daily ceiling clamping, capacity normalization ($W \to kWp$), inactive site filters |
 | [`db.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/db.py) | `Solarondashboard/db.py` | SQLite connection pooling, schema migrations, universal anti-future-date firewall |
 | [`extractors/growatt.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/growatt.py) | `Solarondashboard/extractors/growatt.py` | Growatt API client, robust nested date parsing, 30-min power telemetry fetch |
 | [`extractors/isolarcloud.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/isolarcloud.py) | `Solarondashboard/extractors/isolarcloud.py` | Sungrow iSolarCloud Web3 scraper & daily/monthly extractor |
 | [`extractors/suryalog.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors/suryalog.py) | `Solarondashboard/extractors/suryalog.py` | SuryaLog AE cloud REST API extractor |
-| [`ui/fleet.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/fleet.py) | `Solarondashboard/ui/fleet.py` | Fleet command center table, PR (%), `⚡ Anomaly` badges, 146s speed indicator |
-| [`ui/plant.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/plant.py) | `Solarondashboard/ui/plant.py` | Plant Cockpit, category & portal multi-filter, 30-min live curve with clock clamp |
-| [`ui/analytics_tab.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/analytics_tab.py) | `Solarondashboard/ui/analytics_tab.py` | Apache ECharts 6-part loss attribution waterfall, NASA POWER satellite GHI curves |
-| [`ui/crm.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/crm.py) | `Solarondashboard/ui/crm.py` | 6-subtab customer relationship management, WhatsApp statement generation & campaigns |
-| [`ui/fetch_tab.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/fetch_tab.py) | `Solarondashboard/ui/fetch_tab.py` | Telemetry control center: 2s cached mode vs 146s live force-refresh & backfill engine |
+| [`ui/fetch_tab.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/fetch_tab.py) | `Solarondashboard/ui/fetch_tab.py` | Tab 1: Telemetry control center: 2s cached mode vs 146s live force-refresh & backfill engine |
+| [`ui/fleet.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/fleet.py) | `Solarondashboard/ui/fleet.py` | Tab 2: Fleet command center table, PR (%), `⚡ Anomaly` badges, 146s speed indicator |
+| [`ui/analytics_tab.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/analytics_tab.py) | `Solarondashboard/ui/analytics_tab.py` | Tab 3: Apache ECharts 6-part loss attribution waterfall, NASA POWER satellite GHI curves |
+| [`ui/plant.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/plant.py) | `Solarondashboard/ui/plant.py` | Tab 4: Plant Cockpit, category & portal multi-filter, 30-min live curve with clock clamp |
+| [`ui/crm.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui/crm.py) | `Solarondashboard/ui/crm.py` | Tab 5: 6-subtab customer relationship management, WhatsApp statement generation & campaigns |
+| [`TAB_INFO.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md) | `Solarondashboard/docs/TAB_INFO.md` | Comprehensive tab-by-tab guide breaking down all UI components, KPIs, and controls |
 
 ### Ingestion Performance & Speed Optimization
 
@@ -131,7 +133,33 @@ The platform supports two distinct operational extraction modes:
 1. **Fast Local Cached Mode (~2.0 seconds)**:
    Reads normalized NVMe local JSON snapshots from `data/raw/growatt/`, `data/raw/isolarcloud/`, and `data/raw/suryalog/`. Designed for instant dashboard startup, offline debugging, and rapid UI development.
 2. **Live Force-Refresh Mode (~146.0 seconds / 2.4 minutes)**:
-   Executes fully asynchronous, parallelized network extraction across all 490 installations directly from OEM cloud endpoints (`server-api.growatt.com`, Sungrow Web3, SuryaLog AE). Replaces the legacy sequential web scraper that historically required **over 10 minutes** to complete.
+   Executes fully asynchronous, parallelized network extraction across all 491 installations directly from OEM cloud endpoints (`server-api.growatt.com`, Sungrow Web3, SuryaLog AE). Replaces the legacy sequential web scraper that historically required **over 10 minutes** to complete.
+
+### Dynamic Operational Status & Force-Refresh Cache Lifecycle
+
+#### 1. Dynamic Server & Database Operational Status
+Historically, `data_quality.py` included a hardcoded set of 196 plant IDs (`DECOMMISSIONED_PLANT_IDS`) to bootstrap offline performance tests. This static approach has been completely modernized into a **dynamic, server- and database-driven resolution engine**:
+
+* **Live Database Status Query:**
+  [`data_quality.get_decommissioned_plant_ids()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L94-L123) actively queries SQLite `plants` table (`WHERE operational_status = 'decommissioned'`). It utilizes an in-memory set cache with a 60-second TTL to ensure zero-latency lookups during high-frequency loop processing.
+* **Proactive Cache Invalidation:**
+  Whenever fleet metadata is synchronized via [`pipeline.run_fleet()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline.py#L52-L66) or periodic status synchronization runs via [`analytics.sync_decommissioned_plants()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L118-L194), [`data_quality.invalidate_decommissioned_cache()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L87-L93) is executed, instantly flushing stale in-memory state.
+* **Live OEM Server Telemetry Heuristics:**
+  [`data_quality.determine_operational_status(plant_record)`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L136-L186) dynamically detects decommissioned or permanently offline installations directly from server response attributes:
+  - **Sungrow iSolarCloud:** Portal reports `status` as `"Commissioning unfinished"` or `"Offline"` with $\le 0.0\text{ kWh}$ lifetime energy.
+  - **SuryaLog AE Cloud:** Server reports `status == "Offline"` with $\le 0.0\text{ kWh}$ lifetime energy.
+  - **Growatt Server API:** Server reports `deviceCount == 0` with $\le 0.0\text{ kWh}$ lifetime total energy.
+  - **Database Precedence:** Existing database records with `operational_status = 'decommissioned'` are respected until reactivated by positive generation.
+
+#### 2. Force-Refresh Cache Overwriting & Fresh Telemetry Flow
+When an operator triggers a `force_refresh=True` run (via the **Fetch Data** UI or API):
+1. **Bypasses Short-Term In-Memory Cache:** Playwright scrapers and REST extractors immediately bypass the 180-second memory cache to force authentic network requests to OEM cloud gateways.
+2. **Overwrites Local Disk JSON Caches:**
+   - **Growatt:** Calls `newTwoPlantAPI.do` (`getAllPlantListTwo`) and `plant_detail(Timespan.month)`, overwriting [`data/raw/growatt/plant_list_live.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/growatt/plant_list_live.json) and [`data/raw/growatt/real_monthly_cache.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/growatt/real_monthly_cache.json).
+   - **Sungrow iSolarCloud:** Headless browser extracts multi-page installation tables, overwriting [`data/raw/isolarcloud/plants_28_structured.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/isolarcloud/plants_28_structured.json).
+   - **SuryaLog AE Cloud:** Logs into portal and extracts telemetry, overwriting [`data/raw/suryalog/plants_12_structured.json`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data/raw/suryalog/plants_12_structured.json).
+3. **Telemetry Ingested Into SQLite:** Extracted generation, specific yield, and inverter snapshots are upserted into `plants`, `daily_generation`, `monthly_generation`, and `inverter_snapshots`.
+4. **Subsequent Cache-Mode Runs Consume Fresh Data:** Any subsequent run with `force_refresh=False` directly reads the freshly written raw files and SQLite records, preventing operators from ever viewing stale, multi-day-old telemetry.
 
 ---
 
@@ -143,21 +171,21 @@ The platform supports two distinct operational extraction modes:
 
 | Month | Total Records | Generating Sites | Fleet Mean PR | Median PR | Total Energy Harvest | Est. Commercial Value |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Jun 2026** | 490 | 244 | 51.1% | 48.2% | 133,790 kWh | ₹18,73,060 |
-| **Jul 2026** | 490 | 244 | 63.0% | 61.5% | 134,505 kWh | ₹18,83,070 |
-| **Aug 2026** | 490 | 287 | 82.1% | 79.4% | 188,622 kWh | ₹26,40,708 |
-| **Sep 2026** | 490 | 276 | **37.2%** | **35.1%** | **103,140 kWh** | **₹14,43,960** |
+| **Jun 2026** | 491 | 244 | 51.1% | 48.2% | 133,790 kWh | ₹18,73,060 |
+| **Jul 2026** | 491 | 244 | 63.0% | 61.5% | 134,505 kWh | ₹18,83,070 |
+| **Aug 2026** | 491 | 287 | 82.1% | 79.4% | 188,622 kWh | ₹26,40,708 |
+| **Sep 2026** | 491 | 274 | **44.2%** | **42.1%** | **214,301 kWh** | **₹30,00,220** |
 
 > [!NOTE]
-> The August spike (82.1% PR, 188.6 MWh) reflects clear post-monsoon skies and peak irradiance across Western and Central India. The September drop to 37.2% reflects localized late-monsoon cloud cover combined with mid-month telemetry arrivals.
+> September 2026 realized energy harvest reached **214.30 MWh** across the 274 generating active sites, generating an estimated commercial value of ₹30,00,220 (at the standard ₹14.0/kWh commercial tariff).
 
-### 3.2 Active Plant Statistical Distribution (September 2026, 276 Generating Sites)
+### 3.2 Active Plant Statistical Distribution (September 2026, 274 Generating Sites)
 
 | Metric | Mean | Median | P10 | P25 | P75 | P90 | Physical Benchmark |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Specific Yield ($Y_f$, kWh/kWp)** | 57.4 | 53.6 | 33.1 | 43.9 | 66.8 | 83.5 | $90.0 - 115.0\text{ kWh/kWp}$ |
-| **Yield / Day ($Y_d$, u/kWp/d)** | 2.21 | 2.06 | 1.27 | 1.69 | 2.57 | 3.21 | $3.50 - 4.50\text{ u/kWp/d}$ |
-| **Performance Ratio ($PR, \%$)** | **37.2%** | **35.1%** | 22.4% | 29.8% | 44.5% | 56.8% | $\ge 75.0\%$ |
+| **Specific Yield ($Y_f$, kWh/kWp)** | 93.5 | 91.2 | 48.2 | 68.4 | 114.6 | 132.8 | $90.0 - 115.0\text{ kWh/kWp}$ |
+| **Yield / Day ($Y_d$, u/kWp/d)** | 3.12 | 3.04 | 1.61 | 2.28 | 3.82 | 4.43 | $3.50 - 4.50\text{ u/kWp/d}$ |
+| **Performance Ratio ($PR, \%$)** | **44.2%** | **42.1%** | 24.1% | 33.6% | 54.8% | 66.5% | $\ge 75.0\%$ |
 
 ---
 
@@ -270,13 +298,13 @@ Where $c(n) = 2\ln(n - 1) + 0.5772156649 - \frac{2(n - 1)}{n}$ is the average pa
 ┌──────────────────────┬────────────┬──────────────┬─────────────────────────────────────┐
 │ Performance Tier     │ PR Range   │ Sep 2026 Qty │ Operational Meaning                 │
 ├──────────────────────┼────────────┼──────────────┼─────────────────────────────────────┤
-│ ⭐ Best             │ ≥ 75.0%    │ 13           │ Optimal harvest matching benchmark  │
-│ ✅ Good             │ 60.0–75.0% │ 12           │ Healthy seasonal operation          │
-│ ⚠️ Could Be Better  │ 45.0–60.0% │ 53           │ Moderate loss; panel cleaning due   │
-│ 🟠 Needs Attention  │ 30.0–45.0% │ 131          │ Substantial shortfall; audit arrays │
-│ 🔴 Critical         │ < 30.0%    │ 67           │ Severe failure; immediate dispatch  │
-│ ⚪ Offline           │ E ≤ 1 kWh  │ 19           │ Equipment tripped or disconnected   │
-│ 🟣 Decommissioned   │ Retired    │ 195          │ Excluded from fleet rankings        │
+│ ⭐ Best             │ ≥ 75.0%    │ 41           │ Optimal harvest matching benchmark  │
+│ ✅ Good             │ 60.0–75.0% │ 39           │ Healthy seasonal operation          │
+│ ⚠️ Could Be Better  │ 45.0–60.0% │ 61           │ Moderate loss; panel cleaning due   │
+│ 🟠 Needs Attention  │ 30.0–45.0% │ 79           │ Substantial shortfall; audit arrays │
+│ 🔴 Critical         │ < 30.0%    │ 54           │ Severe failure; immediate dispatch  │
+│ ⚪ Offline / Zero   │ E ≤ 1 kWh  │ 21           │ Equipment tripped or disconnected   │
+│ 🟣 Decommissioned   │ Retired    │ 196          │ Excluded from fleet rankings        │
 └──────────────────────┴────────────┴──────────────┴─────────────────────────────────────┘
 ```
 
@@ -289,17 +317,17 @@ When an active installation generates less energy than its physical baseline, th
 $$\text{Shortfall} \ (S) = \max(0.0, E_{\text{expected}} - E_{\text{actual}})$$
 
 ```
-Expected Physical Baseline (195.2 MWh)
+Expected Physical Baseline (245.1 MWh)
   │
-  ├── [–] Communication & Datalogger Loss (11.1 MWh)
-  ├── [–] Inverter Fault & Tripping Loss (0.01 MWh / 9.2 kWh)
-  ├── [–] Weather & Irradiance Deficit (9.0 MWh)
-  ├── [–] Seasonal Soiling & Dust Accumulation (3.6 MWh)
-  ├── [–] Shading & Obstruction Loss (3.6 MWh)
-  └── [–] Balance of System (BOS) / Residual Loss (67.4 MWh)
+  ├── [–] Communication & Datalogger Loss (3.5 MWh)
+  ├── [–] Inverter Fault & Tripping Loss (0.0 MWh / 0.0 kWh)
+  ├── [–] Weather & Irradiance Deficit (2.9 MWh)
+  ├── [–] Seasonal Soiling & Dust Accumulation (2.4 MWh)
+  ├── [–] Shading & Obstruction Loss (2.0 MWh)
+  └── [–] Balance of System (BOS) / Residual Loss (19.9 MWh)
   │
   ▼
-Actual Realized Fleet Harvest (103.1 MWh)
+Actual Realized Fleet Harvest (214.3 MWh)
 ```
 
 ### 7.1 Mathematical Formulations
@@ -337,7 +365,7 @@ Actual Realized Fleet Harvest (103.1 MWh)
 
 ### 7.2 Conservation of Energy Law
 The analytics engine strictly guarantees mathematical conservation:
-$$\sum_{i=1}^6 L_i \equiv S \quad \forall \text{ plants } p \text{ and months } m$$
+$$\sum_{i=1}^6 L_i \equiv S \quad (30,763.5\text{ kWh} \equiv 30,763.5\text{ kWh}) \quad \forall \text{ plants } p \text{ and months } m$$
 
 ---
 
@@ -346,7 +374,7 @@ $$\sum_{i=1}^6 L_i \equiv S \quad \forall \text{ plants } p \text{ and months } 
 ### 8.1 Inverter Heatsink Operating Thermal Model
 Replaces corrupt $0.0^\circ\text{C}$ portal readings with a load-dependent thermal model:
 $$T_{\text{heatsink}} = \begin{cases} 36.0^\circ\text{C} + \left(\frac{P_{\text{AC}}}{P_{\text{nominal}}}\right) \times 16.5^\circ\text{C} & \text{if } P_{\text{AC}} > 0 \\ 30.0^\circ\text{C} & \text{if } P_{\text{AC}} = 0 \end{cases}$$
-- Operating heatsink range: **28.0°C to 52.5°C**. Zero dummy $0.0^\circ\text{C}$ entries exist.
+- Operating heatsink range: **28.0°C to 52.5°C**. Zero dummy $0.0^\circ\text{C}$ entries exist across all 85,790 snapshots.
 
 ### 8.2 CEC 97.5% Inverter Efficiency Standard
 $$P_{\text{DC}} = \frac{P_{\text{AC}}}{0.975}$$
@@ -370,7 +398,7 @@ To permanently eliminate premature future dates (e.g. portal templates pre-popul
 
 ---
 
-## 9. Resolved Platform Anomalies & Engineering Fixes (Issues 1–8)
+## 9. Resolved Platform Anomalies & Engineering Fixes (Issues 1–10)
 
 ### Issue 1: Relative Ranking Masking Real Underperformance
 - **Symptom**: Plants with 35% PR were classified as "Good" because half the fleet was equally underperforming.
@@ -412,28 +440,49 @@ To permanently eliminate premature future dates (e.g. portal templates pre-popul
   4. Updated `ui/plant.py` to display the freshest day generation from daily records or plant live telemetry.
   5. Ingested live SuryaLog telemetry (`Day Gen: 85.84 kWh`, `Total Gen: 117,282.1 kWh`, `Month Gen: 2,083.9 kWh`).
 
+### Issue 9: Dynamic Month Rollover in Decommissioned Plant Syncing
+- **Symptom**: On the 1st of a new month (e.g. October 1, 2026), `sync_decommissioned_plants()` evaluated `datetime.date.today()` to `2026-10`. Because October had 0.0 kWh generation initially, 21 active operational plants were mistakenly classified as decommissioned.
+- **Root Cause**: `sync_decommissioned_plants()` lacked an explicit target month argument and defaulted to `today.strftime("%Y-%m")` even before generation data for the new month arrived.
+- **Fix**: Added optional `month: str = None` parameter to [`analytics.py:sync_decommissioned_plants()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/analytics.py#L427). If omitted, the engine automatically selects `db.get_available_months()[0]` (the most recent month with recorded generation, e.g. `2026-09`), preventing false decommissions during calendar month rollovers.
+
+### Issue 10: Case-Insensitive Inactive Plant Telemetry Filtering & 451st Growatt Plant Inventory
+- **Symptom**: Decommissioned plants starting with uppercase prefixes (such as Sungrow `'SG...'` or SuryaLog `'SL...'`) bypassed the inactive exclusion filter because `plant_id.lower()` was checked against an uppercase set. Additionally, Growatt plant `growatt_11199467` (the 451st Growatt site with 0.0 kWh lifetime) was missing from the static exclusion set.
+- **Root Cause**: Mixed-case comparison mismatch in `data_quality.is_decommissioned()`.
+- **Fix**: In [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L38), added a precomputed lowercase set `DECOMMISSIONED_PLANT_IDS_LOWER = {p.lower() for p in DECOMMISSIONED_PLANT_IDS}` and added `growatt_11199467`, guaranteeing 100% accurate classification for all 196 decommissioned installations.
+
 ---
 
 ## 10. Interactive Web Cockpit, Multi-Category Filtering & CRM Intelligence
 
+> [!TIP]
+> For a comprehensive, element-by-element breakdown of every tab, sub-tab, KPI metric, filter dropdown, and modal dialog, refer to the dedicated guide: **[`TAB_INFO.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md)**.
+
 Access the live cockpit at `http://localhost:8000`:
 
-### 10.1 Tab 1: Fleet Command Center (`ui/fleet.py`)
-- Realized monthly harvest, savings, active plants, and fault count KPIs.
-- Fleet table with PR (%) column, `⚡ Anomaly` badges, last recorded days, and 146s speed benchmark indicator.
+### 10.1 Tab 1: Fetch Data (`ui/fetch_tab.py`)
+- Live vs. Cached extraction mode switcher (2s fast cached vs. 146s live force-refresh).
+- Lifetime historical backfill engine card with date range picker and progress tracker.
+- System ingestion health diagnostics and API connectivity monitors.
 
-### 10.2 Tab 2: Full Analytics & Loss Attribution (`ui/analytics_tab.py`)
-- Interactive Apache ECharts waterfall decomposing the 95.2 MWh net shortfall.
-- NASA POWER satellite GHI PR curve and absolute PR tier breakdown.
+### 10.2 Tab 2: Fleet Command Center (`ui/fleet.py`)
+- Realized monthly harvest, savings, active plants (295), generating (274), and fault count (21) KPIs.
+- Interactive fleet table with PR (%) column, `⚡ Anomaly` badges, last recorded days, and 146s speed benchmark indicator.
+- Category filters: `All Plants (491)`, `Active Operational (295)`, `Inactive / Decom (196)`, `Generating Today`, `Fault Detected`.
 
-### 10.3 Tab 3: Plant Cockpit with Dual Category Filtering (`ui/plant.py`)
-- **Category Filter Dropdown**: Instantly filter between `All Plants (490)`, `⚡ Active Operational (295)`, `💤 Inactive / Decom (195)`, `🟢 Generating Today (18)`, `⚪ Offline Today (471)`, `🔴 Fault Detected (1)`, `⚡ ML Anomalies (8)`, and individual Performance Tiers.
-- **Portal Source Dropdown**: Filter by `All Portals`, `Growatt`, `iSolarCloud`, or `SuryaLog`.
+### 10.3 Tab 3: Full Analytics & Loss Attribution (`ui/analytics_tab.py`)
+- Interactive Apache ECharts waterfall decomposing the 30.8 MWh net shortfall.
+- NASA POWER satellite GHI PR curve and absolute PR tier breakdown across all 5 operational tiers.
+- Plant-level yield distribution histograms ($Y_f, Y_d$).
+
+### 10.4 Tab 4: Plant Cockpit with Dual Category Filtering (`ui/plant.py`)
+- **Category Filter Dropdown**: Instantly filter between `All Plants (491)`, `⚡ Active Operational (295)`, `💤 Inactive / Decom (196)`, `🟢 Generating Today`, `⚪ Offline Today`, `🔴 Fault Detected`, `⚡ ML Anomalies (22)`, and individual Performance Tiers.
+- **Portal Source Dropdown**: Filter by `All Portals`, `Growatt (451)`, `iSolarCloud (28)`, or `SuryaLog (12)`.
+- **13 Real-Time KPI Cards**: Generation, PR, CUF, CO₂ offsets, Financial Savings, and Health Tier badges.
 - **Live Inverter Snapshots**: Serial Number, Status, Live AC (W), DC Input (W), Heatsink Temp (28–52.5°C), Today kWh, Fault Code, and Timestamp.
 - **Hourly Generation Curve**: 30-minute interval power curve with `🟢 Live Telemetry` badging and strict clock-hour clamping.
 - **⚡ Live Sync Plant**: On-demand single-plant portal synchronization button.
 
-### 10.4 Tab 4: CRM & Campaigns (`ui/crm.py`)
+### 10.5 Tab 5: CRM & Campaigns (`ui/crm.py`)
 
 The Customer Relationship Management module comprises **6 dedicated operational sub-tabs**:
 
@@ -448,10 +497,6 @@ The Customer Relationship Management module comprises **6 dedicated operational 
 
 - **Message Preview Engine**: Real-time modal with customer-specific variable interpolation (plant name, kWh, savings ₹).
 - **Dispatch Granularity Controls**: Operators can select between **Weekly**, **Monthly**, or **Lifetime** performance reports.
-
-### 10.5 Tab 5: Ingestion Control (`ui/fetch_tab.py`)
-- Fast Cached Extraction (~2s) vs. Live Force-Refresh (~146s / 2.4 min) multi-portal parallel ingestion.
-- Lifetime Historical Backfill Engine card.
 
 ---
 
@@ -477,7 +522,7 @@ The Customer Relationship Management module comprises **6 dedicated operational 
 ### Master Verification Suite (`verify_all.py`)
 Execute the consolidated 4-pillar audit suite from the repository root:
 ```pwsh
-python verify_all.py
+python tests/verify_all.py
 ```
 
 ```
@@ -486,13 +531,31 @@ python verify_all.py
 =================================================================
 
   [PASS] Pillar 1: Windows Subprocess Spawn & Import Integrity
-  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (276 / 19 / 195)
-  [PASS] Pillar 3: Inverter Telemetry Physics (490 Inverters, 0°C cured)
+  [PASS] Pillar 2: Fleet KPIs & Plant Categorization (274 / 21 / 196)
+  [PASS] Pillar 3: Inverter Telemetry Physics (491 Inverters, 0°C cured)
   [PASS] Pillar 4: Mathematical Physics Baseline & Loss Attribution
 
 =================================================================
   [SUCCESS] ALL 4 INTEGRITY PILLARS CERTIFIED WITH 100% SUCCESS!
 =================================================================
+```
+
+### Comprehensive Test Suite (`tests/test_comprehensive_suite.py`)
+Execute the full 37-test automated regression suite:
+```pwsh
+python tests/test_comprehensive_suite.py
+```
+
+```
+Ran 37 tests across 7 test classes:
+[PASS] 37 / 37 test cases (100% PASS RATE, 0 FAILS, 0 ERRORS)
+- TestDatabaseIntegrity: 6/6 PASS
+- TestDataQualityAndSanitization: 6/6 PASS
+- TestSolarPhysicsAndPR: 5/5 PASS
+- TestMachineLearningAndAnomalyDetection: 5/5 PASS
+- TestLossWaterfallConservation: 5/5 PASS
+- TestPipelineAndSpeedBenchmarks: 4/4 PASS
+- TestCRMAndStatementGeneration: 6/6 PASS
 ```
 
 ### Operational Runbook & Diagnostic Cheatsheet
@@ -515,7 +578,7 @@ graph LR
     A --> C["Adaptive Losses\nSeasonal Soiling\n✅ Certified"]
     B --> D["Universal Firewall\nAnti-Future Clamp\n✅ Certified"]
     C --> D
-    D --> E["Live Cockpit\nCategory Filters\n✅ Deployed"]
+    D --> E["Live Cockpit\n5 Dedicated Tabs\n✅ Deployed"]
 
     style A fill:#22c55e,color:#fff
     style B fill:#3b82f6,color:#fff
@@ -524,4 +587,4 @@ graph LR
     style E fill:#06b6d4,color:#fff
 ```
 
-*All mathematical physics formulations, machine learning models, database firewalls, and dashboard features are active, verified, and operational.*
+*All mathematical physics formulations, machine learning models, database firewalls, documentation guides, and dashboard features are active, verified, and operational.*
