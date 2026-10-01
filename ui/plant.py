@@ -269,13 +269,13 @@ def build_plant_tab(app_state: dict):
         )
         monthly_row = m_df.iloc[0].to_dict() if not m_df.empty else {}
 
-        # 12-Month generation history
+        # Full lifetime generation history
         hist_df = db.query_df(
-            "SELECT month, kwh, specific_yield, yield_per_day, tier FROM monthly_generation WHERE plant_id = ? ORDER BY month DESC LIMIT 12",
+            "SELECT month, kwh, specific_yield, yield_per_day, tier FROM monthly_generation WHERE plant_id = ? ORDER BY month ASC",
             [pid],
             db="analytics"
         )
-        history = hist_df.iloc[::-1].to_dict(orient="records") if not hist_df.empty else []
+        history = hist_df.to_dict(orient="records") if not hist_df.empty else []
 
         # Loss analysis record for that plant and month
         loss_df = db.query_df(
@@ -648,12 +648,37 @@ def build_plant_tab(app_state: dict):
                     }]
                 }).classes("w-full h-64")
 
-            # 3. Monthly Generation Trend Chart
+            # 3. Monthly Generation Trend Chart (Full Lifetime History with Zoom)
             with ui.card().classes("p-4 bg-gray-900 border border-gray-800"):
-                ui.label("Monthly Generation Trend (kWh)").classes("text-sm font-semibold text-gray-300 mb-2")
+                with ui.row().classes("w-full items-center justify-between mb-2 flex-wrap gap-2"):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.label("Monthly Generation Trend (kWh)").classes("text-sm font-semibold text-gray-300")
+                        hist_len = len(history)
+                        if hist_len > 12:
+                            ui.badge(f"{hist_len} Months (Lifetime)", color="indigo-8").classes("text-[10px] text-white px-2 py-0.5 font-mono")
+                        else:
+                            ui.badge(f"{hist_len} Months", color="blue-9").classes("text-[10px] text-white px-2 py-0.5 font-mono")
+
+                # Highlight selected reporting month
+                mark_point_data = []
+                for h in history:
+                    if h.get("month") == m_val:
+                        val_num = round(h.get("kwh") or 0.0, 1)
+                        mark_point_data.append({
+                            "name": f"Selected ({m_val})",
+                            "coord": [m_val, val_num],
+                            "value": f"{val_num:,.0f}",
+                            "itemStyle": {"color": "#3B82F6", "borderColor": "#60A5FA", "borderWidth": 2}
+                        })
+
+                # Calculate default zoom window to show recent months but allow panning back to earliest
+                zoom_start = 0
+                if len(history) > 24:
+                    zoom_start = max(0, int((1.0 - (24.0 / len(history))) * 100))
+
                 ui.echart({
                     "tooltip": {"trigger": "axis"},
-                    "grid": {"left": "3%", "right": "4%", "bottom": "8%", "containLabel": True},
+                    "grid": {"left": "3%", "right": "4%", "bottom": "18%", "containLabel": True},
                     "xAxis": {
                         "type": "category",
                         "data": [h["month"] for h in history],
@@ -667,13 +692,37 @@ def build_plant_tab(app_state: dict):
                         "axisLabel": {"color": "#9CA3AF"},
                         "splitLine": {"lineStyle": {"color": "#1F2937"}}
                     },
+                    "dataZoom": [
+                        {
+                            "type": "inside",
+                            "start": zoom_start,
+                            "end": 100
+                        },
+                        {
+                            "type": "slider",
+                            "bottom": "0%",
+                            "height": 18,
+                            "borderColor": "#374151",
+                            "fillerColor": "rgba(59, 130, 246, 0.2)",
+                            "handleStyle": {"color": "#3B82F6"},
+                            "textStyle": {"color": "#9CA3AF", "fontSize": 9},
+                            "start": zoom_start,
+                            "end": 100
+                        }
+                    ],
                     "series": [{
                         "name": "Month Total (kWh)",
                         "type": "line",
                         "smooth": True,
                         "data": [round(h.get("kwh") or 0.0, 1) for h in history],
                         "itemStyle": {"color": "#3B82F6"},
-                        "areaStyle": {"color": "rgba(59,130,246,0.15)"}
+                        "areaStyle": {"color": "rgba(59,130,246,0.15)"},
+                        "markPoint": {
+                            "data": mark_point_data,
+                            "symbol": "pin",
+                            "symbolSize": 44,
+                            "label": {"fontSize": 10, "fontWeight": "bold", "color": "#FFFFFF"}
+                        } if mark_point_data else None
                     }]
                 }).classes("w-full h-64")
 

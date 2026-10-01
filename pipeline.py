@@ -590,7 +590,18 @@ def run_historical_backfill(
         total_monthly_records += m_count
 
         if include_daily:
-            d_count = run_daily(f"{m}-28", sources=sources, force_refresh=force_refresh)
+            try:
+                my, mm = map(int, m.split("-"))
+                next_m = datetime.date(my + 1, 1, 1) if mm == 12 else datetime.date(my, mm + 1, 1)
+                days_in_m = (next_m - datetime.timedelta(days=1)).day
+            except Exception:
+                days_in_m = 30
+            curr_ym = datetime.date.today().strftime("%Y-%m")
+            if m == curr_ym:
+                target_day_str = min(datetime.date.today().isoformat(), f"{m}-{days_in_m:02d}")
+            else:
+                target_day_str = f"{m}-{days_in_m:02d}"
+            d_count = run_daily(target_day_str, sources=sources, force_refresh=force_refresh)
             total_daily_records += d_count
 
         try:

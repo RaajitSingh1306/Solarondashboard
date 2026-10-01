@@ -233,25 +233,27 @@ class GrowattExtractor(BaseExtractor):
                 if set_date:
                     install_date = set_date
 
-            # --- CAPACITY RESOLUTION (Live API is ALWAYS authoritative) ---
-            # 1. FIRST: Extract capacity from the LIVE API nominalPower (authoritative source)
+            # --- CAPACITY RESOLUTION (CSV master metadata is authoritative for verified plant capacity) ---
+            meta_match = self.master_metadata.get(raw_id) or self.master_metadata.get(p_name.lower())
             cap = 0.0
-            nominal = self.safe_float(p.get("nominal_Power") or p.get("nominalPower") or 0.0) or 0.0
-            if nominal > 0:
-                cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
 
-            # 2. If API didn't provide capacity, try plant_settings / plant_info JSON files
+            # 1. FIRST: Use CSV master metadata (ground truth from plant records)
+            if meta_match:
+                cap = float(meta_match.get("capacity_kwp") or 0.0)
+
+            # 2. Fallback: LIVE API nominalPower
+            if cap <= 0:
+                nominal = self.safe_float(p.get("nominal_Power") or p.get("nominalPower") or 0.0) or 0.0
+                if nominal > 0:
+                    cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
+
+            # 3. Fallback: plant_settings / plant_info JSON files
             if cap <= 0:
                 nominal = self.safe_float(plant_set.get("nominalPower") or 0.0) or 0.0
                 if nominal <= 0 and isinstance(info, dict):
                     nominal = self.safe_float(info.get("nominal_Power") or info.get("nominalPower") or 0.0) or 0.0
                 if nominal > 0:
                     cap = round(nominal / 1000.0, 2) if nominal > 1000 else round(nominal, 2)
-
-            # 3. If still no capacity, fallback to CSV master metadata
-            meta_match = self.master_metadata.get(raw_id) or self.master_metadata.get(p_name.lower())
-            if cap <= 0 and meta_match:
-                cap = float(meta_match.get("capacity_kwp") or 0.0)
 
             # Always use CSV metadata for coordinates/city/install_date/inverter if available
             if meta_match:
@@ -275,12 +277,13 @@ class GrowattExtractor(BaseExtractor):
                 today_kwh = self.safe_float(p.get("todayEnergy") or 0.0) or 0.0
                 cap = round(max(today_kwh / 3.8, 3.0), 1) if today_kwh > 0 else 3.3
 
-            # Track CSV corrections: if API capacity differs from CSV, log it for CSV update
+            # Log if API reports a different capacity than CSV master
             if meta_match and cap > 0:
-                csv_cap = float(meta_match.get("capacity_kwp") or 0.0)
-                if csv_cap > 0 and abs(csv_cap - cap) / max(csv_cap, cap) > 0.05:
-                    csv_updates[raw_id] = cap
-                    logger.info(f"Capacity correction for {p_name} ({raw_id}): CSV had {csv_cap} kWp, API says {cap} kWp")
+                api_nominal = self.safe_float(p.get("nominal_Power") or p.get("nominalPower") or 0.0) or 0.0
+                if api_nominal > 0:
+                    api_cap = round(api_nominal / 1000.0, 2) if api_nominal > 1000 else round(api_nominal, 2)
+                    if abs(cap - api_cap) / max(cap, api_cap) > 0.05:
+                        logger.debug(f"API capacity difference for {p_name} ({raw_id}): CSV={cap} kWp, API={api_cap} kWp")
 
             self.plant_capacities[pid] = cap
             self.plant_capacities[raw_id] = cap
@@ -605,9 +608,17 @@ class GrowattExtractor(BaseExtractor):
         else:
             eval_days = days_in_month
 
+        # If force_refresh, refresh live monthly cache to get updated readings from portal
+        if force_refresh:
+            try:
+                target_d = datetime.date.today() if month_str == current_ym else datetime.date(y, m, min(28, days_in_month))
+                self.refresh_live_monthly_cache(target_d)
+            except Exception as e:
+                logger.debug(f"Error refreshing live monthly cache: {e}")
+
         # Check for real monthly cache file
         cache_file = self.raw_dir / "real_monthly_cache_202608_202609.json"
-        if cache_file.exists() and not force_refresh:
+        if cache_file.exists():
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
                     cached = json.load(f)

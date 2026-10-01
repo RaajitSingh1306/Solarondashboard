@@ -33,6 +33,8 @@ def build_fetch_tab(
     if not available_months:
         available_months = ["2026-09", "2026-08"]
 
+    cache_meta = db.get_cache_metadata()
+
     # State for the fetch workbench
     workbench_state = {
         "selected_month": app_state.get("month", "2026-09"),
@@ -96,8 +98,10 @@ def build_fetch_tab(
                     ).props("dense outlined dark options-dense filterable use-input").classes("w-full")
 
                 # Cache Strategy
-                with ui.column().classes("gap-1 min-w-[220px]"):
-                    ui.label("Cache Strategy").classes("text-xs font-medium text-gray-400")
+                with ui.column().classes("gap-1 min-w-[240px]"):
+                    with ui.row().classes("w-full items-center justify-between"):
+                        ui.label("Cache Strategy").classes("text-xs font-medium text-gray-400")
+                        cache_badge = ui.badge(f"Cached: {cache_meta['latest_daily_date']}", color="amber-9").classes("text-[10px] text-white px-1.5 py-0.5 font-mono")
                     cache_toggle = ui.toggle(
                         options={
                             "cache": "⚡ From Cache",
@@ -107,11 +111,17 @@ def build_fetch_tab(
                     ).props("dense color=amber-7 text-color=white spread").classes("w-full bg-gray-800 rounded-lg p-0.5 border border-gray-700")
 
             with ui.row().classes("w-full items-center justify-between mt-4 pt-3 border-t border-gray-800 flex-wrap gap-3"):
-                with ui.column().classes("gap-1"):
+                with ui.column().classes("gap-1.5"):
+                    with ui.row().classes("items-center gap-2 text-xs py-1 px-2.5 rounded bg-gray-800/90 border border-gray-700/60 flex-wrap"):
+                        ui.icon("inventory_2", color="amber-4", size="xs")
+                        cache_meta_label = ui.label(
+                            f"Latest Cached Date: {cache_meta['latest_daily_date']} ({cache_meta['plants_on_latest_day']} plants) · Month: {cache_meta['latest_month']} · Synced: {cache_meta['last_sync_timestamp']}"
+                        ).classes("text-xs text-amber-200 font-mono")
+
                     with ui.row().classes("items-center gap-2 text-xs text-gray-400"):
                         ui.icon("info").classes("text-amber-400 text-sm")
                         strategy_desc = ui.label(
-                            "⚡ Cache Mode: Pulls from existing local offline data and cached JSON telemetry instantly."
+                            f"⚡ Cache Mode: Pulls from existing local offline data and cached JSON telemetry (up to {cache_meta['latest_daily_date']})."
                         ).classes("text-xs text-gray-400")
 
                     with ui.row().classes("items-center gap-2 text-xs"):
@@ -155,7 +165,7 @@ def build_fetch_tab(
 
                     if not is_force:
                         strategy_desc.set_text(
-                            "⚡ Cache Mode: Pulls from existing local offline data and cached JSON telemetry instantly."
+                            f"⚡ Cache Mode: Pulls from existing local offline data and cached JSON telemetry (up to {cache_meta['latest_daily_date']})."
                         )
                         est_duration_label.set_text(
                             f"Expected Fetch Time: ~{est_str} (instant local database & offline JSON cache)"
@@ -163,11 +173,11 @@ def build_fetch_tab(
                         est_duration_label.classes(replace="text-cyan-300", remove="text-amber-300")
                     else:
                         strategy_desc.set_text(
-                            "🔄 Force Refresh: Connects to portal gateways, extracts live daily/monthly records, recalculates NASA GHI loss attribution & health tiers."
+                            "🔄 Force Refresh: Connects to portal gateways, extracts live daily/monthly records, recalculates NASA GHI loss attribution & health tiers, and OVERWRITES old records."
                         )
                         if s_val and s_val != "All":
                             est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} (targeted single site refresh)"
+                                f"Expected Fetch Time: ~{est_str} (targeted single site refresh & overwrite)"
                             )
                         elif p_val == "All" or not p_val:
                             est_duration_label.set_text(
@@ -182,6 +192,15 @@ def build_fetch_tab(
                                 f"Expected Fetch Time: ~{est_str} for {p_val.title()} portal telemetry"
                             )
                         est_duration_label.classes(replace="text-amber-300", remove="text-cyan-300")
+
+                def refresh_cache_meta_ui():
+                    nonlocal cache_meta
+                    cache_meta = db.get_cache_metadata()
+                    cache_badge.set_text(f"Cached: {cache_meta['latest_daily_date']}")
+                    cache_meta_label.set_text(
+                        f"Latest Cached Date: {cache_meta['latest_daily_date']} ({cache_meta['plants_on_latest_day']} plants) · Month: {cache_meta['latest_month']} · Synced: {cache_meta['last_sync_timestamp']}"
+                    )
+                    update_strategy_desc()
 
                 cache_toggle.on("update:model-value", lambda e: update_strategy_desc())
 
@@ -230,6 +249,7 @@ def build_fetch_tab(
                 ).props("dense outlined dark options-dense").classes("w-44")
 
                 daily_checkbox = ui.checkbox("Include representative daily telemetry", value=True).classes("text-xs text-gray-300")
+                overwrite_checkbox = ui.checkbox("Overwrite existing records", value=True).classes("text-xs text-indigo-300 font-semibold").tooltip("Re-extracts and overwrites all existing monthly and daily records for selected range")
 
                 backfill_btn = ui.button("🚀 Run Lifetime Backfill", icon="rocket_launch").props("color=indigo-7 text-color=white font-bold unelevated px-5")
 
@@ -247,6 +267,7 @@ def build_fetch_tab(
                 start_m = None if "Commissioning" in str(raw_start) else str(raw_start)
                 end_m = str(end_backfill_select.value or "2026-09")
                 inc_daily = bool(daily_checkbox.value)
+                do_overwrite = bool(overwrite_checkbox.value)
 
                 def on_bf_progress(msg: str, pct: float):
                     if not getattr(client, '_deleted', False):
@@ -260,8 +281,10 @@ def build_fetch_tab(
                         start_year_month=start_m,
                         end_year_month=end_m,
                         include_daily=inc_daily,
+                        force_refresh=do_overwrite,
                         progress_cb=on_bf_progress
                     )
+                    refresh_cache_meta_ui()
                     if not getattr(client, '_deleted', False):
                         with client:
                             ui.notify(
@@ -649,6 +672,7 @@ def build_fetch_tab(
                 app_state["month"] = target_month
                 if target_src != "All":
                     app_state["source"] = target_src
+                refresh_cache_meta_ui()
                 for listener in app_state.get("refresh_listeners", []):
                     try:
                         listener()

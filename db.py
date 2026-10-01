@@ -203,7 +203,7 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
         kwh = excluded.kwh,
         revenue_inr = excluded.revenue_inr,
         specific_yield = excluded.specific_yield,
-        yield_per_day = coalesce(excluded.yield_per_day, monthly_generation.yield_per_day),
+        yield_per_day = excluded.yield_per_day,
         pr_pct = coalesce(excluded.pr_pct, monthly_generation.pr_pct),
         tier = coalesce(excluded.tier, monthly_generation.tier),
         percentile = coalesce(excluded.percentile, monthly_generation.percentile),
@@ -328,6 +328,45 @@ def get_available_months(force_refresh: bool = False) -> List[str]:
     res = ["2026-09", "2026-08", "2026-07"]
     _cached_available_months = res
     return list(res)
+
+def get_cache_metadata() -> Dict[str, Any]:
+    """Returns latest dates, record counts, and sync timestamps for cached data across analytics db."""
+    res = {
+        "latest_daily_date": "N/A",
+        "latest_month": "N/A",
+        "last_sync_timestamp": "N/A",
+        "plants_on_latest_day": 0,
+        "total_daily_records": 0,
+        "total_monthly_records": 0,
+    }
+    try:
+        with analytics_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT MAX(date), COUNT(*) FROM daily_generation")
+            row = cur.fetchone()
+            if row and row[0]:
+                res["latest_daily_date"] = str(row[0])
+                res["total_daily_records"] = int(row[1] or 0)
+
+            cur.execute("SELECT MAX(month), COUNT(*) FROM monthly_generation")
+            row = cur.fetchone()
+            if row and row[0]:
+                res["latest_month"] = str(row[0])
+                res["total_monthly_records"] = int(row[1] or 0)
+
+            cur.execute("SELECT MAX(updated_at) FROM plants")
+            row = cur.fetchone()
+            if row and row[0]:
+                res["last_sync_timestamp"] = str(row[0])
+
+            if res["latest_daily_date"] != "N/A":
+                cur.execute("SELECT COUNT(DISTINCT plant_id) FROM daily_generation WHERE date = ?", [res["latest_daily_date"]])
+                row = cur.fetchone()
+                if row and row[0]:
+                    res["plants_on_latest_day"] = int(row[0])
+    except Exception:
+        pass
+    return res
 
 def init_db() -> None:
     with analytics_conn() as conn:

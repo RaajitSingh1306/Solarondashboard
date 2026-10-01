@@ -3,38 +3,38 @@
     "TC-01": {
       "description": "Growatt extractor fetch fleet",
       "status": "PASS",
-      "details": "Loaded 450 Growatt plants",
-      "duration_sec": 0.066
+      "details": "Loaded 451 Growatt plants",
+      "duration_sec": 0.085
     },
     "TC-02": {
       "description": "iSolarCloud extractor fetch fleet",
       "status": "PASS",
       "details": "Loaded 28 iSolarCloud plants",
-      "duration_sec": 0.0
+      "duration_sec": 0.006
     },
     "TC-03": {
       "description": "SuryaLog extractor fetch fleet",
       "status": "PASS",
       "details": "Loaded 12 SuryaLog plants",
-      "duration_sec": 0.001
+      "duration_sec": 0.007
     },
     "TC-04": {
       "description": "Portal latest timestamp verification (>=11:30 PM)",
       "status": "PASS",
-      "details": "Latest timestamps: {'growatt': '2026-09-29T13:37:52.502557', 'isolarcloud': '2026-09-29T13:37:52.644937', 'suryalog': '2026-09-29T13:37:52.664458'}",
-      "duration_sec": 0.011
+      "details": "Latest timestamps: {'growatt': '2026-09-30T20:38:37.146588', 'isolarcloud': '2026-09-30T20:38:37.371897', 'suryalog': '2026-09-30T20:38:37.407826'}",
+      "duration_sec": 0.12
     },
     "TC-05": {
       "description": "Pipeline execution and cache performance",
       "status": "PASS",
-      "details": "Extracted 490 plants in 25.45s (cache mode)",
-      "duration_sec": 25.446
+      "details": "Extracted 491 plants in 21.14s (cache mode)",
+      "duration_sec": 21.144
     },
     "TC-06": {
       "description": "Total aggregated installations (490 plants)",
-      "status": "PASS",
-      "details": "Source distribution: {'growatt': 450, 'isolarcloud': 28, 'suryalog': 12} (Total: 490)",
-      "duration_sec": 0.003
+      "status": "FAIL",
+      "error": "",
+      "duration_sec": 0.001
     }
   },
   "Phase 2": {
@@ -48,19 +48,19 @@
       "description": "CRM DB tables schema presence",
       "status": "PASS",
       "details": "Found all 3 CRM tables: ['customers', 'sqlite_sequence', 'campaign_log', 'message_queue', 'alert_send_log']",
-      "duration_sec": 0.002
+      "duration_sec": 0.0
     },
     "TC-09": {
       "description": "Performance index verification",
       "status": "PASS",
       "details": "Found 20 indexes, verified performance keys",
-      "duration_sec": 0.002
+      "duration_sec": 0.001
     },
     "TC-10": {
       "description": "Table schema migrations and columns",
       "status": "PASS",
       "details": "Verified all ML & analytics columns present in monthly_generation",
-      "duration_sec": 0.002
+      "duration_sec": 0.001
     }
   },
   "Phase 3": {
@@ -68,31 +68,31 @@
       "description": "Zero 0.0\u00b0C dummy heatsink temperature values",
       "status": "PASS",
       "details": "Zero 0\u00b0C temperature records detected",
-      "duration_sec": 0.232
+      "duration_sec": 0.008
     },
     "TC-12": {
       "description": "Operating temperature physical bounds [25\u00b0C, 55\u00b0C]",
       "status": "PASS",
       "details": "Temperature range: 28.0\u00b0C to 52.5\u00b0C (Avg: 37.2\u00b0C)",
-      "duration_sec": 0.018
+      "duration_sec": 0.012
     },
     "TC-13": {
       "description": "CEC 97.5% Inverter Conversion Efficiency Standard",
       "status": "PASS",
       "details": "Zero records deviate from CEC 97.5% efficiency",
-      "duration_sec": 0.016
+      "duration_sec": 0.011
     },
     "TC-14": {
       "description": "Daily specific yield physical bounds (<= 8.0 kWh/kWp/day)",
       "status": "PASS",
       "details": "All daily yields strictly clamped in [0.0, 8.0] kWh/kWp/day",
-      "duration_sec": 1.438
+      "duration_sec": 0.052
     },
     "TC-15": {
       "description": "Total inverter snapshots scale (>= 40,000 records)",
       "status": "PASS",
-      "details": "Total verified inverter snapshots: 69,695",
-      "duration_sec": 0.102
+      "details": "Total verified inverter snapshots: 85,790",
+      "duration_sec": 0.045
     }
   },
   "Phase 4": {
@@ -100,63 +100,63 @@
       "description": "Specific Yield Mathematical Formulation (Yf = E / P_peak)",
       "status": "PASS",
       "details": "Verified specific yield formula Yf = E/P_peak across plants (max error 0.0050)",
-      "duration_sec": 0.005
+      "duration_sec": 0.001
     },
     "TC-17": {
       "description": "Yield Per Day Formulation (Yd within physical bounds)",
       "status": "PASS",
       "details": "Verified yield per day physical bounds (0.0 to 8.0 kWh/kWp/day)",
-      "duration_sec": 0.003
+      "duration_sec": 0.001
     },
     "TC-18": {
       "description": "Capacity Utilization Factor (CUF) Formulation",
       "status": "PASS",
       "details": "CUF values within physical solar limits (0% to 35%)",
-      "duration_sec": 0.003
+      "duration_sec": 0.001
     },
     "TC-19": {
       "description": "Performance Ratio (PR) Bounds [0%, 150%]",
       "status": "PASS",
-      "details": "PR range: 0.0% to 150.0% (Avg: 45.2%)",
-      "duration_sec": 0.002
+      "details": "PR range: 0.0% to 150.0% (Avg: 41.0%)",
+      "duration_sec": 0.001
     },
     "TC-20": {
       "description": "Loss Waterfall First Law of Thermodynamics Conservation",
       "status": "PASS",
-      "details": "Conserved: Sum of 6 components (34,554.0 kWh) == Shortfall (34,553.9 kWh)",
-      "duration_sec": 0.007
+      "details": "Conserved: Sum of 6 components (30,763.5 kWh) == Shortfall (30,763.5 kWh)",
+      "duration_sec": 0.003
     }
   },
   "Phase 5": {
     "TC-21": {
       "description": "Active Fleet vs Decommissioned Plant Gating (295 / 195)",
-      "status": "PASS",
-      "details": "Total: 490, Active: 295, Decommissioned: 195",
-      "duration_sec": 0.002
+      "status": "FAIL",
+      "error": "Expected 490 total, got 491",
+      "duration_sec": 0.001
     },
     "TC-22": {
       "description": "Active Generating vs Fault/Zero Invariant (276 / 19)",
-      "status": "PASS",
-      "details": "Active Generating: 280, Fault/Zero: 15 (Total Active Fleet: 295)",
-      "duration_sec": 0.007
+      "status": "FAIL",
+      "error": "Expected 295 total active plants, got 274",
+      "duration_sec": 0.003
     },
     "TC-23": {
       "description": "Isolation Forest ML Anomaly Detection Execution (276 active plants)",
-      "status": "PASS",
-      "details": "ML Scored: 280 active generating plants, Flagged Outliers: 14 (Avg score: 0.119)",
-      "duration_sec": 0.002
+      "status": "FAIL",
+      "error": "Expected 276 or 280 active generating scored records, got 274",
+      "duration_sec": 0.001
     },
     "TC-24": {
       "description": "Full Health Tier Distribution Spectrum",
-      "status": "PASS",
-      "details": "All 7 Health Tiers Populated: {'Best': 150, 'Could Be Better': 37, 'Critical': 17, 'Decommissioned': 195, 'Good': 63, 'Needs Attention': 13, 'Offline': 15}",
-      "duration_sec": 0.002
+      "status": "FAIL",
+      "error": "Missing tier Offline in distribution: {'Best': 146, 'Could Be Better': 25, 'Critical': 12, 'Decommissioned': 217, 'Good': 78, 'Needs Attention': 13}",
+      "duration_sec": 0.001
     },
     "TC-25": {
       "description": "Decommissioned Plants Zero Expected Baseline Gating",
       "status": "PASS",
       "details": "Decommissioned plants 100% gated to 0.0 kWh expected baseline",
-      "duration_sec": 0.023
+      "duration_sec": 0.012
     }
   },
   "Phase 6": {
@@ -164,13 +164,13 @@
       "description": "Customer Directory Completeness (490 customer accounts)",
       "status": "PASS",
       "details": "Customer Directory: 490 total, 490 with phone, 416 opted-in",
-      "duration_sec": 0.005
+      "duration_sec": 0.002
     },
     "TC-27": {
       "description": "Multi-Lingual Rich WhatsApp Statement Generation (EN / HI / MR)",
       "status": "PASS",
       "details": "Successfully generated rich WhatsApp statements in English, Hindi, and Marathi (lengths: {'english': 370, 'hindi': 373, 'marathi': 410})",
-      "duration_sec": 0.0
+      "duration_sec": 0.001
     },
     "TC-28": {
       "description": "Tier-Tailored Marketing CTAs across all 7 health tiers",
@@ -187,52 +187,52 @@
     "TC-30": {
       "description": "Customer 360 Profile Retrieval with History",
       "status": "PASS",
-      "details": "Retrieved full customer profile for customer ID 975 (Plant: growatt_11189560)",
-      "duration_sec": 0.023
+      "details": "Retrieved full customer profile for customer ID 1460 (Plant: suryalog_SL-012)",
+      "duration_sec": 0.021
     }
   },
   "Phase 8": {
     "TC-31": {
       "description": "REST API /api/fleet endpoint contract",
-      "status": "PASS",
-      "details": "GET /api/fleet returned 200 OK with 490 plants",
-      "duration_sec": 0.355
+      "status": "FAIL",
+      "error": "Expected 490 plants, got 491",
+      "duration_sec": 0.186
     },
     "TC-32": {
       "description": "REST API /api/loss-waterfall/{month} endpoint contract",
       "status": "PASS",
-      "details": "GET /api/loss-waterfall/2026-09 returned 200 OK (Realization: 103.1%)",
-      "duration_sec": 0.01
+      "details": "GET /api/loss-waterfall/2026-09 returned 200 OK (Realization: 99.9%)",
+      "duration_sec": 0.005
     },
     "TC-33": {
       "description": "REST API /api/plant/{plant_id} Cockpit endpoint contract",
       "status": "PASS",
       "details": "GET /api/plant/growatt_2803798 returned 200 OK (Plant Cockpit with 3 inverters)",
-      "duration_sec": 0.034
+      "duration_sec": 0.08
     },
     "TC-34": {
       "description": "REST API /api/ratings/monthly/{month} endpoint contract",
       "status": "PASS",
-      "details": "GET /api/ratings/monthly/2026-09 returned 200 OK (Distribution: {'Best': 150, 'Good': 63, 'Could Be Better': 37, 'Needs Attention': 13, 'Critical': 17, 'Decommissioned': 195, 'Offline': 15})",
-      "duration_sec": 0.029
+      "details": "GET /api/ratings/monthly/2026-09 returned 200 OK (Distribution: {'Best': 146, 'Good': 78, 'Could Be Better': 25, 'Needs Attention': 13, 'Critical': 12, 'Decommissioned': 217})",
+      "duration_sec": 0.015
     },
     "TC-35": {
       "description": "REST API /api/crm/customers endpoint contract",
       "status": "PASS",
       "details": "GET /api/crm/customers returned 200 OK (Total: 490, Page: 20)",
-      "duration_sec": 0.028
+      "duration_sec": 0.021
     },
     "TC-36": {
       "description": "REST API /api/months endpoint contract",
       "status": "PASS",
       "details": "GET /api/months returned 200 OK (Available: ['2026-09', '2026-08', '2026-07', '2026-06', '2026-05', '2026-04', '2026-03', '2026-02', '2026-01', '2025-12', '2025-11', '2025-10', '2025-09', '2025-08', '2025-07', '2025-06', '2025-05', '2025-04', '2025-03', '2025-02', '2025-01', '2024-12', '2024-11', '2024-10', '2024-09', '2024-08', '2024-07', '2024-06', '2024-05', '2024-04', '2024-03', '2024-02', '2024-01', '2023-12', '2023-11', '2023-10', '2023-09', '2023-08', '2023-07', '2023-06', '2023-05', '2023-04', '2023-03', '2023-02', '2023-01', '2022-12', '2022-11', '2022-10', '2022-09', '2022-08', '2022-07', '2022-06', '2022-05', '2022-04', '2022-03', '2022-02', '2022-01', '2021-12', '2021-11', '2021-10', '2021-09', '2021-08', '2021-07', '2021-06', '2021-05', '2021-04', '2021-03', '2021-02', '2021-01', '2020-12', '2020-11', '2020-10', '2020-09', '2020-08', '2020-07', '2020-06', '2020-05', '2020-04', '2020-03', '2020-02', '2020-01', '2019-12', '2019-11', '2019-10', '2019-09', '2019-08', '2019-07', '2019-06', '2019-05', '2019-04', '2019-03', '2019-02', '2019-01', '2018-12', '2018-11', '2018-10', '2018-09', '2018-08', '2018-07', '2018-06', '2018-05', '2018-04', '2018-03', '2018-02', '2018-01', '2017-12', '2017-11', '2017-10', '2017-09', '2017-08', '2017-07', '2017-06', '2017-05', '2017-04', '2017-03', '2017-02'])",
-      "duration_sec": 0.028
+      "duration_sec": 0.014
     },
     "TC-37": {
       "description": "REST API /api/live endpoint contract",
       "status": "PASS",
       "details": "GET /api/live returned 200 OK (50 live inverter snapshots)",
-      "duration_sec": 1.231
+      "duration_sec": 0.597
     }
   }
 }

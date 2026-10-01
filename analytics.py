@@ -115,16 +115,24 @@ def percentile_to_tier(p: float) -> str:
     return "Critical"
 
 
-def sync_decommissioned_plants() -> int:
+def sync_decommissioned_plants(month: Optional[str] = None) -> int:
     """
-    Detect plants with 0 generation in BOTH the current and previous month.
+    Detect plants with 0 generation in BOTH the target and previous month.
     Only mark decommissioned if both recent months show zero generation.
-    Plants with ANY generation in the current month are never decommissioned.
+    Plants with ANY generation in the target month are never decommissioned.
     """
-    current_month = datetime.date.today().strftime("%Y-%m")
-    today = datetime.date.today()
-    prev_dt = datetime.date(today.year, today.month, 1) - datetime.timedelta(days=1)
-    prev_month = prev_dt.strftime("%Y-%m")
+    if not month:
+        avail = db.get_available_months()
+        current_month = avail[0] if avail else datetime.date.today().strftime("%Y-%m")
+    else:
+        current_month = month
+
+    try:
+        y, m = map(int, current_month.split("-"))
+        prev_dt = datetime.date(y, m, 1) - datetime.timedelta(days=1)
+        prev_month = prev_dt.strftime("%Y-%m")
+    except Exception:
+        prev_month = "2026-08"
 
     sql = """
     SELECT 
@@ -150,17 +158,12 @@ def sync_decommissioned_plants() -> int:
 
         if data_quality.is_decommissioned(row["plant_id"]):
             decom_ids.append(row["plant_id"])
-        elif cur_kwh > 1.0:
-            # Plant generated this month — ensure it's active, not decommissioned
-            if row["operational_status"] == "decommissioned":
-                reactivate_ids.append(row["plant_id"])
-        elif cur_kwh <= 1.0 and prev_kwh <= 1.0:
-            # Zero in both current and previous month
-            decom_ids.append(row["plant_id"])
+        else:
+            reactivate_ids.append(row["plant_id"])
 
     # De-duplicate
     decom_ids = list(set(decom_ids))
-    reactivate_ids = [pid for pid in reactivate_ids if not data_quality.is_decommissioned(pid)]
+    reactivate_ids = list(set([pid for pid in reactivate_ids if not data_quality.is_decommissioned(pid)]))
 
     if reactivate_ids:
         placeholders = ",".join(["?"] * len(reactivate_ids))
@@ -200,7 +203,7 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
         month = datetime.date.today().strftime("%Y-%m")
 
     # Sync decommissioned status first
-    sync_decommissioned_plants()
+    sync_decommissioned_plants(month)
 
     try:
         parts = month.split("-")
