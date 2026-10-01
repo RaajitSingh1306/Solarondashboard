@@ -10,7 +10,7 @@ Provides:
 
 import math
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
@@ -67,6 +67,73 @@ def pr_to_tier(pr: Optional[float]) -> str:
     return "Critical"
 
 
+def rpi_to_tier(rpi_score: Optional[float], availability: Optional[float] = 1.0) -> str:
+    """
+    Map Relative Performance Index (RPI) and availability to operational health tiers:
+    Plan 2 §3 Phase 6 (Task 19):
+    - RPI >= 0.95 and availability >= 0.90 -> Best
+    - RPI >= 0.85 -> Good (Watch)
+    - RPI >= 0.70 -> Needs Attention (Underperforming)
+    - RPI < 0.70 or availability < 0.50 -> Critical
+    """
+    if rpi_score is None or pd.isna(rpi_score):
+        return "Critical"
+    try:
+        r = float(rpi_score)
+        avail = float(availability if availability is not None else 1.0)
+    except (ValueError, TypeError):
+        return "Critical"
+
+    if avail < 0.50 or r < 0.70:
+        return "Critical"
+    elif r < 0.85:
+        return "Needs Attention"
+    elif r < 0.95 or avail < 0.90:
+        return "Good"
+    else:
+        return "Best"
+
+
+def robust_z_score(val: float, series: Sequence[float]) -> float:
+    """
+    Compute robust z-score: z = (val - median) / (1.4826 * MAD).
+    Plan 2 §3 Phase 5.2 (Task 16).
+    """
+    s = [x for x in series if x is not None and not pd.isna(x)]
+    if len(s) < 3:
+        return 0.0
+    med = float(np.median(s))
+    mad = float(np.median([abs(x - med) for x in s]))
+    if mad <= 1e-6:
+        return 0.0
+    return round((val - med) / (1.4826 * mad), 3)
+
+
+def cusum_drift_detector(
+    series: Sequence[float], threshold: float = 4.0, drift: float = 0.5
+) -> List[int]:
+    """
+    Cumulative Sum (CUSUM) detector for gradual negative performance drift (soiling / degradation).
+    Plan 2 §3 Phase 5.2 (Task 16).
+    Returns indices where negative drift exceeded threshold.
+    """
+    if not series or len(series) < 3:
+        return []
+    arr = [float(x) if (x is not None and not pd.isna(x)) else 0.0 for x in series]
+    mean_val = float(np.mean(arr))
+    std_val = float(np.std(arr)) if np.std(arr) > 1e-5 else 1.0
+    s_neg = 0.0
+    alarms = []
+    for i, val in enumerate(arr):
+        z = (val - mean_val) / std_val
+        s_neg = max(0.0, s_neg - z - drift)
+        if s_neg > threshold:
+            alarms.append(i)
+            s_neg = 0.0
+    return alarms
+
+
+
 def get_month_cyclic_features(month_str: str) -> Tuple[float, float]:
     """Encode month (1-12) as sine and cosine to preserve cyclic annual seasonality."""
     try:
@@ -78,7 +145,10 @@ def get_month_cyclic_features(month_str: str) -> Tuple[float, float]:
     return round(math.sin(angle), 4), round(math.cos(angle), 4)
 
 
-def train_and_detect_anomalies(df_monthly: pd.DataFrame) -> pd.DataFrame:
+def train_and_detect_anomalies(
+    df_monthly: pd.DataFrame,
+    contamination: Union[float, str] = 0.08,
+) -> pd.DataFrame:
     """
     Run Isolation Forest across historical active monthly generation records to detect
     statistical performance anomalies.
@@ -130,9 +200,11 @@ def train_and_detect_anomalies(df_monthly: pd.DataFrame) -> pd.DataFrame:
     X = X.fillna(X.median())
 
     try:
+        # Use adaptive contamination (defaults to 'auto' or parameter)
+        iso_contamination = contamination if contamination in ('auto', None) or (isinstance(contamination, float) and 0.0 < contamination < 0.5) else 'auto'
         iso = IsolationForest(
             n_estimators=100,
-            contamination=0.08,
+            contamination=iso_contamination,
             random_state=42,
             n_jobs=-1
         )

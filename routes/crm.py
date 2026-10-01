@@ -2,8 +2,12 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 import pandas as pd
-import crm
-import db
+try:
+    from services import crm
+    from pipeline import db
+except ImportError:
+    import crm
+    import db
 
 router = APIRouter(prefix="/crm")
 

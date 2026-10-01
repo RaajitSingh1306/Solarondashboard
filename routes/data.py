@@ -1,10 +1,17 @@
 import datetime
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
-import db
-import analytics
-import pipeline
-import scheduler
+from pydantic import BaseModel
+try:
+    from pipeline import db, pipeline
+    from core import analytics, forecasting
+    from services import scheduler
+except ImportError:
+    import db
+    import analytics
+    import pipeline
+    import scheduler
+    import forecasting
 
 router = APIRouter()
 
@@ -223,3 +230,77 @@ def scheduler_status():
 def trigger_full_extract():
     res = pipeline.run_full_extract()
     return {"status": "success", "result": res}
+
+
+class AnomalyFeedbackRequest(BaseModel):
+    plant_id: str
+    date_or_month: str
+    flag_type: str
+    technician_label: str  # 'true_fault', 'false_alarm', 'unknown'
+    notes: Optional[str] = None
+    logged_by: str = "operator"
+
+
+@router.get("/anomaly-reviews/{plant_id}")
+def get_anomaly_reviews(plant_id: str):
+    """Retrieve logged ground truth labels for a plant."""
+    return {"plant_id": plant_id, "reviews": db.get_anomaly_feedback(plant_id)}
+
+
+@router.post("/anomaly-reviews")
+def post_anomaly_review(req: AnomalyFeedbackRequest):
+    """Log an operator review / technician label on an algorithmic anomaly."""
+    fb_id = db.log_anomaly_feedback(
+        plant_id=req.plant_id,
+        date_or_month=req.date_or_month,
+        flag_type=req.flag_type,
+        technician_label=req.technician_label,
+        notes=req.notes,
+        logged_by=req.logged_by,
+    )
+    return {"status": "logged", "feedback_id": fb_id}
+
+
+@router.get("/rpi-pr-disagreements/{month}")
+def get_rpi_pr_disagreements(month: str):
+    """Return plants where RPI and absolute PR health tiers disagree by >= 2 levels."""
+    return {"month": month, "disagreements": analytics.flag_rpi_pr_disagreement(month)}
+
+
+@router.get("/forecast/fleet")
+def get_fleet_forecast(target_date: Optional[str] = Query(None), ghi: Optional[float] = Query(None)):
+    """Fleet-wide expected energy forecast for target date."""
+    return forecasting.forecast_fleet_generation(target_date=target_date, ghi_override=ghi)
+
+
+@router.get("/forecast/plant/{plant_id}")
+def get_plant_forecast(
+    plant_id: str,
+    target_date: Optional[str] = Query(None),
+    ghi: Optional[float] = Query(5.2),
+    temp_c: Optional[float] = Query(32.0),
+):
+    """Single plant generation forecast with physics and peer baseline adjustments."""
+    plant_df = db.query_df("SELECT * FROM plants WHERE plant_id = ?", [plant_id], db="analytics")
+    if plant_df.empty:
+        raise HTTPException(status_code=404, detail="Plant not found")
+    r = plant_df.iloc[0]
+    cap = float(r.get("capacity_kwp") or 5.0)
+    lat = float(r.get("latitude") or 20.0)
+    t_date = target_date or (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+
+    forecaster = forecasting.ExpectedGenerationForecaster()
+    pred = forecaster.baseline_predict(
+        capacity_kwp=cap,
+        ghi_kwh_m2=float(ghi or 5.2),
+        rpi_baseline=1.0,
+        ambient_temp_c=float(temp_c or 32.0),
+    )
+    return {
+        "plant_id": plant_id,
+        "plant_name": r.get("plant_name"),
+        "target_date": t_date,
+        "capacity_kwp": cap,
+        "prediction": pred,
+    }
+

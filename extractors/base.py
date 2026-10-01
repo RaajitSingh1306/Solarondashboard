@@ -35,6 +35,17 @@ class BaseExtractor(ABC):
         """Fetch inverter snapshots matching inverter_snapshots schema."""
         pass
 
+    def archive_raw(self, endpoint: str, data: Any, date_str: Optional[str] = None) -> None:
+        """Persist raw vendor response into immutable bronze data lake."""
+        try:
+            try:
+                from pipeline import bronze
+            except ImportError:
+                import bronze
+            bronze.archive_raw_response(self.source, endpoint, data, date_str=date_str)
+        except Exception:
+            pass
+
     @staticmethod
     def safe_float(val: Any) -> Optional[float]:
         """Parse numeric field, return None on null/empty/dash."""

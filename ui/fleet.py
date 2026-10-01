@@ -3,7 +3,10 @@ import datetime
 import time
 from typing import Any, Dict, List, Optional
 from nicegui import ui
-import db
+try:
+    from pipeline import db
+except ImportError:
+    import db
 
 def build_fleet_tab(app_state: dict):
     client = ui.context.client
@@ -168,6 +171,7 @@ def build_fleet_tab(app_state: dict):
         {"name": "yield_per_day", "label": "Units/kWp/day", "field": "yield_per_day", "sortable": True, "align": "right"},
         {"name": "pr_pct", "label": "PR (%)", "field": "pr_pct", "sortable": True, "align": "right"},
         {"name": "tier", "label": "Tier", "field": "tier", "sortable": True, "align": "center"},
+        {"name": "geocode_level", "label": "Location Conf.", "field": "geocode_level", "sortable": True, "align": "center"},
     ]
 
     fleet_table = ui.table(columns=columns, rows=[], row_key="plant_id", pagination=25).classes("w-full cursor-pointer")
@@ -241,6 +245,17 @@ def build_fleet_tab(app_state: dict):
         </q-td>
     """)
 
+    # Custom rendering for geocode location confidence
+    fleet_table.add_slot("body-cell-geocode_level", """
+        <q-td :props="props">
+            <q-badge
+                :color="props.value === 'exact' ? 'positive' : props.value === 'pincode_centroid' ? 'teal-7' : props.value === 'city_centroid' ? 'blue-7' : props.value === 'state_default' ? 'orange-8' : 'grey-8'"
+                text-color="white" class="text-[10px] px-1.5 py-0.5 font-medium">
+                {{ props.value || 'unresolved' }}
+            </q-badge>
+        </q-td>
+    """)
+
     async def load_fleet_data():
         nonlocal all_rows
         m = selected_month["val"]
@@ -251,6 +266,7 @@ def build_fleet_tab(app_state: dict):
         sql = """
         SELECT 
             p.plant_id, p.source, p.plant_name, p.capacity_kwp,
+            coalesce(p.geocode_level, 'unresolved') as geocode_level,
             coalesce(p.operational_status, 'active') as operational_status,
             CASE 
                 WHEN p.operational_status = 'decommissioned' THEN 'decommissioned'
@@ -410,7 +426,10 @@ def build_fleet_tab(app_state: dict):
         timer_task = asyncio.create_task(run_fleet_timer())
 
         try:
-            import pipeline
+            try:
+                from pipeline import pipeline
+            except ImportError:
+                import pipeline
             m = selected_month["val"]
             res = await asyncio.to_thread(
                 pipeline.run_full_extract,

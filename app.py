@@ -21,10 +21,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from nicegui import ui, events
 
 from config import settings
-import db
-import pipeline
+try:
+    from pipeline import db, pipeline
+    from services import scheduler
+except ImportError:
+    import db
+    import pipeline
+    import scheduler
 from extractors import excel_parser
-import scheduler
 from routes import data_router, export_router, crm_router
 from ui import build_fleet_tab, build_analytics_tab, build_plant_tab, build_crm_tab, build_fetch_tab
 

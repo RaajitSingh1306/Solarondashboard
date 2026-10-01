@@ -89,7 +89,7 @@ def get_conn(db: str = "analytics"):
 get_connection = analytics_conn
 
 def get_plants(source: Optional[str] = None, include_decommissioned: bool = False) -> List[Dict[str, Any]]:
-    sql = "SELECT plant_id, source, plant_name, capacity_kwp, latitude, longitude, city, install_date, inverter_model, panel_model, operational_status FROM plants WHERE 1=1"
+    sql = "SELECT plant_id, source, plant_name, capacity_kwp, latitude, longitude, city, install_date, inverter_model, panel_model, operational_status, geocode_level FROM plants WHERE 1=1"
     params: List[Any] = []
     if not include_decommissioned:
         sql += " AND (operational_status IS NULL OR operational_status != 'decommissioned')"
@@ -127,7 +127,10 @@ def executemany(sql: str, rows: List[Union[tuple, list, dict]], db: str = "analy
         return cur.rowcount
 
 def upsert_plant(row: Dict[str, Any]) -> None:
-    import data_quality
+    try:
+        from core import data_quality
+    except ImportError:
+        import data_quality
     row_copy = dict(row)
     if data_quality.is_decommissioned(row_copy.get("plant_id", "")) or row_copy.get("operational_status") == "decommissioned":
         row_copy["operational_status"] = "decommissioned"
@@ -135,13 +138,16 @@ def upsert_plant(row: Dict[str, Any]) -> None:
         row_copy.setdefault("operational_status", "active")
     row_copy.setdefault("last_log_time", None)
     row_copy.setdefault("total_energy_kwh", None)
+    row_copy.setdefault("geocode_level", None)
+    for col in ("latitude", "longitude", "city", "install_date", "inverter_model", "panel_model"):
+        row_copy.setdefault(col, None)
     sql = """
     INSERT INTO plants (
         plant_id, source, plant_name, capacity_kwp, latitude, longitude,
-        city, install_date, inverter_model, panel_model, operational_status, last_log_time, total_energy_kwh, updated_at
+        city, install_date, inverter_model, panel_model, operational_status, geocode_level, last_log_time, total_energy_kwh, updated_at
     ) VALUES (
         :plant_id, :source, :plant_name, :capacity_kwp, :latitude, :longitude,
-        :city, :install_date, :inverter_model, :panel_model, :operational_status, :last_log_time, :total_energy_kwh, CURRENT_TIMESTAMP
+        :city, :install_date, :inverter_model, :panel_model, :operational_status, :geocode_level, :last_log_time, :total_energy_kwh, CURRENT_TIMESTAMP
     )
     ON CONFLICT(plant_id) DO UPDATE SET
         source = excluded.source,
@@ -154,6 +160,7 @@ def upsert_plant(row: Dict[str, Any]) -> None:
         inverter_model = coalesce(excluded.inverter_model, plants.inverter_model),
         panel_model = coalesce(excluded.panel_model, plants.panel_model),
         operational_status = CASE WHEN plants.operational_status = 'decommissioned' OR excluded.operational_status = 'decommissioned' THEN 'decommissioned' ELSE coalesce(excluded.operational_status, plants.operational_status) END,
+        geocode_level = coalesce(excluded.geocode_level, plants.geocode_level),
         last_log_time = coalesce(nullif(excluded.last_log_time, ''), plants.last_log_time),
         total_energy_kwh = coalesce(excluded.total_energy_kwh, plants.total_energy_kwh),
         updated_at = CURRENT_TIMESTAMP;
@@ -169,13 +176,18 @@ def upsert_daily(rows: List[Dict[str, Any]]) -> int:
     if not rows:
         return 0
     for r in rows:
+        r.setdefault("revenue_inr", None)
+        r.setdefault("specific_yield", None)
         r.setdefault("yield_per_day", r.get("specific_yield"))
+        r.setdefault("live_power_kw", None)
+        r.setdefault("status", "active")
         r.setdefault("last_log_time", None)
+        r.setdefault("quality_flags", None)
     sql = """
     INSERT INTO daily_generation (
-        plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, last_log_time
+        plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time
     ) VALUES (
-        :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :last_log_time
+        :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time
     )
     ON CONFLICT(plant_id, date) DO UPDATE SET
         kwh = excluded.kwh,
@@ -184,6 +196,7 @@ def upsert_daily(rows: List[Dict[str, Any]]) -> int:
         yield_per_day = coalesce(excluded.yield_per_day, daily_generation.yield_per_day),
         live_power_kw = excluded.live_power_kw,
         status = excluded.status,
+        quality_flags = coalesce(excluded.quality_flags, daily_generation.quality_flags),
         last_log_time = coalesce(nullif(excluded.last_log_time, ''), daily_generation.last_log_time);
     """
     res = executemany(sql, rows, db="analytics")
@@ -368,6 +381,41 @@ def get_cache_metadata() -> Dict[str, Any]:
         pass
     return res
 
+
+def log_anomaly_feedback(
+    plant_id: str,
+    date_or_month: str,
+    flag_type: str,
+    technician_label: str,
+    notes: Optional[str] = None,
+    logged_by: str = "operator",
+) -> int:
+    """Log ground-truth feedback / label on an algorithmic anomaly flag."""
+    init_db()
+    sql = """
+    INSERT INTO anomaly_feedback (plant_id, date_or_month, flag_type, technician_label, notes, logged_by)
+    VALUES (?, ?, ?, ?, ?, ?);
+    """
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, [plant_id, date_or_month, flag_type, technician_label, notes, logged_by])
+        return cur.lastrowid or 0
+
+
+def get_anomaly_feedback(plant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieve logged anomaly labels and ground-truth outcomes."""
+    init_db()
+    sql = "SELECT id, plant_id, date_or_month, flag_type, technician_label, notes, logged_by, created_at FROM anomaly_feedback"
+    params = []
+    if plant_id:
+        sql += " WHERE plant_id = ?"
+        params.append(plant_id)
+    sql += " ORDER BY created_at DESC;"
+    df = query_df(sql, params, db="analytics")
+    if df.empty:
+        return []
+    return df.to_dict(orient="records")
+
 def init_db() -> None:
     with analytics_conn() as conn:
         cur = conn.cursor()
@@ -384,6 +432,7 @@ def init_db() -> None:
             inverter_model TEXT,
             panel_model TEXT,
             operational_status TEXT DEFAULT 'active',
+            geocode_level TEXT,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -396,6 +445,8 @@ def init_db() -> None:
             yield_per_day REAL,
             live_power_kw REAL,
             status TEXT,
+            quality_flags TEXT,
+            last_log_time TEXT,
             PRIMARY KEY (plant_id, date),
             FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
         );
@@ -461,6 +512,20 @@ def init_db() -> None:
             FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
         );
 
+        CREATE TABLE IF NOT EXISTS anomaly_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id TEXT NOT NULL,
+            date_or_month TEXT NOT NULL,
+            flag_type TEXT NOT NULL,
+            technician_label TEXT NOT NULL,
+            notes TEXT,
+            logged_by TEXT DEFAULT 'operator',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_feedback_plant ON anomaly_feedback(plant_id);
+
         CREATE INDEX IF NOT EXISTS idx_plants_source ON plants(source);
         CREATE INDEX IF NOT EXISTS idx_plants_op_status ON plants(operational_status);
         CREATE INDEX IF NOT EXISTS idx_daily_date ON daily_generation(date);
@@ -481,8 +546,10 @@ def init_db() -> None:
             ("plants", "operational_status", "TEXT DEFAULT 'active'"),
             ("plants", "last_log_time", "TEXT"),
             ("plants", "total_energy_kwh", "REAL"),
+            ("plants", "geocode_level", "TEXT"),
             ("daily_generation", "yield_per_day", "REAL"),
             ("daily_generation", "last_log_time", "TEXT"),
+            ("daily_generation", "quality_flags", "TEXT"),
             ("monthly_generation", "yield_per_day", "REAL"),
             ("monthly_generation", "anomaly_score", "REAL"),
             ("monthly_generation", "anomaly_flag", "INTEGER DEFAULT 0"),

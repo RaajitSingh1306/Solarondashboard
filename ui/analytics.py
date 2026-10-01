@@ -2,8 +2,12 @@ import asyncio
 import datetime
 import logging
 from nicegui import ui
-import db
-import analytics
+try:
+    from pipeline import db
+    from core import analytics
+except ImportError:
+    import db
+    import analytics
 
 logger = logging.getLogger(__name__)
 
@@ -62,27 +66,37 @@ def build_analytics_tab(app_state: dict):
         waterfall_kpis = ui.row().classes("w-full gap-4 mb-4")
         with waterfall_kpis:
             with ui.card().classes("flex-1 p-3 bg-gray-800 border border-gray-700"):
-                exp_title_label = ui.label("Expected Baseline").classes("text-xs text-gray-400 font-medium")
+                with ui.row().classes("w-full items-center justify-between"):
+                    exp_title_label = ui.label("Expected Baseline").classes("text-xs text-gray-400 font-medium")
+                    ui.icon("info", size="xs").classes("text-gray-500").tooltip("Physics formulation: Capacity (kWp) × NASA POWER GHI × Days")
                 exp_mwh_label = ui.label("— MWh").classes("text-xl font-bold text-blue-400")
                 exp_sub_label = ui.label("— installations analyzed").classes("text-[10px] text-gray-500")
 
             with ui.card().classes("flex-1 p-3 bg-gray-800 border border-gray-700"):
-                ui.label("Actual Harvest").classes("text-xs text-gray-400 font-medium")
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label("Actual Harvest").classes("text-xs text-gray-400 font-medium")
+                    ui.icon("info", size="xs").classes("text-gray-500").tooltip("Sum of measured meter energy across operational plants")
                 act_mwh_label = ui.label("— MWh").classes("text-xl font-bold text-emerald-400")
                 ui.label("Realized Generation").classes("text-[10px] text-gray-500")
 
             with ui.card().classes("flex-1 p-3 bg-gray-800 border border-gray-700"):
-                ui.label("Net Shortfall").classes("text-xs text-gray-400 font-medium")
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label("Net Shortfall").classes("text-xs text-gray-400 font-medium")
+                    ui.icon("info", size="xs").classes("text-gray-500").tooltip("First Law of Thermodynamics: Expected - Actual = Total Shortfall")
                 short_mwh_label = ui.label("— MWh").classes("text-xl font-bold text-rose-400")
                 ui.label("Loss to attribution").classes("text-[10px] text-gray-500")
 
             with ui.card().classes("flex-1 p-3 bg-gray-800 border border-gray-700"):
-                ui.label("Realization Rate").classes("text-xs text-gray-400 font-medium")
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label("Realization Rate").classes("text-xs text-gray-400 font-medium")
+                    ui.icon("info", size="xs").classes("text-gray-500").tooltip("Actual kWh ÷ Expected kWh × 100")
                 realization_label = ui.label("—%").classes("text-xl font-bold text-amber-400")
                 ui.label("Actual vs Expected").classes("text-[10px] text-gray-500")
 
             with ui.card().classes("flex-1 p-3 bg-gray-800 border border-gray-700"):
-                ui.label("ML Anomalies").classes("text-xs text-gray-400 font-medium")
+                with ui.row().classes("w-full items-center justify-between"):
+                    ui.label("ML Anomalies").classes("text-xs text-gray-400 font-medium")
+                    ui.icon("info", size="xs").classes("text-gray-500").tooltip("Isolation Forest & robust stats (z-score > 2.5) vs seasonal peer cluster")
                 anomaly_count_label = ui.label("—").classes("text-xl font-bold text-rose-400")
                 ui.label("Outlier underperformers").classes("text-[10px] text-gray-500")
 
@@ -116,11 +130,11 @@ def build_analytics_tab(app_state: dict):
             loss_val_labels = {}
             with loss_cards_col:
                 loss_items_meta = [
-                    ("comm", "📡 Communication & Zero Gen Loss", "Offline telemetry or zero day outputs", "text-rose-400"),
-                    ("weather", "☁️ Weather & Irradiance Deficit", "Cloud cover vs standard clear sky", "text-amber-400"),
-                    ("soiling", "🧼 Soiling & Dust Loss", "Standard panel surface dust accumulation", "text-orange-400"),
-                    ("shading", "🌿 Shading & Obstruction Loss", "Building / vegetation horizon shadows", "text-purple-400"),
-                    ("unknown", "❓ Unexplained / Residual Shortfall", "Inverter clipping & balance of system", "text-gray-400"),
+                    ("comm", "📡 Telemetry & Shutdown [Measured]", "Exact telemetry gaps & logger downtime from plant-day status", "text-rose-400"),
+                    ("weather", "☁️ Weather Deficit [Est. Range ±15%]", "Satellite GHI deficit vs regional clear-sky standard", "text-amber-400"),
+                    ("soiling", "🧼 Soiling & Dust [Est. Range ±30%]", "Seasonal dust deposition & rain wash cycles", "text-orange-400"),
+                    ("shading", "🌿 Shading & Obstruction [Est. Range ±35%]", "Horizon geometry and roof obstacle shadows", "text-purple-400"),
+                    ("unknown", "⚖️ Unattributed Residual [BOS / Variance]", "Wiring resistance, inverter clipping & unclassified variance", "text-gray-400"),
                 ]
                 for key, label, desc, color_cls in loss_items_meta:
                     with ui.row().classes("w-full items-center justify-between p-2 rounded bg-gray-800 border border-gray-700"):

@@ -10,7 +10,7 @@ import calendar
 import datetime
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,10 @@ def get_decommissioned_plant_ids(force_reload: bool = False) -> set:
         return _DECOMMISSIONED_CACHE
 
     try:
-        import db
+        try:
+            from pipeline import db
+        except ImportError:
+            import db
         with db.analytics_conn() as conn:
             cur = conn.cursor()
             cur.execute("SELECT lower(plant_id) FROM plants WHERE operational_status = 'decommissioned'")
@@ -193,12 +196,25 @@ def clean_plant_name(name: Any) -> str:
     return cleaned
 
 
-def normalize_capacity(cap: Any, default: Optional[float] = None) -> Optional[float]:
+def normalize_capacity(
+    cap: Any,
+    default: Optional[float] = None,
+    plant_type: Optional[str] = None,
+    plant_name: Optional[str] = None,
+) -> Optional[float]:
     """
     Validate and normalize plant capacity in kWp.
-    Solar plants in this fleet range from ~1 kWp to ~500 kWp.
-    Values > 5,000 are in Watts and must be divided by 1000.
-    Commercial plants (e.g. 194.4 kWp) MUST NOT be divided.
+    Solar plants in this fleet range from ~1 kWp to ~500 kWp (with utility up to 2,000 kWp).
+    
+    Disambiguation rules:
+    - Values > 5,000 are unambiguously in Watts (e.g. 300,000 W -> 300 kWp, 6,000 W -> 6 kWp).
+    - Values between 1,000 and 5,000:
+      - Residential systems in India are commonly entered in Watts (e.g. 1000, 2000, 3000, 3300, 4000, 5000 W).
+      - If marked as Commercial/Industrial/Utility or plant name contains commercial keywords,
+        and is an exact commercial kWp rating, keep as kWp.
+      - Otherwise divide by 1000.0 to convert Watts -> kWp.
+    - Values <= 500 are in kWp (e.g. 3.3, 5.0, 100.0, 194.4 kWp).
+    - Bounds check: 0.1 kWp to 10,000 kWp.
     """
     if cap is None:
         return default
@@ -206,9 +222,24 @@ def normalize_capacity(cap: Any, default: Optional[float] = None) -> Optional[fl
         val = float(cap)
         if val <= 0:
             return default
-        # Only divide if clearly entered in Watts (>= 1000 W)
-        if val >= 1000:
+
+        # If value > 5,000: unambiguously Watts -> convert to kWp
+        if val > 5000:
             val = val / 1000.0
+        elif val >= 1000:
+            # Check for commercial / industrial indicators
+            is_comm = False
+            if plant_type and any(k in str(plant_type).lower() for k in ("commercial", "industrial", "utility", "mw")):
+                is_comm = True
+            if plant_name and any(k in str(plant_name).lower() for k in (
+                "pvt", "ltd", "industries", "factory", "hospital", "pharma", "mill", "mall", "works", "infra", "park"
+            )):
+                is_comm = True
+
+            # If not clearly commercial rooftop, treat as Watts (e.g. 3000 W -> 3 kWp)
+            if not is_comm:
+                val = val / 1000.0
+
         # Bounds check: 0.1 kWp to 10,000 kWp
         if 0.1 <= val <= 10000.0:
             return round(val, 2)
@@ -311,6 +342,142 @@ def get_capacity_bracket(capacity_kwp: Optional[float]) -> str:
     return "50+ kWp"
 
 
+def is_stuck_value(quality_flags: Optional[str]) -> bool:
+    """Return True if quality_flags string contains STUCK_VALUE."""
+    if not quality_flags:
+        return False
+    return "STUCK_VALUE" in [f.strip() for f in str(quality_flags).split(",")]
+
+
+def detect_stuck_values(
+    daily_records: List[Dict[str, Any]],
+    consecutive_threshold: int = 3,
+    tolerance: float = 0.05,
+    peer_variance_check: bool = False,
+    peer_daily_yields: Optional[Dict[str, float]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Detect repeated identical non-zero kWh generation readings across consecutive days.
+    
+    A solar plant producing the exact same non-zero generation (within tolerance) for N
+    consecutive days indicates stuck sensors, frozen loggers, or cached synthetic values.
+    Real solar generation varies continuously with solar geometry and cloud cover.
+    Zero-generation days (offline/decommissioned) are NOT flagged as stuck values.
+    
+    Args:
+        daily_records: List of daily dicts containing at least 'date' and 'kwh'.
+                       Can contain records for one or multiple plants (if 'plant_id' present).
+        consecutive_threshold: Minimum consecutive days with identical non-zero value (default: 3).
+        tolerance: kWh difference threshold to consider values identical (default: 0.05 kWh).
+        peer_variance_check: If True and peer_daily_yields provided, verify peers varied >10%.
+        peer_daily_yields: Dict mapping date -> median peer yield for cross-checking weather variance.
+        
+    Returns:
+        The list of daily_records with 'quality_flags' updated to include 'STUCK_VALUE'
+        where detected.
+    """
+    if not daily_records:
+        return daily_records
+
+    # Group by plant_id
+    by_plant: Dict[str, List[Dict[str, Any]]] = {}
+    for r in daily_records:
+        pid = str(r.get("plant_id", "default"))
+        by_plant.setdefault(pid, []).append(r)
+
+    for pid, plant_recs in by_plant.items():
+        # Sort chronologically by date
+        plant_recs.sort(key=lambda x: str(x.get("date", "")))
+        n = len(plant_recs)
+        if n < consecutive_threshold:
+            continue
+
+        run_start = 0
+        while run_start < n:
+            kwh_start = plant_recs[run_start].get("kwh")
+            if kwh_start is None or float(kwh_start) <= NOISE_FLOOR_DAILY_KWH:
+                run_start += 1
+                continue
+
+            run_end = run_start + 1
+            while run_end < n:
+                kwh_next = plant_recs[run_end].get("kwh")
+                if kwh_next is None or float(kwh_next) <= NOISE_FLOOR_DAILY_KWH:
+                    break
+                if abs(float(kwh_next) - float(kwh_start)) > tolerance:
+                    break
+                run_end += 1
+
+            run_length = run_end - run_start
+            if run_length >= consecutive_threshold:
+                flag_it = True
+                if peer_variance_check and peer_daily_yields:
+                    run_dates = [str(plant_recs[idx].get("date", "")) for idx in range(run_start, run_end)]
+                    peer_vals = [peer_daily_yields.get(d) for d in run_dates if peer_daily_yields.get(d) is not None]
+                    if len(peer_vals) >= 2 and max(peer_vals) > 0:
+                        variation = (max(peer_vals) - min(peer_vals)) / max(peer_vals)
+                        if variation < 0.10:
+                            flag_it = False
+
+                if flag_it:
+                    for idx in range(run_start, run_end):
+                        rec = plant_recs[idx]
+                        flags = rec.get("quality_flags") or ""
+                        flag_list = [f.strip() for f in str(flags).split(",") if f.strip()]
+                        if "STUCK_VALUE" not in flag_list:
+                            flag_list.append("STUCK_VALUE")
+                        rec["quality_flags"] = ",".join(flag_list)
+
+            run_start = run_end
+
+    return daily_records
+
+
+def scan_and_flag_stuck_values(
+    consecutive_threshold: int = 3,
+    tolerance: float = 0.05,
+    db_name: str = "analytics",
+) -> int:
+    """
+    Scan all daily generation records in SQLite database, detect stuck values,
+    and update quality_flags in place.
+    Returns the count of flagged plant-days.
+    """
+    try:
+        from pipeline import db
+    except ImportError:
+        import db
+    with db.get_conn(db_name) as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT plant_id, date, kwh, quality_flags
+            FROM daily_generation
+            WHERE kwh > {NOISE_FLOOR_DAILY_KWH}
+            ORDER BY plant_id, date ASC
+        """)
+        rows = [dict(r) for r in cur.fetchall()]
+        if not rows:
+            return 0
+
+        flagged_recs = detect_stuck_values(
+            rows, consecutive_threshold=consecutive_threshold, tolerance=tolerance
+        )
+
+        updates = []
+        for r in flagged_recs:
+            if is_stuck_value(r.get("quality_flags")):
+                updates.append((r["quality_flags"], r["plant_id"], r["date"]))
+
+        if updates:
+            cur.executemany("""
+                UPDATE daily_generation
+                SET quality_flags = ?
+                WHERE plant_id = ? AND date = ?
+            """, updates)
+            return len(updates)
+        return 0
+
+
 def validate_daily_record(
     record: Dict[str, Any], capacity_kwp: Optional[float] = None
 ) -> Optional[Dict[str, Any]]:
@@ -351,6 +518,9 @@ def validate_daily_record(
             out["revenue_inr"] = max(0.0, round(float(rev), 2))
         except (ValueError, TypeError):
             out["revenue_inr"] = 0.0
+
+    # Preserve quality flags
+    out["quality_flags"] = out.get("quality_flags")
 
     # Normalize status based on generation
     if out["kwh"] is not None and out["kwh"] > NOISE_FLOOR_DAILY_KWH:

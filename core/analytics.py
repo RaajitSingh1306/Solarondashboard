@@ -1,11 +1,15 @@
 import datetime
 import calendar
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import requests
-import db
-import data_quality
-import ml_analytics
+try:
+    from pipeline import db
+    from core import data_quality, ml_analytics
+except ImportError:
+    import db
+    import data_quality
+    import ml_analytics
 
 INDIA_MONTHLY_GHI_DEFAULTS = {
     "01": 4.60,
@@ -70,14 +74,32 @@ def get_ghi(lat: Optional[float], lon: Optional[float], month: str) -> float:
     _GHI_CACHE[cache_key] = default_ghi
     return default_ghi
 
-def calc_pr(kwh: float, capacity_kwp: float, ghi: float, days_in_month: int) -> Optional[float]:
-    """Performance Ratio = Generation (kWh) / (Installed Capacity (kWp) * GHI * Days)."""
-    if not capacity_kwp or not ghi or not days_in_month:
+def calc_pr(
+    kwh: Optional[float], capacity_kwp: Optional[float], ghi: Optional[float], days_in_month: Optional[int]
+) -> Optional[float]:
+    """
+    Performance Ratio = Actual Generation (kWh) / (Installed Capacity (kWp) * GHI (kWh/m2/day) * Days).
+    
+    IEC 61724 benchmark for solar PV system performance.
+    Clamps negative generation to 0. Returns None if parameters are non-positive or missing.
+    """
+    if kwh is None or capacity_kwp is None or ghi is None or days_in_month is None:
         return None
-    expected_kwh = capacity_kwp * ghi * days_in_month
+    try:
+        kwh_f = max(0.0, float(kwh))
+        cap_f = float(capacity_kwp)
+        ghi_f = float(ghi)
+        days_i = int(days_in_month)
+    except (ValueError, TypeError):
+        return None
+
+    if cap_f <= 0 or ghi_f <= 0 or days_i <= 0:
+        return None
+
+    expected_kwh = cap_f * ghi_f * days_i
     if expected_kwh <= 0:
         return None
-    return round((kwh / expected_kwh) * 100.0, 2)
+    return round((kwh_f / expected_kwh) * 100.0, 2)
 
 def specific_yield(kwh: Optional[float], kwp: Optional[float]) -> Optional[float]:
     if kwh is None or kwp is None or kwp <= 0:
@@ -92,10 +114,28 @@ def cuf(kwh: Optional[float], kwp: Optional[float], hours: Optional[int] = None)
         hours = 24 * 30
     return round((kwh / (kwp * hours)) * 100.0, 2)
 
-def revenue(kwh: Optional[float], tariff_inr: float = 5.5) -> Optional[float]:
+def revenue(kwh: Optional[float], tariff_inr: Optional[float] = None) -> Optional[float]:
+    """
+    Calculate solar generation revenue in INR.
+    Defaults to settings.price_per_unit (14.0 INR/kWh) if tariff_inr is not specified.
+    """
     if kwh is None:
         return None
-    return round(kwh * tariff_inr, 2)
+    try:
+        kwh_f = max(0.0, float(kwh))
+    except (ValueError, TypeError):
+        return None
+
+    if tariff_inr is None:
+        from config import settings
+        tariff_inr = getattr(settings, "price_per_unit", 14.0)
+
+    try:
+        t_f = float(tariff_inr)
+    except (ValueError, TypeError):
+        t_f = 14.0
+
+    return round(kwh_f * t_f, 2)
 
 def co2_saved(kwh: Optional[float]) -> Optional[float]:
     """India CEA standard factor: 0.82 kg CO2 / kWh."""
@@ -149,7 +189,10 @@ def sync_decommissioned_plants(month: Optional[str] = None) -> int:
     if df.empty:
         return 0
 
-    import data_quality
+    try:
+        from core import data_quality
+    except ImportError:
+        import data_quality
     decom_ids = []
     reactivate_ids = []
     for _, row in df.iterrows():
@@ -635,20 +678,161 @@ def get_loss_waterfall(month: Optional[str] = None, source: Optional[str] = None
         }
 
     r = df.iloc[0]
+    expected_kwh = round(float(r["total_expected_kwh"] or 0.0), 1)
+    actual_kwh = round(float(r["total_actual_kwh"] or 0.0), 1)
+    shortfall_kwh = round(float(r["total_shortfall_kwh"] or 0.0), 1)
+    comm_loss = round(float(r["total_comm_loss"] or 0.0), 1)
+    shutdown_loss = round(float(r["total_shutdown_loss"] or 0.0), 1)
+    weather_loss = round(float(r["total_weather_loss"] or 0.0), 1)
+    soiling_loss = round(float(r["total_soiling_loss"] or 0.0), 1)
+    shading_loss = round(float(r["total_shading_loss"] or 0.0), 1)
+    unknown_loss = round(float(r["total_unknown_loss"] or 0.0), 1)
+
+    loss_ranges = {
+        "comm_loss": {
+            "type": "measured",
+            "point_kwh": comm_loss,
+            "min_kwh": comm_loss,
+            "max_kwh": comm_loss,
+            "confidence": "high",
+            "basis": "Exact telemetry gaps & logger downtime from plant-day status",
+        },
+        "shutdown_loss": {
+            "type": "measured",
+            "point_kwh": shutdown_loss,
+            "min_kwh": shutdown_loss,
+            "max_kwh": shutdown_loss,
+            "confidence": "high",
+            "basis": "Inverter fault codes & grid outage zero-days",
+        },
+        "weather_loss": {
+            "type": "estimated",
+            "point_kwh": weather_loss,
+            "min_kwh": round(weather_loss * 0.85, 1),
+            "max_kwh": round(weather_loss * 1.15, 1),
+            "confidence": "medium",
+            "basis": "Satellite GHI deficit vs clear-sky model (±15% satellite irradiance band)",
+        },
+        "soiling_loss": {
+            "type": "estimated",
+            "point_kwh": soiling_loss,
+            "min_kwh": round(soiling_loss * 0.70, 1),
+            "max_kwh": round(soiling_loss * 1.30, 1),
+            "confidence": "low_to_medium",
+            "basis": "Empirical dust accumulation & rainfall washing cycles (±30% band)",
+        },
+        "shading_loss": {
+            "type": "estimated",
+            "point_kwh": shading_loss,
+            "min_kwh": round(shading_loss * 0.65, 1),
+            "max_kwh": round(shading_loss * 1.35, 1),
+            "confidence": "low",
+            "basis": "Horizon & near-field geometry estimate without 3D LIDAR (±35% band)",
+        },
+        "unattributed_loss": {
+            "type": "residual",
+            "point_kwh": unknown_loss,
+            "min_kwh": unknown_loss,
+            "max_kwh": unknown_loss,
+            "confidence": "unattributed",
+            "basis": "Balance of system (BOS), wiring resistance, and unclassified variance",
+        },
+    }
+
     return {
         "month": month,
         "source": source or "All",
         "total_plants": int(r["total_plants"] or 0),
-        "expected_kwh": round(float(r["total_expected_kwh"] or 0.0), 1),
-        "actual_kwh": round(float(r["total_actual_kwh"] or 0.0), 1),
-        "shortfall_kwh": round(float(r["total_shortfall_kwh"] or 0.0), 1),
-        "comm_loss_kwh": round(float(r["total_comm_loss"] or 0.0), 1),
-        "shutdown_loss_kwh": round(float(r["total_shutdown_loss"] or 0.0), 1),
-        "weather_loss_kwh": round(float(r["total_weather_loss"] or 0.0), 1),
-        "soiling_loss_kwh": round(float(r["total_soiling_loss"] or 0.0), 1),
-        "shading_loss_kwh": round(float(r["total_shading_loss"] or 0.0), 1),
-        "unknown_loss_kwh": round(float(r["total_unknown_loss"] or 0.0), 1),
+        "expected_kwh": expected_kwh,
+        "actual_kwh": actual_kwh,
+        "shortfall_kwh": shortfall_kwh,
+        "comm_loss_kwh": comm_loss,
+        "shutdown_loss_kwh": shutdown_loss,
+        "weather_loss_kwh": weather_loss,
+        "soiling_loss_kwh": soiling_loss,
+        "shading_loss_kwh": shading_loss,
+        "unknown_loss_kwh": unknown_loss,
         "avg_pr": round(float(r["avg_pr"] or 0.0), 1),
         "avg_realization": round(float(r["avg_realization"] or 0.0), 1),
+        "loss_ranges": loss_ranges,
     }
+
+
+def flag_rpi_pr_disagreement(month: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Compare RPI-based health tier vs absolute PR tier for geocoded/active plants.
+    Detects cases where absolute PR misdiagnoses weather-constrained fleets or
+    where RPI catches localized underperformance obscured by high regional sun.
+    Plan 2 §3 Phase 6 (Task 20).
+    """
+    if not month:
+        month = datetime.date.today().strftime("%Y-%m")
+
+    sql = """
+    SELECT m.plant_id, p.plant_name as name, p.city, p.capacity_kwp as capacity_kw, p.geocode_level,
+           m.pr_pct, m.tier as health_tier, m.specific_yield, m.yield_per_day
+    FROM monthly_generation m
+    JOIN plants p ON m.plant_id = p.plant_id
+    WHERE m.month = ? AND (p.operational_status IS NULL OR p.operational_status != 'decommissioned')
+      AND m.specific_yield > 0
+    """
+    df = db.query_df(sql, [month], db="analytics")
+    if df.empty:
+        return []
+
+    tier_ranks = {
+        "Best": 4,
+        "Good": 3,
+        "Could Be Better": 2,
+        "Needs Attention": 1,
+        "Critical": 0,
+    }
+
+    try:
+        from engines.rpi import calculate_monthly_fleet_rpi
+    except ImportError:
+        from rpi import calculate_monthly_fleet_rpi
+    try:
+        rpi_df = calculate_monthly_fleet_rpi(month)
+    except Exception:
+        rpi_df = pd.DataFrame()
+
+    rpi_map = {}
+    if not rpi_df.empty and "plant_id" in rpi_df.columns:
+        for _, row in rpi_df.iterrows():
+            rpi_map[str(row["plant_id"])] = {
+                "rpi_score": float(row.get("rpi_score", 1.0)),
+                "rpi_tier": str(row.get("rpi_tier", "Good")),
+            }
+
+    disagreements = []
+    for _, row in df.iterrows():
+        pid = str(row["plant_id"])
+        pr_tier = str(row["health_tier"] or "Critical")
+        rpi_info = rpi_map.get(pid, {"rpi_score": 1.0, "rpi_tier": "Good"})
+        rpi_tier = rpi_info["rpi_tier"]
+
+        pr_rank = tier_ranks.get(pr_tier, 1)
+        rpi_rank = tier_ranks.get(rpi_tier, 3)
+
+        diff = abs(pr_rank - rpi_rank)
+        if diff >= 2:
+            disagreements.append({
+                "plant_id": pid,
+                "name": row["name"],
+                "city": row["city"],
+                "geocode_level": row.get("geocode_level", "unknown"),
+                "pr_pct": round(float(row["pr_pct"] or 0.0), 1),
+                "pr_tier": pr_tier,
+                "rpi_score": round(rpi_info["rpi_score"], 2),
+                "rpi_tier": rpi_tier,
+                "divergence": "PR_PUNISHED_BY_WEATHER" if rpi_rank > pr_rank else "PEER_OUTPERFORMANCE_MASKING",
+                "diagnosis": (
+                    "Low absolute PR caused by regional cloud cover; peers performed similarly."
+                    if rpi_rank > pr_rank
+                    else "Absolute PR appears acceptable due to high insolation, but plant is lagging local peers."
+                ),
+            })
+    return disagreements
+
 

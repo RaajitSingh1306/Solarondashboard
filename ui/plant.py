@@ -2,8 +2,12 @@ import asyncio
 import datetime
 import time
 from nicegui import ui
-import db
-import analytics
+try:
+    from pipeline import db
+    from core import analytics
+except ImportError:
+    import db
+    import analytics
 
 def build_plant_tab(app_state: dict):
     client = ui.context.client
@@ -201,7 +205,10 @@ def build_plant_tab(app_state: dict):
             timer_task = asyncio.create_task(run_plant_timer())
 
             try:
-                import pipeline
+                try:
+                    from pipeline import pipeline
+                except ImportError:
+                    import pipeline
                 if p_src == "suryalog":
                     from extractors.suryalog import SuryaLogExtractor
                     ext = SuryaLogExtractor()
@@ -209,7 +216,10 @@ def build_plant_tab(app_state: dict):
                     await asyncio.to_thread(pipeline.run_fleet, sources=["suryalog"], force_refresh=False)
                     await asyncio.to_thread(pipeline.run_daily, sources=["suryalog"], force_refresh=False)
                     await asyncio.to_thread(pipeline.run_monthly, month_str=selected_plant["month"], sources=["suryalog"], force_refresh=False)
-                    import analytics
+                    try:
+                        from core import analytics
+                    except ImportError:
+                        import analytics
                     analytics.classify_all(selected_plant["month"])
                 else:
                     await asyncio.to_thread(pipeline.run_full_extract, month_str=selected_plant["month"], sources=[p_src] if p_src else None, force_refresh=True, target_plant_id=pid)
@@ -555,6 +565,8 @@ def build_plant_tab(app_state: dict):
             kpi_card("PR (%)", f"{float(monthly_row.get('pr_pct') or 0.0):.1f}%" if monthly_row.get('pr_pct') is not None else "—", "query_stats", "blue-4")
             kpi_card("Tier", tier, "star", "amber-4")
             kpi_card("Peer Percentile", f"P{percentile:.0f}", "leaderboard", "indigo-4")
+            kpi_card("Location Conf.", f"{plant.get('geocode_level', 'unresolved')}", "place", "teal-4")
+            kpi_card("RPI Index", f"{float(monthly_row.get('rpi_score', 1.0) or 1.0):.2f}", "insights", "amber-4")
 
         # ML Anomaly Callout Banner
         is_anomaly = int(monthly_row.get("anomaly_flag") or 0) == 1
@@ -570,6 +582,39 @@ def build_plant_tab(app_state: dict):
             with ui.row().classes("w-full p-2.5 rounded-lg bg-gray-900 border border-gray-800 items-center gap-2 mb-4"):
                 ui.icon("info", color="cyan-4", size="xs")
                 ui.label(explanation).classes("text-xs text-gray-300")
+
+        # Operator Anomaly Review / Feedback Panel (Phase 5 Task 17b & Phase 6)
+        with ui.card().classes("w-full p-4 rounded-lg bg-gray-900 border border-gray-800 mb-4"):
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("fact_check", color="amber-4", size="sm")
+                    ui.label("Field Validation & Ground-Truth Anomaly Review").classes("text-sm font-semibold text-gray-200")
+                ui.badge("Label Loop", color="indigo-8").classes("text-xs text-white")
+            with ui.row().classes("w-full items-center gap-4 mt-2 flex-wrap"):
+                review_outcome = ui.select(
+                    options={"true_fault": "✅ Confirmed Real Fault", "false_alarm": "❌ False Alarm (Normal)", "unknown": "❓ Inconclusive / Pending Site Visit"},
+                    value="true_fault" if is_anomaly else "false_alarm",
+                    label="Technician Assessment"
+                ).classes("w-64").props("dense outlined dark options-dense")
+                review_notes = ui.input(label="Inspection Notes / Root Cause", placeholder="e.g. String fuse blown, tree shade at 4pm").classes("flex-1").props("dense outlined dark")
+
+                async def submit_review():
+                    if not pid:
+                        return
+                    out = review_outcome.value or "unknown"
+                    notes_txt = review_notes.value or ""
+                    await asyncio.to_thread(
+                        db.log_anomaly_feedback,
+                        plant_id=pid,
+                        date_or_month=m_val,
+                        flag_type="ML_ANOMALY" if is_anomaly else "OPERATOR_FLAG",
+                        technician_label=out,
+                        notes=notes_txt,
+                        logged_by="operator"
+                    )
+                    ui.notify("Validation label logged successfully to ground-truth dataset!", type="positive", position="top")
+
+                ui.button("Submit Validation", icon="save", on_click=submit_review).props("dense color=primary").classes("px-4")
 
         # Plant Loss Attribution Banner
         if loss_row:

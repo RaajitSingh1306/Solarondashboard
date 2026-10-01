@@ -25,12 +25,17 @@ cur_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(cur_dir))
 sys.path.insert(0, str(cur_dir.parent))
 
-import db
-import analytics
-import ml_analytics
-import data_quality
-import pipeline
-import crm
+try:
+    from pipeline import db, pipeline
+    from core import analytics, ml_analytics, data_quality
+    from services import crm
+except ImportError:
+    import db
+    import analytics
+    import ml_analytics
+    import data_quality
+    import pipeline
+    import crm
 from config import settings
 from fastapi.testclient import TestClient
 from app import app

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solaron"
+version = "2.0.0"
+description = "Solaron Solar Analytics & CRM Platform"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "nicegui>=1.4.0",
+    "uvicorn>=0.22.0",
+    "pydantic-settings>=2.0.0",
+    "pydantic>=2.0.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "httpx>=0.24.0",
+    "pytest>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "engines*", "pipeline*", "services*", "extractors*", "routes*", "ui*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "verify_all.py"]
+asyncio_mode = "strict"

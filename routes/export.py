@@ -4,7 +4,10 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import StreamingResponse
 import pandas as pd
-import db
+try:
+    from pipeline import db
+except ImportError:
+    import db
 
 router = APIRouter(prefix="/export")
 

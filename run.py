@@ -23,11 +23,16 @@ os.environ["PYTHONPATH"] = f"{root_dir}{os.pathsep}{solaron_dir}{os.pathsep}{cur
 
 if __name__ == "__main__":
     import uvicorn
-    from solaron.config import settings
+    try:
+        from solaron.config import settings
+        app_target = "solaron.app:app"
+    except ImportError:
+        from config import settings
+        app_target = "app:app"
 
     print("\n" + "=" * 60)
     print("  SOLARON SOLAR ANALYTICS & CRM PLATFORM")
     print(f"  Open in browser: http://localhost:{settings.app_port} or http://127.0.0.1:{settings.app_port}")
     print("=" * 60 + "\n")
 
-    uvicorn.run("solaron.app:app", host="127.0.0.1", port=settings.app_port, reload=True)
+    uvicorn.run(app_target, host="127.0.0.1", port=settings.app_port, reload=True)

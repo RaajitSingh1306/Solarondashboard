@@ -3,8 +3,12 @@ import datetime
 import urllib.parse
 from typing import Any, Dict, List, Optional
 from nicegui import ui
-import db
-import crm
+try:
+    from pipeline import db
+    from services import crm
+except ImportError:
+    import db
+    import crm
 import pandas as pd
 
 def fetch_fleet_send_data(

@@ -3,8 +3,11 @@ import datetime
 import time
 from typing import Any, Callable, Dict, List, Optional
 from nicegui import ui
-import db
-import pipeline
+try:
+    from pipeline import db, pipeline
+except ImportError:
+    import db
+    import pipeline
 
 def build_fetch_tab(
     app_state: Dict[str, Any],

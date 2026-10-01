@@ -39,9 +39,13 @@ os.environ["PYTHONPATH"] = f"{project_dir}{os.pathsep}{root_dir}{os.pathsep}{cur
 import sqlite3
 import pandas as pd
 from config import settings
-import db
-import analytics
-import data_quality
+try:
+    from pipeline import db
+    from core import analytics, data_quality
+except ImportError:
+    import db
+    import analytics
+    import data_quality
 
 
 def _worker_spawn_check(conn_pipe):

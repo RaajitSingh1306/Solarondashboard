@@ -15,7 +15,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from extractors.base import BaseExtractor
-import db
+try:
+    from pipeline import db
+except ImportError:
+    import db
 
 logger = logging.getLogger(__name__)
 

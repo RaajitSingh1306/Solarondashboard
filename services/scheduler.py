@@ -2,9 +2,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from config import settings
-import pipeline
-import analytics
-import crm
+try:
+    from pipeline import pipeline
+    from core import analytics
+    from services import crm
+except ImportError:
+    import pipeline
+    import analytics
+    import crm
 
 scheduler = BackgroundScheduler()
 

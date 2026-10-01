@@ -2,7 +2,10 @@ import datetime
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from config import settings
-import db
+try:
+    from pipeline import db
+except ImportError:
+    import db
 
 TEMPLATES = {
     "english": {

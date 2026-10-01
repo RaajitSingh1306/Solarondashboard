@@ -6,8 +6,14 @@ from pathlib import Path
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import pandas as pd
-import db
-import data_quality
+try:
+    from pipeline import db
+    from core import data_quality
+    from services import geocode
+except ImportError:
+    import db
+    import data_quality
+    import geocode
 from extractors.base import BaseExtractor
 from extractors.growatt import GrowattExtractor
 from extractors.isolarcloud import ISolarCloudExtractor
@@ -27,18 +33,20 @@ def get_extractors(sources: Optional[List[str]] = None):
 def normalize_plant_record(p: Dict[str, Any]) -> Dict[str, Any]:
     cap = data_quality.normalize_capacity(p.get("capacity_kwp"))
     p_name = data_quality.clean_plant_name(p.get("plant_name", ""))
+    geo = geocode.geocode_plant(p)
     return {
         "plant_id": str(p.get("plant_id")),
         "source": str(p.get("source", "unknown")).lower(),
         "plant_name": p_name,
         "capacity_kwp": cap,
-        "latitude": p.get("latitude"),
-        "longitude": p.get("longitude"),
-        "city": p.get("city", ""),
+        "latitude": geo.get("latitude"),
+        "longitude": geo.get("longitude"),
+        "city": geo.get("city") or p.get("city", ""),
         "install_date": p.get("install_date", ""),
         "inverter_model": p.get("inverter_model", ""),
         "panel_model": p.get("panel_model", ""),
         "operational_status": data_quality.determine_operational_status(p),
+        "geocode_level": geo.get("geocode_level", "unresolved"),
         "last_log_time": p.get("last_log_time"),
         "total_energy_kwh": p.get("total_energy_kwh"),
     }
@@ -93,6 +101,7 @@ def run_daily(date_str: Optional[str] = None, sources: Optional[List[str]] = Non
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error in run_daily for {ext.source}: {e}")
+    data_quality.scan_and_flag_stuck_values()
     return total
 
 def run_monthly(month_str: Optional[str] = None, sources: Optional[List[str]] = None, force_refresh: bool = False) -> int:
@@ -141,7 +150,10 @@ def run_full_extract(
     target_plant_id: Optional[str] = None,
     progress_cb: Optional[Callable[[str, float], None]] = None
 ) -> Dict[str, Any]:
-    import analytics
+    try:
+        from core import analytics
+    except ImportError:
+        import analytics
 
     start_time = time.time()
     if not month_str:
@@ -279,12 +291,16 @@ def run_full_extract(
 
 def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
     """Seed SQLite database directly from CSV exports with standardized IDs, physics checks, and deduping."""
-    import analytics
+    try:
+        from core import analytics
+    except ImportError:
+        import analytics
     db.init_db()
+    project_root = Path(__file__).resolve().parent.parent
     base_candidates = [
         Path(csv_dir) if csv_dir else None,
-        Path(__file__).resolve().parent.parent / "solaron_analytics_dataset_csv",
-        Path(__file__).resolve().parent / "solaron_analytics_dataset_csv",
+        project_root.parent / "solaron_analytics_dataset_csv",
+        project_root / "solaron_analytics_dataset_csv",
         Path("solaron_analytics_dataset_csv"),
     ]
     target_dir = None
@@ -335,13 +351,20 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
                 "latitude": float(row["latitude"]) if pd.notna(row.get("latitude")) else None,
                 "longitude": float(row["longitude"]) if pd.notna(row.get("longitude")) else None,
                 "city": str(row.get("city", "")).strip() if pd.notna(row.get("city")) else "",
+                "state": str(row.get("state", "")).strip() if pd.notna(row.get("state")) else "",
                 "install_date": str(row.get("install_date", "")) if pd.notna(row.get("install_date")) else "",
                 "inverter_model": str(row.get("inverter_model", "")) if pd.notna(row.get("inverter_model")) else "",
                 "panel_model": str(row.get("panel_model", "")) if pd.notna(row.get("panel_model")) else "",
                 "operational_status": "decommissioned" if data_quality.is_decommissioned(pid) else "active",
             }
+            geo = geocode.geocode_plant(rec)
+            rec["latitude"] = geo.get("latitude")
+            rec["longitude"] = geo.get("longitude")
+            rec["city"] = geo.get("city") or rec["city"]
+            rec["geocode_level"] = geo.get("geocode_level", "unresolved")
             db.upsert_plant(rec)
             counts["plants"] += 1
+        geocode.geocode_all_plants_in_db()
 
     # 2. Daily Generation
     daily_csv = target_dir / "fleet_daily_generation.csv"
@@ -382,6 +405,7 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
                 rows = []
         if rows:
             counts["daily"] += db.upsert_daily(rows)
+        data_quality.scan_and_flag_stuck_values()
 
     # 3. Monthly Generation with Deduplication and Physics Validation
     monthly_csv = target_dir / "fleet_monthly_generation.csv"
@@ -535,7 +559,10 @@ def run_historical_backfill(
     Backfills monthly and representative daily solar generation records across the lifetime of the fleet.
     If start_year_month is None, automatically detects the earliest plant installation date in the database.
     """
-    import analytics
+    try:
+        from core import analytics
+    except ImportError:
+        import analytics
     start_time = time.time()
 
     def report(msg: str, pct: float):
