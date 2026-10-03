@@ -595,7 +595,7 @@ The data extraction and ingestion engine serving as the operational gateway to a
 
 The portfolio master grid providing comprehensive operational visibility and interactive fleet analytics:
 - **6 Top KPI Summary Cards:** Real-time summary cards displaying Monthly Harvest (`214.30 MWh`), Estimated Commercial Value (`₹30,00,220`), Active Generating plants (`274 / 295`), Zero Generation alerts (`21`), Decommissioned plants (`196 / 491`), and Active Fleet Capacity (`2.29 MWp` across 295 inverters).
-- **Multi-Parameter Filter Toolbar:** Month dropdown with quick period buttons (`This Month (Sep)`, `Prev Month (Aug)`), Platform filter, Status filter (`active`, `offline`, `fault`, `decommissioned`), Tier filter including `⚡ Anomaly Outliers`, debounced plant name search, and `Include Decommissioned` toggle.
+- **Multi-Parameter Filter Toolbar:** Month dropdown with quick period buttons (`This Month (Oct)`, `Prev Month (Sep)`), Platform filter, Status filter (`active`, `offline`, `fault`, `decommissioned`), Tier filter including `⚡ Anomaly Outliers`, debounced plant name search, and `Include Decommissioned` toggle.
 - **Master Fleet Table (14 Columns, Quasar / Tailwind):** Plant Name, Platform badge, kWp, Status chip, Portal Last Log with schedule icon, Last Recorded Day badge, Live kW, Today kWh, Month kWh, Est. Savings (₹), Specific Yield, Units/kWp/day, PR (%) color spectrum, and Performance Tier with `⚡ Anomaly` badge and score tooltip.
 - **Interactivity:** One-click row selection immediately navigates to Tab 4 (Plant Cockpit) pre-selecting the installation.
 - **Live Sync & Streaming Export:** Direct streaming export as CSV or XLSX; `⚡ Live Fetch All Portals` button with real-time timer.
@@ -605,7 +605,7 @@ The portfolio master grid providing comprehensive operational visibility and int
 │  Monthly Output (2026-09)   Est. Value      Active Generating   Fault / Zero    Capacity   │
 │         214.30 MWh          ₹30,00,220          274 / 295            21         2.29 MWp   │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Filters: [Month: 2026-09] [This Month] [Prev Month] [Portal: All] [Status: All] [Tier] │
+│ Filters: [Month: 2026-10] [This Month] [Prev Month] [Portal: All] [Status: All] [Tier] │
 │          [Search Plant...]  [Include Decommissioned]   [CSV] [XLSX] [⚡ Live Fetch]    │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ Plant Name    Portal   kWp    Status   Today kWh  Month kWh  Est. ₹   PR (%)   Tier      │
@@ -619,7 +619,7 @@ The portfolio master grid providing comprehensive operational visibility and int
 #### Key Capabilities:
 - **Persistent KPI Cards:** Real-time summary cards display Monthly Harvest (MWh), Estimated Financial Value (₹), Active Generating ratio (`276 / 295`), Zero Generation alerts (`19`), and Active Fleet Capacity (`1.81 MWp`).
 - **Multi-Parameter Filter Toolbar:**
-  - **Reporting Month:** Switch between historical months or use quick presets (`This Month (Sep)`, `Prev Month (Aug)`).
+  - **Reporting Month:** Switch between historical months or use quick presets (`This Month (Oct)`, `Prev Month (Sep)`).
   - **Portal Source:** Filter by `growatt`, `isolarcloud`, `suryalog`, or `All`.
   - **Operating Status:** Filter by `active`, `offline`, `fault`, `decommissioned`.
   - **Performance Tier:** Filter by specific health tiers or isolate `⚡ Anomaly Outliers`.

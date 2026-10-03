@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 from nicegui import ui
 try:
     from pipeline import db, pipeline
@@ -32,15 +32,21 @@ def build_fetch_tab(
         src = p.get("source", "").title()
         plant_options[pid] = f"[{src}] {pname} ({p.get('capacity_kwp', 0):.1f} kWp)"
 
+    today = datetime.date.today()
+    cur_m = today.strftime("%Y-%m")
+    first_of_cur = today.replace(day=1)
+    prev_date = first_of_cur - datetime.timedelta(days=1)
+    prev_m = prev_date.strftime("%Y-%m")
+
     available_months = db.get_available_months()
     if not available_months:
-        available_months = ["2026-09", "2026-08"]
+        available_months = [cur_m, prev_m]
 
     cache_meta = db.get_cache_metadata()
 
     # State for the fetch workbench
     workbench_state = {
-        "selected_month": app_state.get("month", "2026-09"),
+        "selected_month": app_state.get("month", cur_m),
         "selected_platform": app_state.get("source", "All"),
         "selected_site": "All",
         "cache_mode": "cache",  # 'cache' or 'force'
@@ -245,9 +251,10 @@ def build_fetch_tab(
                     label="Backfill Start Month"
                 ).props("dense outlined dark options-dense").classes("w-64")
 
+                bf_options = available_months[:6] if len(available_months) >= 4 else [cur_m, prev_m, "2026-08", "2026-07"]
                 end_backfill_select = ui.select(
-                    options=["2026-09", "2026-08", "2026-07", "2026-06"],
-                    value="2026-09",
+                    options=bf_options,
+                    value=cur_m if cur_m in bf_options else bf_options[0],
                     label="Backfill End Month"
                 ).props("dense outlined dark options-dense").classes("w-44")
 
@@ -258,7 +265,7 @@ def build_fetch_tab(
 
             backfill_status_row = ui.row().classes("w-full items-center gap-3 mt-3 hidden p-3 bg-indigo-950/40 border border-indigo-800/30 rounded-lg")
             with backfill_status_row:
-                bf_spinner = ui.spinner(size="sm", color="indigo")
+                ui.spinner(size="sm", color="indigo")
                 bf_status_label = ui.label("Backfilling historical generation...").classes("text-xs text-indigo-200 font-mono")
                 bf_progress_bar = ui.linear_progress(value=0.0).props("color=indigo-4 track-color=grey-9 rounded").classes("flex-1 h-2")
 
@@ -268,7 +275,7 @@ def build_fetch_tab(
                 
                 raw_start = start_backfill_select.value
                 start_m = None if "Commissioning" in str(raw_start) else str(raw_start)
-                end_m = str(end_backfill_select.value or "2026-09")
+                end_m = str(end_backfill_select.value or cur_m)
                 inc_daily = bool(daily_checkbox.value)
                 do_overwrite = bool(overwrite_checkbox.value)
 
@@ -325,7 +332,7 @@ def build_fetch_tab(
                     ui.spinner(size="lg", color="amber")
                     with ui.column().classes("gap-0"):
                         ui.label("Ingesting Fleet Telemetry & Running Analytics").classes("text-base font-bold text-white")
-                        fetch_subtitle = ui.label("Querying portal APIs, calculating NASA GHI loss attribution & health tiers...").classes("text-xs text-gray-400")
+                        ui.label("Querying portal APIs, calculating NASA GHI loss attribution & health tiers...").classes("text-xs text-gray-400")
 
                 # Live Running Timer Pill
                 with ui.row().classes("items-center gap-2.5 px-3.5 py-2 bg-amber-500/10 border border-amber-500/40 rounded-lg"):

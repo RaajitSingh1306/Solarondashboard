@@ -269,6 +269,12 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
     except Exception:
         days_in_month = 30
 
+    try:
+        from core.data_quality import get_elapsed_days_in_month
+        eval_days = get_elapsed_days_in_month(month)
+    except Exception:
+        eval_days = days_in_month
+
     sql = """
     SELECT 
         m.plant_id, m.month, m.kwh, m.specific_yield, m.yield_per_day,
@@ -335,7 +341,7 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
             lon = float(row["longitude"] or 72.87)
             ghi = get_ghi(lat, lon, month)
             kwh = float(row["kwh"] or 0.0)
-            theoretical = ghi * days_in_month * cap
+            theoretical = ghi * eval_days * cap
             pr = round((kwh / theoretical) * 100.0, 1) if theoretical > 0 else 0.0
             pr = min(150.0, max(0.0, pr))
             pr_list.append(pr)
@@ -464,6 +470,12 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         m_key = f"{m_int:02d}"
         days_in_month = 30
 
+    try:
+        from core.data_quality import get_elapsed_days_in_month
+        eval_days = get_elapsed_days_in_month(month)
+    except Exception:
+        eval_days = days_in_month
+
     sql = """
     SELECT 
         p.plant_id, p.source, p.plant_name, p.capacity_kwp, p.capacity_effective, p.capacity_suspect,
@@ -552,7 +564,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
             continue
 
         # Baseline expected kWh = GHI * Days * Capacity * Benchmark PR (0.75)
-        expected_kwh = round(ghi * days_in_month * cap * STANDARD_PR_BENCHMARK, 2)
+        expected_kwh = round(ghi * eval_days * cap * STANDARD_PR_BENCHMARK, 2)
         expected_rows.append({
             "plant_id": pid,
             "month": month,
@@ -563,7 +575,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         })
 
         # Performance Ratio & Realization Rate
-        theoretical_energy = ghi * days_in_month * cap
+        theoretical_energy = ghi * eval_days * cap
         pr = round((actual_kwh / theoretical_energy) * 100.0, 1) if theoretical_energy > 0 else 0.0
         pr = min(150.0, max(0.0, pr))
         realization = round((actual_kwh / expected_kwh) * 100.0, 1) if expected_kwh > 0 else 0.0
@@ -575,9 +587,9 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         })
 
         shortfall = max(0.0, round(expected_kwh - actual_kwh, 2))
-        d_info = daily_map.get(pid, {"zero_days": 0, "fault_days": 0, "total_days": days_in_month})
-        zero_ratio = (d_info["zero_days"] / max(1, days_in_month))
-        fault_ratio = (d_info["fault_days"] / max(1, days_in_month))
+        d_info = daily_map.get(pid, {"zero_days": 0, "fault_days": 0, "total_days": eval_days})
+        zero_ratio = (d_info["zero_days"] / max(1, eval_days))
+        fault_ratio = (d_info["fault_days"] / max(1, eval_days))
 
         if shortfall <= 0.0:
             loss_rows.append({

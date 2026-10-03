@@ -196,7 +196,7 @@ Recomputed reactively whenever the reporting month or platform filter changes:
 6. **Active Fleet Capacity**: Total operational capacity in MWp (`2.29 MWp` across 295 active inverters).
 
 ### 3.2 Control & Filtering Toolbar
-- **Reporting Month Selector**: Dropdown + Quick Presets (`This Month (Sep)`, `Prev Month (Aug)`).
+- **Reporting Month Selector**: Dropdown + Quick Presets (`This Month (Oct)`, `Prev Month (Sep)` dynamically matching current calendar period).
 - **Platform Filter**: Filter by portal (`All`, `growatt`, `isolarcloud`, `suryalog`).
 - **Status Filter**: Filter by operational state (`All`, `active`, `offline`, `fault`, `decommissioned`).
 - **Tier & Anomaly Filter**: Filter by health tier (`Best`, `Good`, `Could Be Better`, `Needs Attention`, `Critical`, `Offline`, `Fault`, `Decommissioned`) OR isolate `⚡ Anomaly Outliers` flagged by the Machine Learning Isolation Forest.
@@ -262,7 +262,7 @@ The **Full Analytics** tab houses Solaron's mathematical physics engine and flee
 ```
 
 ### 4.1 Analysis Month & Platform Toolbar
-- Dedicated period selector, quick period buttons (`Sep 2026`, `Aug 2026`), and platform scope filter.
+- Dedicated period selector, dynamic quick period buttons (`Oct 2026`, `Sep 2026`), and platform scope filter.
 - `Apply Period` triggers concurrent background recalculation of the loss waterfall and all 4 chart series.
 - Direct CSV and XLSX export shortcuts.
 

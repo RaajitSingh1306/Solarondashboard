@@ -9,7 +9,6 @@ try:
 except ImportError:
     import db
     import crm
-import pandas as pd
 
 def fetch_fleet_send_data(
     m: str = "2026-09",
@@ -141,7 +140,9 @@ _fetch_fleet_send_data = fetch_fleet_send_data
 
 
 def build_crm_tab(app_state: dict):
-    selected_month = {"val": app_state.get("month", "2026-09")}
+    today = datetime.date.today()
+    cur_m = today.strftime("%Y-%m")
+    selected_month = {"val": app_state.get("month", cur_m)}
     selected_view = {"mode": "monthly"}  # 'daily', 'weekly', 'monthly', 'yearly'
     selected_date = {"val": datetime.date.today().isoformat()}
     selected_date_range = {"start": "", "end": ""}
@@ -169,19 +170,19 @@ def build_crm_tab(app_state: dict):
         # Granularity switcher tabs (programmatic string values)
         preview_granularity_tabs = ui.tabs().classes("w-full bg-gray-800 text-gray-300 rounded-lg mb-2")
         with preview_granularity_tabs:
-            vg_monthly = ui.tab("monthly", label="Monthly Statement", icon="calendar_month")
-            vg_daily = ui.tab("daily", label="Daily Report", icon="today")
-            vg_weekly = ui.tab("weekly", label="Weekly", icon="date_range")
-            vg_yearly = ui.tab("yearly", label="Yearly Recap", icon="emoji_events")
-            vg_offline = ui.tab("offline", label="Offline Alert", icon="notifications_active")
-            vg_monsoon = ui.tab("monsoon", label="Monsoon Advisory", icon="cloudy_snowing")
+            ui.tab("monthly", label="Monthly Statement", icon="calendar_month")
+            ui.tab("daily", label="Daily Report", icon="today")
+            ui.tab("weekly", label="Weekly", icon="date_range")
+            ui.tab("yearly", label="Yearly Recap", icon="emoji_events")
+            ui.tab("offline", label="Offline Alert", icon="notifications_active")
+            ui.tab("monsoon", label="Monsoon Advisory", icon="cloudy_snowing")
 
         # Language tabs (programmatic string values)
         lang_tabs = ui.tabs().classes("w-full bg-gray-800/80 text-gray-300 rounded-lg mb-3")
         with lang_tabs:
-            t_en = ui.tab("english", label="English")
-            t_hi = ui.tab("hindi", label="हिंदी (Hindi)")
-            t_mr = ui.tab("marathi", label="मराठी (Marathi)")
+            ui.tab("english", label="English")
+            ui.tab("hindi", label="हिंदी (Hindi)")
+            ui.tab("marathi", label="मराठी (Marathi)")
 
         # WhatsApp Bubble Card (WhatsApp Emerald Green Styled, with message_label strictly nested INSIDE)
         with ui.card().classes("w-full p-4 bg-[#075E54] text-white rounded-xl shadow-inner whitespace-pre-line font-sans text-xs leading-relaxed border border-emerald-600/40 min-h-[160px]"):
@@ -692,12 +693,12 @@ def build_crm_tab(app_state: dict):
                             avail_m = db.get_available_months()
                             stmt_month_select = ui.select(
                                 options=avail_m,
-                                value=selected_month["val"] if selected_month["val"] in avail_m else (avail_m[0] if avail_m else "2026-09"),
+                                value=selected_month["val"] if selected_month["val"] in avail_m else (avail_m[0] if avail_m else cur_m),
                                 label="Statement Month"
                             ).classes("w-40").props("dense outlined dark options-dense")
 
                             ui.button("⚡ Prepare Monthly Campaign", icon="campaign", on_click=lambda: run_prepare_monthly()).props("dense unelevated color=primary")
-                            ui.button("📥 Export CSV", icon="download", on_click=lambda: ui.download(f"/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
+                            ui.button("📥 Export CSV", icon="download", on_click=lambda: ui.download("/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
 
                     # 4 KPI Summary Cards
                     with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):
@@ -823,7 +824,7 @@ def build_crm_tab(app_state: dict):
                     with ui.column().classes("w-full gap-2 mt-3 p-4 bg-gray-950 border border-gray-800 rounded-lg"):
                         with ui.row().classes("w-full items-center justify-between"):
                             camp_title_label = ui.label("No Campaign Selected").classes("text-sm font-bold text-white")
-                            camp_status_chip = ui.badge("IDLE", color="gray-7").classes("text-xs font-semibold px-2 py-0.5 rounded")
+                            ui.badge("IDLE", color="gray-7").classes("text-xs font-semibold px-2 py-0.5 rounded")
 
                         # Progress Bar
                         camp_prog_bar = ui.linear_progress(value=0.0).props("color=emerald-5 track-color=grey-9 rounded").classes("w-full h-2.5")
@@ -949,7 +950,7 @@ def build_crm_tab(app_state: dict):
         d_val = selected_date.get("val") or datetime.date.today().isoformat()
         d_rng = (selected_date_range.get("start"), selected_date_range.get("end")) if selected_date_range.get("start") else None
         y_val = selected_year.get("val", "2026")
-        m_val = selected_month.get("val", "2026-09")
+        m_val = selected_month.get("val", cur_m)
 
         cached_telemetry_rows = await asyncio.to_thread(
             _fetch_fleet_send_data, m_val, mode, d_val, d_rng, y_val
@@ -1366,7 +1367,7 @@ def build_crm_tab(app_state: dict):
     # External refresh listener
     async def on_external_update():
         if app_state.get("month") != selected_month["val"]:
-            selected_month["val"] = app_state.get("month", "2026-09")
+            selected_month["val"] = app_state.get("month", cur_m)
             await load_all_crm_data()
 
     if "refresh_listeners" in app_state:

@@ -1,6 +1,6 @@
 # 📊 Solaron Fleet Operations, Solar Physics & Machine Learning Specification
 > **Unified Master Data, Analytics & Engineering Architecture Document**  
-> **Version:** 2.2.0 · **Date:** 2026-10-01 · **Status:** Active & Deployed  
+> **Version:** 2.3.0 · **Date:** 2026-10-03 · **Status:** Active & Deployed  
 > **Authors:** Solaron Engineering Team & Antigravity AI Pair Programming Session  
 > **Monitored Fleet:** 491 Aggregated Installations · **Active Operational Fleet:** 295 Installations (2.29 MWp)  
 > **Exhaustive Tab Guide:** For an in-depth breakdown of every tab, sub-tab, KPI, and modal, see [TAB_INFO.md](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/TAB_INFO.md)
@@ -16,7 +16,7 @@
 6. [Machine Learning Anomaly Detection Engine (Isolation Forest)](#6-machine-learning-anomaly-detection-engine-isolation-forest)
 7. [Adaptive 6-Part Loss Attribution Waterfall & Conservation Law](#7-adaptive-6-part-loss-attribution-waterfall--conservation-law)
 8. [Telemetry Sanitization, Ingestion Firewalls & Anti-Cracked-Data Rules](#8-telemetry-sanitization-ingestion-firewalls--anti-cracked-data-rules)
-9. [Resolved Platform Anomalies & Engineering Fixes (Issues 1–10)](#9-resolved-platform-anomalies--engineering-fixes-issues-110)
+9. [Resolved Platform Anomalies & Engineering Fixes (Issues 1–11)](#9-resolved-platform-anomalies--engineering-fixes-issues-111)
 10. [Interactive Web Cockpit, Multi-Category Filtering & CRM Intelligence](#10-interactive-web-cockpit-multi-category-filtering--crm-intelligence)
 11. [Parallel Engineering Project Reference: Smart Grid IDS](#11-parallel-engineering-project-reference-smart-grid-ids)
 12. [Verification Suite, Operational Runbook & Delivery Status](#12-verification-suite-operational-runbook--delivery-status)
@@ -398,7 +398,7 @@ To permanently eliminate premature future dates (e.g. portal templates pre-popul
 
 ---
 
-## 9. Resolved Platform Anomalies & Engineering Fixes (Issues 1–10)
+## 9. Resolved Platform Anomalies & Engineering Fixes (Issues 1–11)
 
 ### Issue 1: Relative Ranking Masking Real Underperformance
 - **Symptom**: Plants with 35% PR were classified as "Good" because half the fleet was equally underperforming.
@@ -449,6 +449,24 @@ To permanently eliminate premature future dates (e.g. portal templates pre-popul
 - **Symptom**: Decommissioned plants starting with uppercase prefixes (such as Sungrow `'SG...'` or SuryaLog `'SL...'`) bypassed the inactive exclusion filter because `plant_id.lower()` was checked against an uppercase set. Additionally, Growatt plant `growatt_11199467` (the 451st Growatt site with 0.0 kWh lifetime) was missing from the static exclusion set.
 - **Root Cause**: Mixed-case comparison mismatch in `data_quality.is_decommissioned()`.
 - **Fix**: In [`data_quality.py`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/data_quality.py#L38), added a precomputed lowercase set `DECOMMISSIONED_PLANT_IDS_LOWER = {p.lower() for p in DECOMMISSIONED_PLANT_IDS}` and added `growatt_11199467`, guaranteeing 100% accurate classification for all 196 decommissioned installations.
+
+### Issue 11: In-Progress Calendar Month PR Distortion & Full-Month Denominator Clamping
+- **Symptom**: During early days of an ongoing month (e.g. October 3, 2026), the entire fleet displayed seemingly catastrophic performance: 251 operational plants were classified into the **Critical** tier (<30% PR) with average fleet PR plummeting to ~7.7%.
+- **Root Cause**: In [`analytics.classify_all()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/core/analytics.py#L251) and [`analytics.get_loss_waterfall()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/core/analytics.py#L452), the expected baseline energy and theoretical reference energy formulas were hardcoded to use `days_in_month = calendar.monthrange(year, m)[1]` (i.e. **31 days**):
+  $$\text{Theoretical Energy (Flawed)} = P_{\text{nominal}} \times GHI \times 31\text{ days}$$
+  $$PR_{\text{flawed}} = \frac{E_{\text{actual}} \ (3\text{ days harvest} \approx 93\text{ kWh})}{P_{\text{nominal}} \times GHI \times 31\text{ days}} \approx 7.7\%$$
+  Because only 3 days of generation had elapsed, dividing by 31 days of solar irradiance deflated the physical PR by a factor of $\approx \frac{3}{31} \approx 0.097$.
+- **Physics-Compliant Fix**:
+  Integrated [`data_quality.get_elapsed_days_in_month(month)`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/core/data_quality.py#L262) into both [`classify_all()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/core/analytics.py#L251) and [`get_loss_waterfall()`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/core/analytics.py#L452):
+  $$D_{\text{eval}} = \begin{cases} \min(\text{today.day}, D_{\text{total}}) & \text{if ongoing month} \\ D_{\text{total}} & \text{if completed historical month} \end{cases}$$
+  $$PR = \frac{E_{\text{actual}}}{P_{\text{nominal}} \times GHI \times D_{\text{eval}}} \times 100\% \quad (7.7\% \longrightarrow 79.5\%)$$
+- **Operational Impact**:
+  Re-evaluating the current month (2026-10) with dynamic elapsed day normalization immediately corrected the fleet health tiers:
+  - **⭐ Best (≥75% PR)**: **169 plants** (average PR 92.1%)
+  - **✅ Good (60–75% PR)**: **43 plants** (average PR 68.4%)
+  - **⚠️ Could Be Better (45–60% PR)**: **18 plants** (average PR 53.6%)
+  - **🟠 Needs Attention (30–45% PR)**: **11 plants** (average PR 38.3%)
+  - **🔴 Critical (<30% PR)**: **10 plants** (actual underperformers/tripped equipment)
 
 ---
 

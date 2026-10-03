@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from nicegui import ui
 try:
     from pipeline import db
@@ -11,7 +11,15 @@ except ImportError:
 def build_fleet_tab(app_state: dict):
     client = ui.context.client
     all_rows = []
-    selected_month = {"val": app_state.get("month", "2026-09")}
+    today = datetime.date.today()
+    cur_m = today.strftime("%Y-%m")
+    cur_name = today.strftime("%b")
+    first_of_cur = today.replace(day=1)
+    prev_date = first_of_cur - datetime.timedelta(days=1)
+    prev_m = prev_date.strftime("%Y-%m")
+    prev_name = prev_date.strftime("%b")
+
+    selected_month = {"val": app_state.get("month", cur_m)}
 
     # Top KPI Summary Cards Container (Persistent components with reactive labels)
     kpi_container = ui.row().classes("w-full gap-4 mb-6")
@@ -103,8 +111,8 @@ def build_fleet_tab(app_state: dict):
 
         # Quick Period presets
         with ui.button_group().props("dense outline"):
-            ui.button("This Month (Sep)", on_click=lambda: asyncio.create_task(set_month("2026-09"))).props("dense text-color=white")
-            ui.button("Prev Month (Aug)", on_click=lambda: asyncio.create_task(set_month("2026-08"))).props("dense text-color=white")
+            ui.button(f"This Month ({cur_name})", on_click=lambda: asyncio.create_task(set_month(cur_m))).props("dense text-color=white")
+            ui.button(f"Prev Month ({prev_name})", on_click=lambda: asyncio.create_task(set_month(prev_m))).props("dense text-color=white")
 
         source_filter = ui.select(
             options=["All", "growatt", "isolarcloud", "suryalog"],
@@ -504,7 +512,7 @@ def build_fleet_tab(app_state: dict):
     # Register external month change listener
     async def on_global_update():
         if app_state.get("month") != selected_month["val"]:
-            selected_month["val"] = app_state.get("month", "2026-09")
+            selected_month["val"] = app_state.get("month", cur_m)
             month_select.value = selected_month["val"]
         if app_state.get("source") != source_filter.value:
             source_filter.value = app_state.get("source", "All")

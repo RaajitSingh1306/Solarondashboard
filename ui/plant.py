@@ -11,9 +11,17 @@ except ImportError:
 
 def build_plant_tab(app_state: dict):
     client = ui.context.client
+    today = datetime.date.today()
+    cur_m = today.strftime("%Y-%m")
+    cur_lbl = today.strftime("%b %Y")
+    first_of_cur = today.replace(day=1)
+    prev_date = first_of_cur - datetime.timedelta(days=1)
+    prev_m = prev_date.strftime("%Y-%m")
+    prev_lbl = prev_date.strftime("%b %Y")
+
     selected_plant = {
         "id": None,
-        "month": app_state.get("month", "2026-09")
+        "month": app_state.get("month", cur_m)
     }
 
     def kpi_card(label: str, value: str, icon: str, colour: str = "primary"):
@@ -165,8 +173,8 @@ def build_plant_tab(app_state: dict):
 
         # Quick month presets
         with ui.button_group().props("dense outline"):
-            ui.button("Sep 2026", on_click=lambda: set_plant_month("2026-09")).props("dense text-color=white")
-            ui.button("Aug 2026", on_click=lambda: set_plant_month("2026-08")).props("dense text-color=white")
+            ui.button(cur_lbl, on_click=lambda: set_plant_month(cur_m)).props("dense text-color=white")
+            ui.button(prev_lbl, on_click=lambda: set_plant_month(prev_m)).props("dense text-color=white")
 
         sync_plant_btn = ui.button(
             "⚡ Live Sync Plant",
@@ -525,7 +533,6 @@ def build_plant_tab(app_state: dict):
         is_live_telemetry = data.get("is_live_telemetry", False)
 
         # KPI row calculations
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
         target_kwh = float(data.get("target_day_kwh") or 0.0)
         if target_kwh > 0:
             today_kwh = f"{target_kwh:,.2f} kWh"
@@ -841,7 +848,7 @@ def build_plant_tab(app_state: dict):
     def on_global_update():
         changed = False
         if app_state.get("month") != selected_plant["month"]:
-            set_plant_month(app_state.get("month", "2026-09"))
+            set_plant_month(app_state.get("month", cur_m))
             changed = True
         if app_state.get("selected_plant") and app_state.get("selected_plant") != selected_plant["id"]:
             selected_plant["id"] = app_state.get("selected_plant")

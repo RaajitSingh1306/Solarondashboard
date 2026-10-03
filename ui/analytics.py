@@ -12,25 +12,33 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 def build_analytics_tab(app_state: dict):
+    today = datetime.date.today()
+    cur_m = today.strftime("%Y-%m")
+    cur_lbl = today.strftime("%b %Y")
+    first_of_cur = today.replace(day=1)
+    prev_date = first_of_cur - datetime.timedelta(days=1)
+    prev_m = prev_date.strftime("%Y-%m")
+    prev_lbl = prev_date.strftime("%b %Y")
+
     selected_period = {
-        "month": app_state.get("month", "2026-09"),
+        "month": app_state.get("month", cur_m),
         "platform": app_state.get("source", "All")
     }
 
     # Top Control Bar
     with ui.row().classes("w-full items-center gap-3 mb-6"):
         avail_months = db.get_available_months()
-        default_month = selected_period["month"] if selected_period["month"] in avail_months else (avail_months[0] if avail_months else "2026-09")
+        default_month = selected_period["month"] if selected_period["month"] in avail_months else (avail_months[0] if avail_months else cur_m)
         month_select = ui.select(
-            options=avail_months or ["2026-09", "2026-08"],
+            options=avail_months or [cur_m, prev_m],
             value=default_month,
             label="Analysis Month"
         ).classes("w-40").props("dense outlined dark options-dense")
 
         # Quick Period Presets
         with ui.button_group().props("dense outline"):
-            ui.button("Sep 2026", on_click=lambda: asyncio.create_task(set_period("2026-09"))).props("dense text-color=white")
-            ui.button("Aug 2026", on_click=lambda: asyncio.create_task(set_period("2026-08"))).props("dense text-color=white")
+            ui.button(cur_lbl, on_click=lambda: asyncio.create_task(set_period(cur_m))).props("dense text-color=white")
+            ui.button(prev_lbl, on_click=lambda: asyncio.create_task(set_period(prev_m))).props("dense text-color=white")
 
         platform_filter = ui.select(
             options=["All", "growatt", "isolarcloud", "suryalog"],
@@ -60,7 +68,7 @@ def build_analytics_tab(app_state: dict):
             with ui.column().classes("gap-0"):
                 ui.label("NASA GHI Baseline & 6-Part Loss Attribution Engine").classes("text-base font-bold text-amber-400 tracking-wide")
                 ui.label("Physics-based shortfall decomposition against NASA POWER solar irradiance benchmark").classes("text-xs text-gray-400")
-            loss_month_badge = ui.badge("Month: 2026-09", color="amber-8").props("text-color=black font-bold")
+            loss_month_badge = ui.badge(f"Month: {selected_period['month']}", color="amber-8").props("text-color=black font-bold")
 
         # Loss summary metrics cards (Persistent components with reactive labels)
         waterfall_kpis = ui.row().classes("w-full gap-4 mb-4")
@@ -459,7 +467,7 @@ def build_analytics_tab(app_state: dict):
     # Register external month change listener
     async def on_global_update():
         if app_state.get("month") != selected_period["month"]:
-            selected_period["month"] = app_state.get("month", "2026-09")
+            selected_period["month"] = app_state.get("month", cur_m)
             month_select.value = selected_period["month"]
         await refresh_charts()
 
