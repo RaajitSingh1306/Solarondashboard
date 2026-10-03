@@ -479,11 +479,15 @@ def scan_and_flag_stuck_values(
 
 
 def validate_daily_record(
-    record: Dict[str, Any], capacity_kwp: Optional[float] = None
+    record: Dict[str, Any],
+    capacity_kwp: Optional[float] = None,
+    capacity_effective: Optional[float] = None,
+    is_capacity_suspect: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Validate and sanitize daily record: reject negative values, remove noise floor,
     reject future dates beyond today, and compute specific yield and yield_per_day.
+    Flags impossible yields (>7.5 kWh/kWp) and capacity suspect plants.
     """
     out = dict(record)
     d_date = str(out.get("date", "")).strip()
@@ -502,11 +506,23 @@ def validate_daily_record(
     else:
         out["kwh"] = 0.0
 
-    cap = normalize_capacity(capacity_kwp or out.get("capacity_kwp"))
-    if cap and cap > 0 and out["kwh"] is not None:
-        sy = recompute_specific_yield(out["kwh"], cap, is_daily=True)
-        out["specific_yield"] = sy
-        out["yield_per_day"] = sy
+    raw_cap = normalize_capacity(capacity_kwp or out.get("capacity_kwp"))
+    eff_cap = normalize_capacity(capacity_effective or out.get("capacity_effective")) or raw_cap
+    eval_cap = eff_cap if (is_capacity_suspect or out.get("capacity_suspect")) and eff_cap and eff_cap > 0 else raw_cap
+
+    flags = [f.strip() for f in str(out.get("quality_flags") or "").split(",") if f.strip()]
+
+    if eval_cap and eval_cap > 0 and out["kwh"] is not None:
+        raw_sy = round(out["kwh"] / eval_cap, 3)
+        if raw_sy > 7.5:
+            if "SY_IMPOSSIBLE" not in flags:
+                flags.append("SY_IMPOSSIBLE")
+        if is_capacity_suspect or out.get("capacity_suspect"):
+            if "CAPACITY_SUSPECT" not in flags:
+                flags.append("CAPACITY_SUSPECT")
+
+        out["specific_yield"] = min(raw_sy, MAX_DAILY_YIELD_KWH_KWP)
+        out["yield_per_day"] = out["specific_yield"]
     else:
         out["specific_yield"] = out.get("specific_yield") or 0.0
         out["yield_per_day"] = out.get("specific_yield") or 0.0
@@ -519,8 +535,7 @@ def validate_daily_record(
         except (ValueError, TypeError):
             out["revenue_inr"] = 0.0
 
-    # Preserve quality flags
-    out["quality_flags"] = out.get("quality_flags")
+    out["quality_flags"] = ",".join(flags) if flags else None
 
     # Normalize status based on generation
     if out["kwh"] is not None and out["kwh"] > NOISE_FLOOR_DAILY_KWH:
@@ -532,7 +547,10 @@ def validate_daily_record(
 
 
 def validate_monthly_record(
-    record: Dict[str, Any], capacity_kwp: Optional[float] = None
+    record: Dict[str, Any],
+    capacity_kwp: Optional[float] = None,
+    capacity_effective: Optional[float] = None,
+    is_capacity_suspect: bool = False,
 ) -> Dict[str, Any]:
     """
     Validate and sanitize monthly record: reject negative values, remove noise floor,
@@ -554,11 +572,15 @@ def validate_monthly_record(
     else:
         out["kwh"] = 0.0
 
-    cap = normalize_capacity(capacity_kwp or out.get("capacity_kwp"))
-    if cap and cap > 0 and out["kwh"] is not None:
-        sy = recompute_specific_yield(out["kwh"], cap, is_daily=False, month_str=month_str)
-        out["specific_yield"] = sy
-        out["yield_per_day"] = compute_yield_per_day(out["kwh"], cap, days=elapsed_days)
+    raw_cap = normalize_capacity(capacity_kwp or out.get("capacity_kwp"))
+    eff_cap = normalize_capacity(capacity_effective or out.get("capacity_effective")) or raw_cap
+    eval_cap = eff_cap if (is_capacity_suspect or out.get("capacity_suspect")) and eff_cap and eff_cap > 0 else raw_cap
+
+    if eval_cap and eval_cap > 0 and out["kwh"] is not None:
+        raw_sy = round(out["kwh"] / eval_cap, 2)
+        out["specific_yield"] = min(raw_sy, MAX_MONTHLY_YIELD_KWH_KWP)
+        ypd = round(out["specific_yield"] / float(elapsed_days), 2) if elapsed_days > 0 else 0.0
+        out["yield_per_day"] = min(ypd, MAX_DAILY_YIELD_KWH_KWP)
     else:
         out["specific_yield"] = out.get("specific_yield") or 0.0
         out["yield_per_day"] = 0.0
@@ -599,3 +621,90 @@ def is_plant_decommissioned(
             pass
 
     return False
+
+
+def audit_and_update_plant_capacities(db_name: str = "analytics") -> Dict[str, Any]:
+    """
+    Audit fleet plants for capacity mismatches between nominal portal capacity
+    and actual telemetry (peak AC power and P95 daily generation).
+    Updates plants table in SQLite with capacity_effective and capacity_suspect.
+    """
+    try:
+        from pipeline import db
+    except ImportError:
+        import db
+
+    with db.get_conn(db_name) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT plant_id, plant_name, capacity_kwp, source FROM plants")
+        plants = [dict(r) for r in cur.fetchall()]
+        if not plants:
+            return {"total": 0, "suspect": 0}
+
+        cur.execute("""
+            SELECT plant_id, max(live_power_kw) as max_live_kw
+            FROM daily_generation
+            WHERE live_power_kw IS NOT NULL AND live_power_kw > 0
+            GROUP BY plant_id
+        """)
+        live_kw_map = {r["plant_id"]: float(r["max_live_kw"]) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT plant_id, max(ac_power_w) / 1000.0 as peak_snap_kw
+            FROM inverter_snapshots
+            WHERE ac_power_w IS NOT NULL AND ac_power_w > 0
+            GROUP BY plant_id
+        """)
+        snap_kw_map = {r["plant_id"]: float(r["peak_snap_kw"]) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT plant_id, kwh
+            FROM daily_generation
+            WHERE kwh > 0.1
+            ORDER BY plant_id, kwh ASC
+        """)
+        daily_kwh_by_plant: Dict[str, List[float]] = {}
+        for r in cur.fetchall():
+            daily_kwh_by_plant.setdefault(r["plant_id"], []).append(float(r["kwh"]))
+
+        updates = []
+        suspect_count = 0
+        for p in plants:
+            pid = p["plant_id"]
+            nom_cap = float(p.get("capacity_kwp") or 0.0)
+            if nom_cap <= 0:
+                continue
+
+            peak_ac = max(live_kw_map.get(pid, 0.0), snap_kw_map.get(pid, 0.0))
+            kwh_list = daily_kwh_by_plant.get(pid, [])
+            p95_kwh = 0.0
+            if kwh_list:
+                idx = int(len(kwh_list) * 0.95)
+                idx = min(idx, len(kwh_list) - 1)
+                p95_kwh = kwh_list[idx]
+
+            is_suspect = False
+            # Check 1: Live AC power exceeds nominal capacity by >25%
+            if peak_ac > (nom_cap * 1.25):
+                is_suspect = True
+            # Check 2: 95th percentile daily kWh exceeds 7.5 kWh/kWp
+            if nom_cap > 0 and (p95_kwh / nom_cap) > 7.5:
+                is_suspect = True
+
+            if is_suspect:
+                suspect_count += 1
+                inferred_from_ac = peak_ac / 0.85 if peak_ac > 0 else 0.0
+                inferred_from_kwh = p95_kwh / 5.2 if p95_kwh > 0 else 0.0
+                eff_cap = round(max(inferred_from_ac, inferred_from_kwh, nom_cap), 1)
+                updates.append((eff_cap, 1, pid))
+            else:
+                updates.append((nom_cap, 0, pid))
+
+        if updates:
+            cur.executemany("""
+                UPDATE plants
+                SET capacity_effective = ?, capacity_suspect = ?
+                WHERE plant_id = ?
+            """, updates)
+
+        return {"total": len(plants), "suspect": suspect_count}

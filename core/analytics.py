@@ -1,15 +1,23 @@
 import datetime
 import calendar
+import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import requests
+
+logger = logging.getLogger(__name__)
+
 try:
     from pipeline import db
     from core import data_quality, ml_analytics
 except ImportError:
-    import db
-    import data_quality
-    import ml_analytics
+    try:
+        from Solarondashboard.pipeline import db  # type: ignore[import-untyped,import-not-found]
+        from Solarondashboard.core import data_quality, ml_analytics  # type: ignore[import-untyped,import-not-found]
+    except ImportError:
+        import db  # type: ignore[import-untyped,import-not-found]
+        import data_quality  # type: ignore[import-untyped,import-not-found]
+        import ml_analytics  # type: ignore[import-untyped,import-not-found]
 
 INDIA_MONTHLY_GHI_DEFAULTS = {
     "01": 4.60,
@@ -60,7 +68,7 @@ def get_ghi(lat: Optional[float], lon: Optional[float], month: str) -> float:
             "end": year,
             "format": "JSON",
         }
-        res = requests.get(url, params=params, timeout=1.2)
+        res = requests.get(url, params=params, timeout=6.0)
         if res.status_code == 200:
             data = res.json()
             series = data.get("properties", {}).get("parameter", {}).get("ALLSKY_SFC_SW_DWN", {})
@@ -68,8 +76,8 @@ def get_ghi(lat: Optional[float], lon: Optional[float], month: str) -> float:
             if val is not None and val > 0:
                 _GHI_CACHE[cache_key] = float(val)
                 return float(val)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"NASA POWER API fallback to default for ({lat_r}, {lon_r}, {month}): {e}")
 
     _GHI_CACHE[cache_key] = default_ghi
     return default_ghi
@@ -264,7 +272,8 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
     sql = """
     SELECT 
         m.plant_id, m.month, m.kwh, m.specific_yield, m.yield_per_day,
-        p.source, p.capacity_kwp, coalesce(p.latitude, 19.07) as latitude, coalesce(p.longitude, 72.87) as longitude,
+        p.source, p.capacity_kwp, p.capacity_effective, p.capacity_suspect,
+        coalesce(p.latitude, 19.07) as latitude, coalesce(p.longitude, 72.87) as longitude,
         coalesce(p.operational_status, 'active') as operational_status,
         coalesce(d.status, 'active') as latest_status
     FROM monthly_generation m
@@ -314,8 +323,12 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
     if not active_df.empty:
         # Compute GHI, theoretical energy, and absolute PR for each active plant
         pr_list = []
+        sy_eval_list = []
         for _, row in active_df.iterrows():
-            cap = float(row["capacity_kwp"] or 3.3)
+            nom_cap = float(row["capacity_kwp"] or 3.3)
+            eff_cap = float(row.get("capacity_effective") or nom_cap)
+            is_suspect = bool(row.get("capacity_suspect"))
+            cap = eff_cap if is_suspect and eff_cap > 0 else nom_cap
             if cap <= 0:
                 cap = 3.3
             lat = float(row["latitude"] or 19.07)
@@ -326,13 +339,15 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
             pr = round((kwh / theoretical) * 100.0, 1) if theoretical > 0 else 0.0
             pr = min(150.0, max(0.0, pr))
             pr_list.append(pr)
+            sy_eval_list.append(round(kwh / cap, 2) if cap > 0 else 0.0)
 
         active_df["pr_pct"] = pr_list
+        active_df["sy_eval"] = sy_eval_list
         # Absolute PR-based Tiering
         active_df["tier"] = active_df["pr_pct"].apply(ml_analytics.pr_to_tier)
 
-        # Peer percentile rank by specific yield (for leaderboard & reference)
-        sy = pd.to_numeric(active_df["specific_yield"], errors="coerce").fillna(0.0)
+        # Peer percentile rank by effective specific yield (for fair leaderboard & reference)
+        sy = pd.to_numeric(active_df["sy_eval"], errors="coerce").fillna(0.0)
         if len(active_df) == 1:
             active_df["percentile"] = 75.0
         else:
@@ -451,7 +466,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
 
     sql = """
     SELECT 
-        p.plant_id, p.source, p.plant_name, p.capacity_kwp,
+        p.plant_id, p.source, p.plant_name, p.capacity_kwp, p.capacity_effective, p.capacity_suspect,
         coalesce(p.latitude, 19.07) as latitude,
         coalesce(p.longitude, 72.87) as longitude,
         coalesce(p.operational_status, 'active') as operational_status,
@@ -489,7 +504,10 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
 
     for _, row in df.iterrows():
         pid = str(row["plant_id"])
-        cap = float(row["capacity_kwp"] or 3.3)
+        nom_cap = float(row["capacity_kwp"] or 3.3)
+        eff_cap = float(row.get("capacity_effective") or nom_cap)
+        is_suspect = bool(row.get("capacity_suspect"))
+        cap = eff_cap if is_suspect and eff_cap > 0 else nom_cap
         if cap <= 0:
             cap = 3.3
         actual_kwh = float(row["actual_kwh"] or 0.0)

@@ -237,11 +237,27 @@ def build_fleet_tab(app_state: dict):
     """)
 
     # Custom chip rendering for platform
+    # Custom chip rendering for platform
     fleet_table.add_slot("body-cell-source", """
         <q-td :props="props">
             <q-badge :color="props.value === 'growatt' ? 'indigo-7' : props.value === 'isolarcloud' ? 'cyan-8' : props.value === 'suryalog' ? 'orange-8' : 'grey-8'">
                 {{ props.value }}
             </q-badge>
+        </q-td>
+    """)
+
+    # Custom rendering for capacity with mismatch warning badge
+    fleet_table.add_slot("body-cell-capacity_kwp", """
+        <q-td :props="props">
+            <div class="row items-center justify-end gap-1">
+                <span>{{ props.value }}</span>
+                <q-badge v-if="props.row.capacity_suspect === 1" color="amber-9" text-color="black" class="font-bold text-[9px] px-1 py-0.5 cursor-pointer">
+                    ⚠ ~{{ props.row.capacity_effective }}
+                    <q-tooltip class="bg-gray-900 text-amber-300 border border-amber-500/50 text-xs">
+                        ⚠ Capacity Mismatch: Portal reported {{ props.value }} kWp, but inverter telemetry indicates ~{{ props.row.capacity_effective }} kWp system.
+                    </q-tooltip>
+                </q-badge>
+            </div>
         </q-td>
     """)
 
@@ -265,7 +281,7 @@ def build_fleet_tab(app_state: dict):
         d_end = min(f"{m}-31", today_str) if m == current_ym else f"{m}-31"
         sql = """
         SELECT 
-            p.plant_id, p.source, p.plant_name, p.capacity_kwp,
+            p.plant_id, p.source, p.plant_name, p.capacity_kwp, p.capacity_effective, p.capacity_suspect,
             coalesce(p.geocode_level, 'unresolved') as geocode_level,
             coalesce(p.operational_status, 'active') as operational_status,
             CASE 
@@ -386,13 +402,13 @@ def build_fleet_tab(app_state: dict):
 
         p = (src or "all").lower()
         if p == "growatt":
-            est_t = 65.0
+            est_t = 75.0
         elif p == "isolarcloud":
-            est_t = 25.0
+            est_t = 60.0
         elif p == "suryalog":
-            est_t = 20.0
+            est_t = 180.0
         else:
-            est_t = 146.0
+            est_t = 300.0
 
         secs_int = int(round(est_t))
         est_fmt = f"{secs_int // 60}m {secs_int % 60:02d}s" if secs_int >= 60 else f"{secs_int}s"

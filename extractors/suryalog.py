@@ -68,16 +68,6 @@ class SuryaLogExtractor(BaseExtractor):
         plant_var = ((h_plant % 15) - 7) / 100.0
         return max(0.55, min(1.25, round(city_factor + plant_var, 3)))
 
-    def _get_chitra_days_1_to_21(self) -> List[float]:
-        """Deterministic realistic daily generation for CHITRA days 1..21 summing to 1683.10 kWh."""
-        weights = [0.85 + (int(hashlib.md5(f"chitra_{d}".encode()).hexdigest()[:4], 16) % 35) / 100.0 for d in range(1, 22)]
-        s = sum(weights)
-        target = 1683.10
-        days = [round(w / s * target, 2) for w in weights]
-        diff = round(target - sum(days), 2)
-        days[0] = round(days[0] + diff, 2)
-        return days
-
     def scrape_live_portal(self, target_plant_name: Optional[str] = None, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """Log into cloud.suryalog.ae and scrape live telemetry for commercial plants."""
         global _LAST_LIVE_SCRAPE_TS, _LAST_LIVE_SCRAPE_CACHE
@@ -316,7 +306,6 @@ class SuryaLogExtractor(BaseExtractor):
             raw_list = self._load_cached_records(force_reload=force_refresh)
 
         results = []
-        chitra_d1_21 = self._get_chitra_days_1_to_21()
 
         for p in raw_list:
             raw_id = str(p.get("plant_id") or p.get("plant_name", ""))
@@ -339,87 +328,70 @@ class SuryaLogExtractor(BaseExtractor):
                 (cached_yest_kwh is None or cached_yest_kwh <= 0.05)
             ) or ("offline" in status_raw and (cached_month_kwh is None or cached_month_kwh <= 1.0))
 
+            # Only emit verified telemetry from portal (today and yesterday)
+            log_time = str(p.get("last_log_time") or "")
+
+            # 1. Today's record
+            d_today = f"{year_month}-{target_day:02d}"
             if is_offline:
-                for day_int in range(1, target_day + 1):
-                    d_str = f"{year_month}-{day_int:02d}"
-                    results.append({
-                        "plant_id": pid,
-                        "date": d_str,
-                        "kwh": 0.0,
-                        "revenue_inr": 0.0,
-                        "specific_yield": 0.0,
-                        "yield_per_day": 0.0,
-                        "live_power_kw": 0.0,
-                        "status": "offline",
-                        "last_log_time": str(p.get("last_log_time") or "") if day_int == target_day else None,
-                    })
-                continue
-
-            # Plant is active. Reconcile daily generation with portal monthly total.
-            today_kwh = cached_today_kwh if (cached_today_kwh is not None and cached_today_kwh >= 0) else round(base_daily * 0.45, 2)
-            yest_kwh = cached_yest_kwh if (cached_yest_kwh is not None and cached_yest_kwh >= 0) else round(base_daily * 0.95, 2)
-
-            daily_kwh_map = {}
-            if target_day == 1:
-                daily_kwh_map[1] = today_kwh
-            elif target_day == 2:
-                if cached_month_kwh is not None and cached_month_kwh >= today_kwh:
-                    daily_kwh_map[1] = round(cached_month_kwh - today_kwh, 2)
-                else:
-                    daily_kwh_map[1] = yest_kwh
-                daily_kwh_map[2] = today_kwh
+                kwh_today = 0.0
+                cur_kw = 0.0
+                stat_today = "offline"
+            elif cached_today_kwh is not None:
+                kwh_today = max(0.0, round(cached_today_kwh, 2))
+                cur_kw = max(0.0, round(cached_cur_kw, 2)) if cached_cur_kw is not None else 0.0
+                stat_today = "active" if (kwh_today > 0.05 or cur_kw > 0) else "offline"
+            elif cached_cur_kw is not None and cached_cur_kw > 0:
+                kwh_today = 0.0
+                cur_kw = round(cached_cur_kw, 2)
+                stat_today = "active"
             else:
-                daily_kwh_map[target_day] = today_kwh
-                daily_kwh_map[target_day - 1] = yest_kwh
+                kwh_today = None
+                cur_kw = None
+                stat_today = "offline"
 
-                # Reconcile days 1 .. target_day - 2 against remaining monthly total
-                if cached_month_kwh is not None and cached_month_kwh >= (today_kwh + yest_kwh):
-                    rem_kwh = cached_month_kwh - today_kwh - yest_kwh
-                elif cached_month_kwh is not None and cached_month_kwh > today_kwh:
-                    rem_kwh = cached_month_kwh - today_kwh
-                    daily_kwh_map[target_day - 1] = round(rem_kwh * 0.10, 2)
-                    rem_kwh = rem_kwh - daily_kwh_map[target_day - 1]
-                else:
-                    rem_kwh = base_daily * (target_day - 2)
-
-                w_list = []
-                for d in range(1, target_day - 1):
-                    d_str = f"{year_month}-{d:02d}"
-                    w = self._get_daily_weather_factor(city, d_str, pid)
-                    w_list.append((d, w))
-                sum_w = sum(w for _, w in w_list) if w_list else 1.0
-
-                allocated_sum = 0.0
-                for d, w in w_list:
-                    val = round(rem_kwh * (w / sum_w), 2)
-                    daily_kwh_map[d] = val
-                    allocated_sum += val
-
-                diff = round(rem_kwh - allocated_sum, 2)
-                last_d = target_day - 2
-                daily_kwh_map[last_d] = max(0.0, round(daily_kwh_map[last_d] + diff, 2))
-
-            for day_int in range(1, target_day + 1):
-                d_str = f"{year_month}-{day_int:02d}"
-                kwh = daily_kwh_map.get(day_int, 0.0)
-                if day_int == target_day:
-                    live_power = cached_cur_kw if cached_cur_kw is not None else (round(cap * 0.40, 2) if kwh > 0 else 0.0)
-                else:
-                    live_power = round(min(cap, kwh / 4.8), 2) if kwh > 0 else 0.0
-
-                sy = round(kwh / cap, 3) if cap > 0 else 0.0
-                stat = "active" if (kwh > 0.05 or live_power > 0) else "offline"
+            if kwh_today is not None:
+                sy_today = round(kwh_today / cap, 3) if cap > 0 else 0.0
                 results.append({
                     "plant_id": pid,
-                    "date": d_str,
-                    "kwh": kwh,
-                    "revenue_inr": round(kwh * 14.0, 2),
-                    "specific_yield": sy,
-                    "yield_per_day": sy,
-                    "live_power_kw": live_power,
-                    "status": stat,
-                    "last_log_time": str(p.get("last_log_time") or "") if day_int == target_day else None,
+                    "date": d_today,
+                    "kwh": kwh_today,
+                    "revenue_inr": round(kwh_today * 14.0, 2),
+                    "specific_yield": sy_today,
+                    "yield_per_day": sy_today,
+                    "live_power_kw": cur_kw,
+                    "status": stat_today,
+                    "last_log_time": log_time,
+                    "source_type": "portal",
                 })
+
+            # 2. Yesterday's record (from verified PYKWH)
+            if target_day > 1:
+                d_yest = f"{year_month}-{(target_day - 1):02d}"
+                if is_offline:
+                    kwh_yest = 0.0
+                    stat_yest = "offline"
+                elif cached_yest_kwh is not None:
+                    kwh_yest = max(0.0, round(cached_yest_kwh, 2))
+                    stat_yest = "active" if kwh_yest > 0.05 else "offline"
+                else:
+                    kwh_yest = None
+                    stat_yest = "offline"
+
+                if kwh_yest is not None:
+                    sy_yest = round(kwh_yest / cap, 3) if cap > 0 else 0.0
+                    results.append({
+                        "plant_id": pid,
+                        "date": d_yest,
+                        "kwh": kwh_yest,
+                        "revenue_inr": round(kwh_yest * 14.0, 2),
+                        "specific_yield": sy_yest,
+                        "yield_per_day": sy_yest,
+                        "live_power_kw": None,
+                        "status": stat_yest,
+                        "last_log_time": f"{d_yest} 23:59 (portal PYKWH)",
+                        "source_type": "portal",
+                    })
 
         return results
 
@@ -460,7 +432,6 @@ class SuryaLogExtractor(BaseExtractor):
             pr = self._get_plant_pr(pid, base_pr=0.78)
             base_daily = cap * ghi * pr
 
-            is_chitra = (raw_id == "SL-002" or "CHITRA" in raw_id.upper() or "CHITRA" in str(p.get("plant_name", "")).upper())
             cached_month_kwh = self.safe_float(p.get("month_energy_kwh"))
             cached_cuf = self.safe_float(p.get("cuf_pct"))
             cached_today_kwh = self.safe_float(p.get("today_energy_kwh"))
@@ -481,46 +452,23 @@ class SuryaLogExtractor(BaseExtractor):
                 logger.warning(f"Ignoring corrupted monthly value {cached_month_kwh} for SuryaLog plant {pid}")
                 cached_month_kwh = None
 
-            if is_chitra and month_str == "2026-09":
-                monthly_kwh = cached_month_kwh if (cached_month_kwh is not None and cached_month_kwh > 0) else 1838.75
-                sy = round(monthly_kwh / cap, 2)
-                ypd = round(sy / float(eval_days), 2)
-                cuf = cached_cuf if (cached_cuf is not None and cached_cuf > 0) else 17.93
-                pr_pct = round(pr * 100.0, 1)
-                explanation = f"On-site telemetry: {monthly_kwh} kWh (SY: {sy} kWh/kWp, CUF: {cuf}%)"
-            elif cached_month_kwh is not None and cached_month_kwh > 0 and month_str == current_ym:
-                monthly_kwh = cached_month_kwh
+            if cached_month_kwh is not None and cached_month_kwh > 0 and month_str == current_ym:
+                monthly_kwh = round(cached_month_kwh, 2)
                 sy = round(monthly_kwh / cap, 2) if cap > 0 else 0.0
                 ypd = round(sy / float(eval_days), 2) if (eval_days > 0 and cap > 0) else 0.0
                 cuf = cached_cuf if (cached_cuf is not None and cached_cuf > 0) else (round((monthly_kwh / (cap * 24.0 * float(eval_days))) * 100.0, 2) if (eval_days > 0 and cap > 0) else 0.0)
-                pr_pct = round(pr * 100.0, 1)
+                pr_pct = None
                 explanation = f"Portal telemetry {monthly_kwh} kWh (SY: {sy} kWh/kWp, {ypd} units/kWp/day)"
             elif is_zero_monthly:
                 monthly_kwh = 0.0
                 sy = 0.0
                 ypd = 0.0
                 cuf = 0.0
-                pr_pct = round(pr * 100.0, 1)
+                pr_pct = None
                 explanation = f"Plant offline in {month_str}"
             else:
-                daily_sum = 0.0
-                for d in range(1, eval_days + 1):
-                    d_str = f"{month_str}-{d:02d}"
-                    w = self._get_daily_weather_factor(city, d_str, pid)
-                    if month_str == current_ym and d == eval_days:
-                        d_kwh = cached_today_kwh if cached_today_kwh is not None else round(base_daily * w * 0.35, 2)
-                    elif month_str == current_ym and d == eval_days - 1 and cached_yest_kwh is not None:
-                        d_kwh = cached_yest_kwh
-                    else:
-                        d_kwh = round(base_daily * w, 2)
-                    daily_sum += d_kwh
-
-                monthly_kwh = round(daily_sum, 2)
-                sy = round(monthly_kwh / cap, 2) if cap > 0 else 0.0
-                ypd = round(sy / float(eval_days), 2) if (eval_days > 0 and cap > 0) else 0.0
-                cuf = round((monthly_kwh / (cap * 24.0 * float(eval_days))) * 100.0, 2) if (eval_days > 0 and cap > 0) else 0.0
-                pr_pct = round(pr * 100.0, 1)
-                explanation = f"Commercial generation {monthly_kwh} kWh (SY: {sy} kWh/kWp, {ypd} units/kWp/day)"
+                # For past months or missing monthly cache, do not fabricate synthetic numbers!
+                continue
 
             results.append({
                 "plant_id": pid,
@@ -556,10 +504,11 @@ class SuryaLogExtractor(BaseExtractor):
             cur_kw = self.safe_float(p.get("current_power_kw"))
             today_kwh = self.safe_float(p.get("today_energy_kwh"))
 
-            ac_power_w = round(cur_kw * 1000.0, 1) if cur_kw is not None else round(cap * 380.0, 1)
+            ac_power_w = round(cur_kw * 1000.0, 1) if (cur_kw is not None and cur_kw > 0) else 0.0
             dc_power_w = round(ac_power_w / 0.975, 1) if ac_power_w > 0 else 0.0
-            e_today_kwh = today_kwh if today_kwh is not None else round(cap * 1.3, 2)
+            e_today_kwh = today_kwh if today_kwh is not None else 0.0
             status = "active" if (cur_kw and cur_kw > 0) or (today_kwh and today_kwh > 0) else "offline"
+            temp = self.safe_float(p.get("temperature_c"))
 
             snapshots.append({
                 "plant_id": pid,
@@ -567,7 +516,7 @@ class SuryaLogExtractor(BaseExtractor):
                 "status": status,
                 "ac_power_w": ac_power_w,
                 "dc_power_w": dc_power_w,
-                "temperature_c": 46.0 if status == "active" else 30.0,
+                "temperature_c": temp,
                 "e_today_kwh": e_today_kwh,
                 "fault_code": "0",
                 "snapshot_ts": now_ts,

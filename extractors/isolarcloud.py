@@ -299,36 +299,37 @@ class ISolarCloudExtractor(BaseExtractor):
                 (cached_month_kwh is None or cached_month_kwh == 0)
             )
 
-            for day_int in range(1, target_day + 1):
-                d_str = f"{year_month}-{day_int:02d}"
-                w = self._get_daily_weather_factor(city, d_str, pid)
+            # Only emit records for dates with actual portal telemetry (today)
+            d_str = f"{year_month}-{target_day:02d}"
+            if is_offline:
+                kwh = 0.0
+                cur_kw = 0.0
+                rec_log = log_time
+            elif cached_today_kwh is not None:
+                kwh = max(0.0, round(cached_today_kwh, 2))
+                cur_kw = max(0.0, round(cached_cur_kw, 2)) if cached_cur_kw is not None else 0.0
+                rec_log = log_time
+            elif cached_cur_kw is not None and cached_cur_kw > 0:
+                kwh = 0.0
+                cur_kw = round(cached_cur_kw, 2)
+                rec_log = log_time
+            else:
+                # No portal telemetry for this plant today
+                continue
 
-                if is_offline:
-                    kwh = 0.0
-                    cur_kw = 0.0
-                    rec_log = log_time if day_int == target_day else ""
-                elif day_int == target_day:
-                    kwh = cached_today_kwh if cached_today_kwh is not None else round(base_daily * w * 0.35, 2)
-                    cur_kw = cached_cur_kw if cached_cur_kw is not None else round(cap * 0.45, 2)
-                    rec_log = log_time
-                else:
-                    kwh = round(base_daily * w, 2)
-                    h_p = int(hashlib.md5(f"live_{pid}_{d_str}".encode()).hexdigest()[:4], 16)
-                    cur_kw = round(cap * (0.65 + ((h_p % 15) / 100.0)), 2)
-                    rec_log = ""
-
-                sy = round(kwh / cap, 3) if cap > 0 else 0.0
-                results.append({
-                    "plant_id": pid,
-                    "date": d_str,
-                    "kwh": kwh,
-                    "revenue_inr": round(kwh * 14.0, 2),
-                    "specific_yield": sy,
-                    "yield_per_day": sy,
-                    "live_power_kw": cur_kw,
-                    "status": "offline" if is_offline else status,
-                    "last_log_time": rec_log,
-                })
+            sy = round(kwh / cap, 3) if cap > 0 else 0.0
+            results.append({
+                "plant_id": pid,
+                "date": d_str,
+                "kwh": kwh,
+                "revenue_inr": round(kwh * 14.0, 2),
+                "specific_yield": sy,
+                "yield_per_day": sy,
+                "live_power_kw": cur_kw,
+                "status": "offline" if is_offline else status,
+                "last_log_time": rec_log,
+                "source_type": "portal",
+            })
 
         return results
 
@@ -365,10 +366,6 @@ class ISolarCloudExtractor(BaseExtractor):
             raw_id = str(p.get("plant_id") or p.get("plant_name", ""))
             pid = self.plant_id("isolarcloud", raw_id)
             cap = self.safe_float(p.get("capacity_kwp") or 3.0) or 3.0
-            city = str(p.get("city") or "Pune")
-            ghi = self._get_city_ghi(city)
-            pr = self._get_plant_pr(pid)
-            base_daily = cap * ghi * pr
 
             cached_today_kwh = self.safe_float(p.get("today_energy_kwh"))
             cached_month_kwh = self.safe_float(p.get("month_energy_kwh"))
@@ -388,18 +385,8 @@ class ISolarCloudExtractor(BaseExtractor):
                 monthly_kwh = 0.0
                 explanation = f"Plant offline in {month_str}"
             else:
-                # Sum daily generations for exact reconciliation
-                daily_sum = 0.0
-                for d in range(1, eval_days + 1):
-                    d_str = f"{month_str}-{d:02d}"
-                    w = self._get_daily_weather_factor(city, d_str, pid)
-                    if month_str == current_ym and d == eval_days:
-                        d_kwh = cached_today_kwh if cached_today_kwh is not None else round(base_daily * w * 0.35, 2)
-                    else:
-                        d_kwh = round(base_daily * w, 2)
-                    daily_sum += d_kwh
-                monthly_kwh = round(daily_sum, 2)
-                explanation = f"Calculated telemetry: {monthly_kwh} kWh ({monthly_kwh / cap:.1f} kWh/kWp)"
+                # For past months or missing monthly cache, do not fabricate synthetic numbers!
+                continue
 
             sy = round(monthly_kwh / cap, 2) if cap > 0 else 0.0
             ypd = round(sy / float(eval_days), 2) if (eval_days > 0 and cap > 0) else 0.0
@@ -413,10 +400,11 @@ class ISolarCloudExtractor(BaseExtractor):
                 "specific_yield": sy,
                 "yield_per_day": ypd,
                 "cuf_pct": cuf,
-                "pr_pct": round(pr * 100.0, 1),
+                "pr_pct": None,
                 "tier": None,
                 "percentile": None,
                 "explanation": explanation,
+                "source_type": "portal",
             })
 
         return results
@@ -434,15 +422,15 @@ class ISolarCloudExtractor(BaseExtractor):
             raw_id = str(p.get("plant_id") or p.get("plant_name", ""))
             pid = self.plant_id("isolarcloud", raw_id)
             inv_model = str(p.get("inverter_model") or "SG3.0RS")
-            cur_kw = self.safe_float(p.get("current_power_kw") or 1.35) or 1.35
-            today_kwh = self.safe_float(p.get("today_energy_kwh") or 11.55) or 11.55
+            cur_kw = self.safe_float(p.get("current_power_kw"))
+            today_kwh = self.safe_float(p.get("today_energy_kwh"))
             status = self.normalize_status(p.get("status") or "normal")
 
-            h_p = int(hashlib.md5(f"temp_{pid}".encode()).hexdigest()[:4], 16)
-            temp = round(38.0 + (h_p % 80) / 10.0, 1)
+            temp = self.safe_float(p.get("temperature_c"))
 
-            ac_w = round(cur_kw * 1000, 1)
+            ac_w = round(cur_kw * 1000.0, 1) if (cur_kw is not None and cur_kw > 0) else 0.0
             dc_w = round(ac_w / 0.975, 1) if ac_w > 0 else 0.0
+            actual_today = today_kwh if today_kwh is not None else 0.0
 
             snapshots.append({
                 "plant_id": pid,
@@ -451,7 +439,7 @@ class ISolarCloudExtractor(BaseExtractor):
                 "ac_power_w": ac_w,
                 "dc_power_w": dc_w,
                 "temperature_c": temp,
-                "e_today_kwh": today_kwh,
+                "e_today_kwh": actual_today,
                 "fault_code": "0",
                 "snapshot_ts": now_ts,
             })

@@ -13,33 +13,62 @@ except ImportError:
 
 scheduler = BackgroundScheduler()
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def setup_scheduler():
+    # 1. High-frequency residential sync: Growatt API is fast (~45s), run every 15 min with force_refresh
     scheduler.add_job(
         pipeline.run_snapshots,
         trigger=IntervalTrigger(minutes=15),
-        id="hourly_snapshots",
-        name="15-Minute Live Inverter Snapshots",
+        kwargs={"sources": ["growatt"], "force_refresh": True},
+        id="growatt_live_snapshots",
+        name="15-Minute Growatt Live Snapshots",
+        coalesce=True,
+        max_instances=1,
         replace_existing=True
     )
+    # 2. Hourly full fleet snapshot sync across all 3 portals
+    scheduler.add_job(
+        pipeline.run_snapshots,
+        trigger=IntervalTrigger(hours=1),
+        kwargs={"force_refresh": True},
+        id="hourly_fleet_snapshots",
+        name="Hourly All-Portal Fleet Snapshots",
+        coalesce=True,
+        max_instances=1,
+        replace_existing=True
+    )
+    # 3. Daily full extract + historical ingestion at 06:00 IST (00:30 UTC)
     scheduler.add_job(
         pipeline.run_full_extract,
         trigger=CronTrigger(hour=0, minute=30),  # 06:00 IST
+        kwargs={"force_refresh": True},
         id="daily_full_extract",
         name="Daily Full Extraction (Fleet, Daily, Monthly, Snapshots)",
+        coalesce=True,
+        max_instances=1,
         replace_existing=True
     )
+    # 4. Monthly peer classification on the 1st of every month
     scheduler.add_job(
         analytics.classify_all,
         trigger=CronTrigger(day=1, hour=1, minute=30),  # 07:00 IST on 1st of month
         id="monthly_classification",
         name="Monthly Peer-Group Performance Classification",
+        coalesce=True,
+        max_instances=1,
         replace_existing=True
     )
+    # 5. Monthly WhatsApp CRM statement generation
     scheduler.add_job(
         crm.prepare_monthly_campaign,
         trigger=CronTrigger(day=1, hour=2, minute=30),  # 08:00 IST on 1st of month
         id="monthly_campaign_prep",
         name="Monthly WhatsApp Statement Campaign Preparation",
+        coalesce=True,
+        max_instances=1,
         replace_existing=True
     )
 

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import sys
 from pathlib import Path
@@ -21,13 +22,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from nicegui import ui, events
 
 from config import settings
-try:
-    from pipeline import db, pipeline
-    from services import scheduler
-except ImportError:
-    import db
-    import pipeline
-    import scheduler
+from pipeline import db
+from services import scheduler
 from extractors import excel_parser
 from routes import data_router, export_router, crm_router
 from ui import build_fleet_tab, build_analytics_tab, build_plant_tab, build_crm_tab, build_fetch_tab
@@ -69,7 +65,8 @@ def dashboard():
 
     # Shared Reactive Application State
     avail_months = db.get_available_months()
-    init_month = "2026-09" if "2026-09" in avail_months else (avail_months[0] if avail_months else "2026-09")
+    cur_month = datetime.date.today().strftime("%Y-%m")
+    init_month = cur_month if cur_month in avail_months else (avail_months[0] if avail_months else cur_month)
     app_state = {
         "month": init_month,
         "source": "All",
@@ -107,10 +104,17 @@ def dashboard():
         ui.label("Upload an exported SolarOn .xlsx or .xls report file. Plant generation and financial savings will be automatically extracted and merged.").classes("text-xs text-gray-400 mb-4")
 
         async def handle_excel_upload(e: events.UploadEventArguments):
-            temp_path = Path(__file__).resolve().parent / "data" / "raw" / e.name
+            file_obj = getattr(e, "file", e)
+            file_name = getattr(file_obj, "name", "report.xlsx")
+            file_content = getattr(file_obj, "content", None)
+
+            temp_path = Path(__file__).resolve().parent / "data" / "raw" / file_name
             temp_path.parent.mkdir(parents=True, exist_ok=True)
             with open(temp_path, "wb") as f:
-                f.write(e.content.read())
+                if file_content is not None and hasattr(file_content, "read"):
+                    f.write(file_content.read())  # type: ignore[attr-defined]
+                elif isinstance(file_content, (bytes, bytearray)):
+                    f.write(file_content)
 
             if not getattr(client, '_deleted', False):
                 with client:
@@ -151,11 +155,13 @@ def dashboard():
         # Month Selector & Stepper
         with ui.row().classes("items-center gap-1 bg-gray-800 rounded-lg px-2 py-0.5 border border-gray-700"):
             def step_month(direction: int):
-                cur_opts = header_month_select.options
+                opts = header_month_select.options
+                cur_opts: list[str] = list(opts.keys()) if isinstance(opts, dict) else list(opts or [])
                 if not cur_opts:
                     return
                 try:
-                    idx = cur_opts.index(header_month_select.value)
+                    val_str = str(header_month_select.value)
+                    idx = cur_opts.index(val_str)
                     new_idx = max(0, min(len(cur_opts) - 1, idx + direction))
                     header_month_select.value = cur_opts[new_idx]
                 except Exception:
@@ -218,10 +224,13 @@ def dashboard():
 
     app_state["switch_tab_fn"] = switch_tab
 
+    def open_upload_modal() -> None:
+        upload_dialog.open()
+
     # Tab Panels: Mount all tabs upfront so switching is instantaneous and panels are never empty
     with ui.tab_panels(tabs, value=t_fetch).classes("w-full p-6 bg-[#0B0F19]"):
         with ui.tab_panel(t_fetch):
-            build_fetch_tab(app_state, switch_tab=switch_tab, open_upload_modal=upload_dialog.open)
+            build_fetch_tab(app_state, switch_tab=switch_tab, open_upload_modal=open_upload_modal)
         with ui.tab_panel(t_fleet):
             build_fleet_tab(app_state)
         with ui.tab_panel(t_analytics):

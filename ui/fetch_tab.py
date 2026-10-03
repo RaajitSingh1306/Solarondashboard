@@ -137,17 +137,17 @@ def build_fetch_tab(
                     if not is_force:
                         return 3.0
                     if site and site != "All":
-                        return 12.0
+                        return 15.0
                     p = (platform or "all").lower()
                     if p == "growatt":
-                        return 65.0
+                        return 75.0
                     elif p == "isolarcloud":
-                        return 25.0
+                        return 60.0
                     elif p == "suryalog":
-                        return 20.0
+                        return 180.0
                     else:
-                        # Full fleet across all 3 portals (490 plants, daily/monthly ingestion, NASA GHI loss attribution)
-                        return 146.0
+                        # Full fleet across all 3 portals (~5 mins)
+                        return 300.0
 
                 def format_duration(seconds: float) -> str:
                     secs = int(round(seconds))
@@ -184,11 +184,11 @@ def build_fetch_tab(
                             )
                         elif p_val == "All" or not p_val:
                             est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} (~1m 45s for 467 plants across Growatt, iSolarCloud & SuryaLog)"
+                                f"Expected Fetch Time: ~{est_str} (full fleet across Growatt, iSolarCloud & SuryaLog)"
                             )
                         elif p_val.lower() == "growatt":
                             est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} (~1m 05s for Growatt portal - 449 plants)"
+                                f"Expected Fetch Time: ~{est_str} (Growatt residential fleet - 449 plants)"
                             )
                         else:
                             est_duration_label.set_text(

@@ -479,8 +479,8 @@ class GrowattExtractor(BaseExtractor):
                                 kwh = live_etoday
                             sy = round(kwh / cap, 3) if cap > 0 else 0.0
                             
-                            pwr = round(live_pac_w / 1000.0, 3) if (d_str == today_str and live_pac_w > 0) else (round(cap * 0.75, 2) if kwh > 0 else 0.0)
-                            log_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M") if (d_str == today_str and (kwh > 0 or pwr > 0)) else ""
+                            pwr = round(live_pac_w / 1000.0, 3) if (d_str == today_str and live_pac_w > 0) else None
+                            log_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M") if (d_str == today_str and (kwh > 0 or (pwr and pwr > 0))) else f"{d_str} 23:59 (portal history)"
                             daily_out.append({
                                 "plant_id": pid,
                                 "date": d_str,
@@ -488,8 +488,9 @@ class GrowattExtractor(BaseExtractor):
                                 "revenue_inr": round(kwh * 14.0, 2),
                                 "specific_yield": sy,
                                 "live_power_kw": pwr,
-                                "status": "active" if (kwh > 0 or pwr > 0) else "offline",
+                                "status": "active" if (kwh > 0 or (pwr and pwr > 0)) else "offline",
                                 "last_log_time": log_time,
+                                "source_type": "portal",
                             })
                     if daily_out:
                         return daily_out
@@ -523,25 +524,24 @@ class GrowattExtractor(BaseExtractor):
                     if day_int > target_day:
                         continue
                     d_str = f"{year_month}-{day_int:02d}"
-                    # Physics clamp for cracked sensor readings (e.g. 190 kWh on 3.3 kWp)
-                    if cap > 0 and kwh > (cap * 8.0):
-                        kwh = round(cap * 8.0, 2)
-                    sy = min(round(kwh / cap, 3), 8.0) if cap > 0 else None
+                    sy = round(kwh / cap, 3) if cap > 0 else 0.0
                     results.append({
                         "plant_id": pid,
                         "date": d_str,
                         "kwh": kwh,
                         "revenue_inr": round(kwh * 14.0, 2),
                         "specific_yield": sy,
-                        "live_power_kw": round(cap * 0.75, 2) if kwh > 0 else 0.0,
+                        "live_power_kw": None,
                         "status": "active" if kwh > 0 else "offline",
+                        "last_log_time": f"{d_str} 23:59 (portal detail)",
+                        "source_type": "portal",
                     })
                 plants_with_detail.add(pid)
             except Exception as e:
                 logger.debug(f"Error parsing detail file {dfile.name}: {e}")
 
-        # For remaining plants, generate day records for the month up to target_day
-        weights = [0.92, 1.05, 0.78, 1.10, 0.95, 1.02, 0.88, 1.15, 0.90, 1.00]
+        # For remaining plants without detail files, emit ONLY today's verified reading
+        today_date_str = f"{year_month}-{target_day:02d}"
         for p in self.cached_plants:
             raw_id = str(p.get("plantId") or p.get("id") or "")
             pid = self.plant_id("growatt", raw_id)
@@ -550,42 +550,23 @@ class GrowattExtractor(BaseExtractor):
 
             cap = self.plant_capacities.get(pid, 3.3)
             today_kwh = self.safe_float(p.get("eToday") or p.get("todayEnergy")) or 0.0
-            total_kwh = self.safe_float(p.get("eTotal") or p.get("totalEnergy")) or 0.0
             cur_pac_w = self.safe_float(p.get("currentPac")) or 0.0
             is_active = (today_kwh > 0 or cur_pac_w > 0)
-            live_kw = round(cur_pac_w / 1000.0, 3) if cur_pac_w > 0 else (round(cap * 0.75, 2) if today_kwh > 0 else 0.0)
+            live_kw = round(cur_pac_w / 1000.0, 3) if cur_pac_w > 0 else 0.0
             log_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M") if is_active else ""
 
-            for day_int in range(1, target_day + 1):
-                d_str = f"{year_month}-{day_int:02d}"
-                if day_int == target_day:
-                    kwh = today_kwh
-                    pwr = live_kw
-                    rec_log = log_time
-                elif is_active:
-                    w = weights[(day_int - 1) % len(weights)]
-                    base = today_kwh if today_kwh > 0 else round(cap * 3.5, 2)
-                    kwh = round(base * w, 2)
-                    pwr = round(cap * 0.75, 2) if kwh > 0 else 0.0
-                    rec_log = ""
-                else:
-                    kwh = 0.0
-                    pwr = 0.0
-                    rec_log = ""
-
-                if cap > 0 and kwh > (cap * 8.0):
-                    kwh = round(cap * 8.0, 2)
-                sy = min(round(kwh / cap, 3), 8.0) if cap > 0 and kwh > 0 else 0.0
-                results.append({
-                    "plant_id": pid,
-                    "date": d_str,
-                    "kwh": kwh,
-                    "revenue_inr": round(kwh * 14.0, 2),
-                    "specific_yield": sy,
-                    "live_power_kw": pwr,
-                    "status": "active" if (kwh > 0 or pwr > 0) else "offline",
-                    "last_log_time": rec_log,
-                })
+            sy = round(today_kwh / cap, 3) if (cap > 0 and today_kwh > 0) else 0.0
+            results.append({
+                "plant_id": pid,
+                "date": today_date_str,
+                "kwh": today_kwh,
+                "revenue_inr": round(today_kwh * 14.0, 2),
+                "specific_yield": sy,
+                "live_power_kw": live_kw if live_kw > 0 else 0.0,
+                "status": "active" if is_active else "offline",
+                "last_log_time": log_time,
+                "source_type": "portal",
+            })
 
         return results
 
@@ -727,15 +708,13 @@ class GrowattExtractor(BaseExtractor):
                 live_kw = self.safe_float(st_info.get("live_power_kw") or 0.0) or 0.0
                 cur_pac = live_kw * 1000.0 if live_kw > 0 else 0.0
 
-            # Physics clamp: max AC power cannot exceed 115% of nominal inverter capacity
-            ac_w = round(min(cur_pac, cap * 1.15 * 1000.0), 1)
+            # Real inverter AC power and daily energy from portal telemetry
+            ac_w = round(cur_pac, 1) if cur_pac > 0 else 0.0
 
             e_today = self.safe_float(p.get("eToday") or p.get("todayEnergy"))
             if e_today is None or e_today <= 0:
                 e_today = self.safe_float(st_info.get("e_today_kwh") or 0.0) or 0.0
-
-            # Physics clamp: daily yield <= 8.0 kWh/kWp
-            e_today = round(min(e_today, cap * 8.0), 2)
+            e_today = round(max(0.0, e_today), 2)
 
             # Inverter DC power and realistic operating heatsink temperature
             dc_w = round(ac_w / 0.975, 1) if ac_w > 0 else 0.0

@@ -1,0 +1,39 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    ".",
+    "core",
+    "engines",
+    "pipeline",
+    "services",
+    "extractors",
+    "routes",
+    "ui",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/core",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/engines",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/pipeline",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/services",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/extractors",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/routes",
+    "c:/Users/raaji/Downloads/Solaron/Solarondashboard/ui"
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalOperand": "none",
+  "reportArgumentType": "none",
+  "reportFunctionMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalIterable": "none",
+  "reportOptionalCall": "none",
+  "reportPrivateImportUsage": "none",
+  "reportUnknownMemberType": "none"
+}

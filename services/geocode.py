@@ -16,6 +16,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from pipeline import db
+except ImportError:
+    try:
+        from Solarondashboard.pipeline import db  # type: ignore[import-untyped,import-not-found]
+    except ImportError:
+        import db  # type: ignore[import-untyped,import-not-found]
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -233,10 +241,6 @@ def geocode_all_plants_in_db(db_name: str = "analytics") -> Dict[str, int]:
     Backfill geocode levels and centroid coordinates across all plants in database.
     Leverages raw Growatt live addresses if available.
     """
-    try:
-        from pipeline import db
-    except ImportError:
-        import db
     _load_pincodes()
 
     # Load raw growatt live plant addresses

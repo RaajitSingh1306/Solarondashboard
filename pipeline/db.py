@@ -89,7 +89,7 @@ def get_conn(db: str = "analytics"):
 get_connection = analytics_conn
 
 def get_plants(source: Optional[str] = None, include_decommissioned: bool = False) -> List[Dict[str, Any]]:
-    sql = "SELECT plant_id, source, plant_name, capacity_kwp, latitude, longitude, city, install_date, inverter_model, panel_model, operational_status, geocode_level FROM plants WHERE 1=1"
+    sql = "SELECT plant_id, source, plant_name, capacity_kwp, capacity_effective, capacity_suspect, latitude, longitude, city, install_date, inverter_model, panel_model, operational_status, geocode_level FROM plants WHERE 1=1"
     params: List[Any] = []
     if not include_decommissioned:
         sql += " AND (operational_status IS NULL OR operational_status != 'decommissioned')"
@@ -139,20 +139,24 @@ def upsert_plant(row: Dict[str, Any]) -> None:
     row_copy.setdefault("last_log_time", None)
     row_copy.setdefault("total_energy_kwh", None)
     row_copy.setdefault("geocode_level", None)
+    row_copy.setdefault("capacity_effective", None)
+    row_copy.setdefault("capacity_suspect", 0)
     for col in ("latitude", "longitude", "city", "install_date", "inverter_model", "panel_model"):
         row_copy.setdefault(col, None)
     sql = """
     INSERT INTO plants (
-        plant_id, source, plant_name, capacity_kwp, latitude, longitude,
+        plant_id, source, plant_name, capacity_kwp, capacity_effective, capacity_suspect, latitude, longitude,
         city, install_date, inverter_model, panel_model, operational_status, geocode_level, last_log_time, total_energy_kwh, updated_at
     ) VALUES (
-        :plant_id, :source, :plant_name, :capacity_kwp, :latitude, :longitude,
+        :plant_id, :source, :plant_name, :capacity_kwp, :capacity_effective, :capacity_suspect, :latitude, :longitude,
         :city, :install_date, :inverter_model, :panel_model, :operational_status, :geocode_level, :last_log_time, :total_energy_kwh, CURRENT_TIMESTAMP
     )
     ON CONFLICT(plant_id) DO UPDATE SET
         source = excluded.source,
         plant_name = excluded.plant_name,
         capacity_kwp = excluded.capacity_kwp,
+        capacity_effective = coalesce(excluded.capacity_effective, plants.capacity_effective),
+        capacity_suspect = coalesce(excluded.capacity_suspect, plants.capacity_suspect),
         latitude = coalesce(excluded.latitude, plants.latitude),
         longitude = coalesce(excluded.longitude, plants.longitude),
         city = coalesce(excluded.city, plants.city),
@@ -183,21 +187,35 @@ def upsert_daily(rows: List[Dict[str, Any]]) -> int:
         r.setdefault("status", "active")
         r.setdefault("last_log_time", None)
         r.setdefault("quality_flags", None)
+        r.setdefault("source_type", "portal")
     sql = """
     INSERT INTO daily_generation (
-        plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time
+        plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time, source_type
     ) VALUES (
-        :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time
+        :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time, :source_type
     )
     ON CONFLICT(plant_id, date) DO UPDATE SET
-        kwh = excluded.kwh,
-        revenue_inr = excluded.revenue_inr,
-        specific_yield = excluded.specific_yield,
+        kwh = CASE 
+            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.kwh
+            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.kwh
+            ELSE daily_generation.kwh 
+        END,
+        revenue_inr = CASE 
+            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.revenue_inr
+            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.revenue_inr
+            ELSE daily_generation.revenue_inr 
+        END,
+        specific_yield = CASE 
+            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.specific_yield
+            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.specific_yield
+            ELSE daily_generation.specific_yield 
+        END,
         yield_per_day = coalesce(excluded.yield_per_day, daily_generation.yield_per_day),
-        live_power_kw = excluded.live_power_kw,
+        live_power_kw = coalesce(excluded.live_power_kw, daily_generation.live_power_kw),
         status = excluded.status,
         quality_flags = coalesce(excluded.quality_flags, daily_generation.quality_flags),
-        last_log_time = coalesce(nullif(excluded.last_log_time, ''), daily_generation.last_log_time);
+        last_log_time = coalesce(nullif(excluded.last_log_time, ''), daily_generation.last_log_time),
+        source_type = coalesce(excluded.source_type, daily_generation.source_type);
     """
     res = executemany(sql, rows, db="analytics")
     clear_available_months_cache()
@@ -208,9 +226,9 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
         return 0
     sql = """
     INSERT INTO monthly_generation (
-        plant_id, month, kwh, revenue_inr, specific_yield, yield_per_day, pr_pct, tier, percentile, anomaly_score, anomaly_flag
+        plant_id, month, kwh, revenue_inr, specific_yield, yield_per_day, pr_pct, tier, percentile, anomaly_score, anomaly_flag, source_type
     ) VALUES (
-        :plant_id, :month, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :pr_pct, :tier, :percentile, :anomaly_score, :anomaly_flag
+        :plant_id, :month, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :pr_pct, :tier, :percentile, :anomaly_score, :anomaly_flag, :source_type
     )
     ON CONFLICT(plant_id, month) DO UPDATE SET
         kwh = excluded.kwh,
@@ -221,7 +239,8 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
         tier = coalesce(excluded.tier, monthly_generation.tier),
         percentile = coalesce(excluded.percentile, monthly_generation.percentile),
         anomaly_score = coalesce(excluded.anomaly_score, monthly_generation.anomaly_score),
-        anomaly_flag = coalesce(excluded.anomaly_flag, monthly_generation.anomaly_flag);
+        anomaly_flag = coalesce(excluded.anomaly_flag, monthly_generation.anomaly_flag),
+        source_type = coalesce(excluded.source_type, monthly_generation.source_type);
     """
     # ensure default keys exist
     for r in rows:
@@ -233,6 +252,7 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
         r.setdefault("yield_per_day", None)
         r.setdefault("anomaly_score", None)
         r.setdefault("anomaly_flag", 0)
+        r.setdefault("source_type", "portal")
     res = executemany(sql, rows, db="analytics")
     clear_available_months_cache()
     return res
@@ -320,6 +340,9 @@ def get_available_months(force_refresh: bool = False) -> List[str]:
     sql = """
     SELECT DISTINCT month FROM monthly_generation 
     WHERE month IS NOT NULL AND month != ''
+    UNION
+    SELECT DISTINCT substr(date, 1, 7) as month FROM daily_generation
+    WHERE date IS NOT NULL AND length(date) >= 7
     ORDER BY month DESC;
     """
     df = query_df(sql, db="analytics")
@@ -425,6 +448,8 @@ def init_db() -> None:
             source TEXT NOT NULL,
             plant_name TEXT NOT NULL,
             capacity_kwp REAL,
+            capacity_effective REAL,
+            capacity_suspect INTEGER DEFAULT 0,
             latitude REAL,
             longitude REAL,
             city TEXT,
@@ -433,6 +458,8 @@ def init_db() -> None:
             panel_model TEXT,
             operational_status TEXT DEFAULT 'active',
             geocode_level TEXT,
+            last_log_time TEXT,
+            total_energy_kwh REAL,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -447,6 +474,7 @@ def init_db() -> None:
             status TEXT,
             quality_flags TEXT,
             last_log_time TEXT,
+            source_type TEXT DEFAULT 'portal',
             PRIMARY KEY (plant_id, date),
             FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
         );
@@ -463,6 +491,7 @@ def init_db() -> None:
             percentile REAL,
             anomaly_score REAL,
             anomaly_flag INTEGER DEFAULT 0,
+            source_type TEXT DEFAULT 'portal',
             PRIMARY KEY (plant_id, month),
             FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
         );
@@ -547,12 +576,16 @@ def init_db() -> None:
             ("plants", "last_log_time", "TEXT"),
             ("plants", "total_energy_kwh", "REAL"),
             ("plants", "geocode_level", "TEXT"),
+            ("plants", "capacity_effective", "REAL"),
+            ("plants", "capacity_suspect", "INTEGER DEFAULT 0"),
             ("daily_generation", "yield_per_day", "REAL"),
             ("daily_generation", "last_log_time", "TEXT"),
             ("daily_generation", "quality_flags", "TEXT"),
+            ("daily_generation", "source_type", "TEXT DEFAULT 'portal'"),
             ("monthly_generation", "yield_per_day", "REAL"),
             ("monthly_generation", "anomaly_score", "REAL"),
             ("monthly_generation", "anomaly_flag", "INTEGER DEFAULT 0"),
+            ("monthly_generation", "source_type", "TEXT DEFAULT 'portal'"),
         ]:
             try:
                 cur.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {ctype};")

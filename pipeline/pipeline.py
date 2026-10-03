@@ -183,11 +183,31 @@ def run_full_extract(
     except Exception:
         prev_month = "2026-08" if month_str == "2026-09" else "2026-09"
 
-    run_monthly(prev_month, sources=sources, force_refresh=False)
-    run_daily(f"{prev_month}-28", sources=sources, force_refresh=False)
+    # Only sync previous month if on days 1-3 of a month or if prev_month is empty in DB
+    prev_month_needs_sync = False
+    today_dt = datetime.date.today()
+    if today_dt.day <= 3 and month_str == today_dt.strftime("%Y-%m"):
+        prev_month_needs_sync = True
+    else:
+        try:
+            with db.analytics_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM monthly_generation WHERE month = ?", (prev_month,))
+                row = cur.fetchone()
+                if not row or row[0] == 0:
+                    prev_month_needs_sync = True
+        except Exception:
+            pass
+
+    if prev_month_needs_sync:
+        run_monthly(prev_month, sources=sources, force_refresh=False)
 
     report("Collecting live inverter telemetry snapshots...", 0.70)
     s_count = run_snapshots(sources=sources, force_refresh=force_refresh)
+
+    # Audit plant capacities for inverter nominal power misconfigurations
+    report("Auditing plant capacities & physics validation...", 0.80)
+    data_quality.audit_and_update_plant_capacities()
 
     # Run performance classification and NASA GHI loss attribution
     report("Benchmarking solar insolation & classifying health tiers...", 0.85)

@@ -265,7 +265,7 @@ def build_plant_tab(app_state: dict):
 
         # Daily generation for that month
         d_df = db.query_df(
-            "SELECT date, kwh, specific_yield, live_power_kw, status, last_log_time FROM daily_generation WHERE plant_id = ? AND strftime('%Y-%m', date) = ? ORDER BY date ASC",
+            "SELECT date, kwh, specific_yield, live_power_kw, status, last_log_time, quality_flags, source_type FROM daily_generation WHERE plant_id = ? AND strftime('%Y-%m', date) = ? ORDER BY date ASC",
             [pid, m_val],
             db="analytics"
         )
@@ -273,7 +273,7 @@ def build_plant_tab(app_state: dict):
 
         # Monthly record for that month
         m_df = db.query_df(
-            "SELECT month, kwh, revenue_inr, specific_yield, yield_per_day, pr_pct, tier, percentile, anomaly_score, anomaly_flag FROM monthly_generation WHERE plant_id = ? AND month = ?",
+            "SELECT month, kwh, revenue_inr, specific_yield, yield_per_day, pr_pct, tier, percentile, anomaly_score, anomaly_flag, source_type FROM monthly_generation WHERE plant_id = ? AND month = ?",
             [pid, m_val],
             db="analytics"
         )
@@ -358,13 +358,15 @@ def build_plant_tab(app_state: dict):
         if target_day > today_str:
             target_day = today_str
         target_day_kwh = 0.0
-        if daily:
-            for d in daily:
-                if d.get("date") == target_day:
-                    target_day_kwh = float(d.get("kwh") or 0.0)
-                    break
-            if target_day_kwh == 0.0:
-                target_day_kwh = float(daily[-1].get("kwh") or 0.0)
+        target_df = db.query_df(
+            "SELECT kwh FROM daily_generation WHERE plant_id = ? AND date = ?",
+            [pid, target_day],
+            db="analytics"
+        )
+        if not target_df.empty and target_df.iloc[0]["kwh"] is not None:
+            target_day_kwh = float(target_df.iloc[0]["kwh"])
+        elif daily:
+            target_day_kwh = float(daily[-1].get("kwh") or 0.0)
 
         cap_val = float(plant.get("capacity_kwp") or 3.3)
         hourly_hours, hourly_data, is_live_telemetry = _get_hourly_profile(pid, target_day, target_day_kwh, cap_val)
@@ -382,6 +384,7 @@ def build_plant_tab(app_state: dict):
             "lifetime_val": lifetime_val,
             "last_recorded_day": last_recorded_day,
             "target_day": target_day,
+            "target_day_kwh": target_day_kwh,
             "hourly_hours": hourly_hours,
             "hourly_data": hourly_data,
             "is_live_telemetry": is_live_telemetry,
@@ -523,11 +526,9 @@ def build_plant_tab(app_state: dict):
 
         # KPI row calculations
         today_str = datetime.date.today().strftime("%Y-%m-%d")
-        d_val = float(daily[-1]['kwh']) if (daily and daily[-1].get("kwh") is not None) else 0.0
-        p_val = float(plant.get("today_energy_kwh") or 0.0) if (target_day == today_str) else 0.0
-        best_day_kwh = max(d_val, p_val)
-        if best_day_kwh > 0:
-            today_kwh = f"{best_day_kwh:,.2f} kWh"
+        target_kwh = float(data.get("target_day_kwh") or 0.0)
+        if target_kwh > 0:
+            today_kwh = f"{target_kwh:,.2f} kWh"
         elif daily and daily[-1].get("kwh") is not None:
             today_kwh = f"{float(daily[-1]['kwh']):,.2f} kWh"
         else:
@@ -551,8 +552,13 @@ def build_plant_tab(app_state: dict):
             status_text = latest_status.upper()
             status_color = "positive" if latest_status == "active" else "negative" if latest_status == "fault" else "grey-7"
 
+        is_cap_suspect = bool(plant.get("capacity_suspect"))
+        eff_cap = float(plant.get("capacity_effective") or plant.get("capacity_kwp") or 0.0)
+        nom_cap = float(plant.get("capacity_kwp") or 0.0)
+
         with ui.row().classes("w-full gap-4 mb-4 flex-wrap"):
-            kpi_card("Installed Capacity", f"{plant.get('capacity_kwp', '—')} kWp", "bolt", "amber-5")
+            cap_disp = f"{nom_cap:.1f} kWp (Eff: ~{eff_cap:.1f})" if is_cap_suspect else f"{plant.get('capacity_kwp', '—')} kWp"
+            kpi_card("Installed Capacity", cap_disp, "bolt", "amber-5")
             kpi_card("Status", status_text, "circle", status_color)
             kpi_card("Total Gen", total_kwh_str, "all_inclusive", "blue-4")
             kpi_card(f"{m_val} Gen", month_kwh, "calendar_month", "teal-5")
@@ -567,6 +573,15 @@ def build_plant_tab(app_state: dict):
             kpi_card("Peer Percentile", f"P{percentile:.0f}", "leaderboard", "indigo-4")
             kpi_card("Location Conf.", f"{plant.get('geocode_level', 'unresolved')}", "place", "teal-4")
             kpi_card("RPI Index", f"{float(monthly_row.get('rpi_score', 1.0) or 1.0):.2f}", "insights", "amber-4")
+
+        # Capacity Mismatch Callout Banner
+        if is_cap_suspect:
+            with ui.row().classes("w-full p-3 rounded-lg bg-amber-950/70 border border-amber-700/60 items-center justify-between mb-4"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("warning", color="amber-4", size="sm")
+                    with ui.column().classes("gap-0"):
+                        ui.label(f"Portal Capacity Mismatch: Portal reports {nom_cap:.1f} kWp, but inverter telemetry indicates ~{eff_cap:.1f} kWp installation.").classes("text-sm font-bold text-amber-200")
+                        ui.label(f"Specific yield and PR are evaluated against effective capacity ({eff_cap:.1f} kWp) to eliminate artificial distortion.").classes("text-xs text-amber-300/80")
 
         # ML Anomaly Callout Banner
         is_anomaly = int(monthly_row.get("anomaly_flag") or 0) == 1
