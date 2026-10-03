@@ -146,8 +146,8 @@ def build_fetch_tab(
                     elif p == "suryalog":
                         return 180.0
                     else:
-                        # Full fleet across all 3 portals (~5 mins)
-                        return 300.0
+                        # Full fleet across all 3 portals (~10 mins)
+                        return 600.0
 
                 def format_duration(seconds: float) -> str:
                     secs = int(round(seconds))

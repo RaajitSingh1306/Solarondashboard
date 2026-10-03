@@ -408,7 +408,7 @@ def build_fleet_tab(app_state: dict):
         elif p == "suryalog":
             est_t = 180.0
         else:
-            est_t = 300.0
+            est_t = 600.0
 
         secs_int = int(round(est_t))
         est_fmt = f"{secs_int // 60}m {secs_int % 60:02d}s" if secs_int >= 60 else f"{secs_int}s"
