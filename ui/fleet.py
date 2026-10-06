@@ -5,8 +5,13 @@ from typing import Any, Dict
 from nicegui import ui
 try:
     from pipeline import db
+    from ui.export_dialog import show_export_dialog
 except ImportError:
     import db
+    try:
+        from export_dialog import show_export_dialog
+    except ImportError:
+        from ui.export_dialog import show_export_dialog
 
 def build_fleet_tab(app_state: dict):
     client = ui.context.client
@@ -138,17 +143,27 @@ def build_fleet_tab(app_state: dict):
 
         ui.space()
 
-        ui.button(
-            "CSV",
-            on_click=lambda: ui.download(f"/api/export/fleet-daily?fmt=csv&month={selected_month['val']}"),
-            icon="download"
-        ).props("dense flat color=primary")
+        with ui.button_group().props("dense outline"):
+            ui.button(
+                "Export Data",
+                icon="file_download",
+                on_click=lambda: show_export_dialog(
+                    month=selected_month["val"],
+                    platform=source_filter.value,
+                    include_decom=show_decom_switch.value,
+                    default_dataset="monthly"
+                ),
+            ).props("dense unelevated color=indigo-7 text-color=white font-medium").tooltip("Export Monthly or Daily fleet data with custom column selection as CSV or Excel")
 
-        ui.button(
-            "XLSX",
-            on_click=lambda: ui.download(f"/api/export/fleet-daily?fmt=xlsx&month={selected_month['val']}"),
-            icon="download"
-        ).props("dense flat color=positive")
+            ui.button(
+                "Quick CSV",
+                icon="download",
+                on_click=lambda: ui.download(
+                    f"/api/export/fleet-monthly?fmt=csv&month={selected_month['val']}"
+                    + (f"&source={source_filter.value}" if source_filter.value != "All" else "")
+                    + f"&include_decom={str(show_decom_switch.value).lower()}"
+                ),
+            ).props("dense flat text-color=cyan-3").tooltip("Download monthly CSV (11 default columns)")
 
         sync_status_label = ui.label("").classes("text-xs text-amber-300/80 self-center ml-2")
 

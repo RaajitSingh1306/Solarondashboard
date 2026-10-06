@@ -743,8 +743,9 @@ FastAPI exposes RESTful endpoints with interactive Swagger UI documentation at `
 
 | Method | Endpoint | Description | Query Parameters |
 |:---|:---|:---|:---|
-| `GET` | `/api/export/fleet-daily` | Stream daily fleet generation dataset | `fmt` (`csv`/`xlsx`), `start` (`YYYY-MM-DD`), `end` (`YYYY-MM-DD`) |
-| `GET` | `/api/export/fleet-monthly` | Stream monthly fleet yield dataset | `fmt` (`csv`/`xlsx`), `month` (`YYYY-MM`) |
+| `GET` | `/api/export/columns` | Retrieve column catalog metadata for picker UI | `dataset` (`monthly` or `daily`) |
+| `GET` | `/api/export/fleet-monthly` | Stream monthly fleet yield with selectable columns | `fmt` (`csv`/`xlsx`), `cols` (comma-separated keys), `month` (`YYYY-MM`), `start_month`, `end_month`, `source`, `include_decom` |
+| `GET` | `/api/export/fleet-daily` | Stream daily fleet generation with selectable columns | `fmt` (`csv`/`xlsx`), `cols` (comma-separated keys), `month` (`YYYY-MM`), `start`, `end`, `source`, `include_decom` |
 | `GET` | `/api/export/fleet-status` | Stream current operational status snapshot | `fmt` (`csv`/`xlsx`) |
 | `GET` | `/api/export/ratings` | Stream performance ratings and percentiles | `fmt` (`csv`/`xlsx`), `month` (`YYYY-MM`) |
 

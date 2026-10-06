@@ -6,9 +6,14 @@ from nicegui import ui
 try:
     from pipeline import db
     from services import crm
+    from ui.export_dialog import show_export_dialog
 except ImportError:
     import db
     import crm
+    try:
+        from export_dialog import show_export_dialog
+    except ImportError:
+        show_export_dialog = None
 
 def fetch_fleet_send_data(
     m: str = "2026-09",
@@ -568,7 +573,18 @@ def build_crm_tab(app_state: dict):
                             ui.button("Select All", on_click=lambda: select_helper("all")).props("dense flat size=sm color=white")
                             ui.button("Clear", on_click=lambda: select_helper("none")).props("dense flat size=sm color=gray-4")
 
-                        ui.button("📥 Export Table CSV", on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv"), icon="download").props("dense outline size=sm color=cyan")
+                        with ui.button_group().props("dense outline"):
+                            ui.button(
+                                "📥 Export Fleet Data",
+                                on_click=lambda: show_export_dialog(platform=source_filter.value, default_dataset="monthly") if show_export_dialog else ui.download("/api/export/fleet-status?fmt=csv"),
+                                icon="file_download"
+                            ).props("dense unelevated color=indigo-7 text-color=white font-medium").tooltip("Export Monthly or Daily fleet data with custom column selection as CSV or Excel")
+
+                            ui.button(
+                                "Quick Status CSV",
+                                on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv"),
+                                icon="download"
+                            ).props("dense flat text-color=cyan-3").tooltip("Quick download of current fleet status snapshot CSV")
 
                 # Direct Telemetry & Send Table
                 telemetry_cols = [
@@ -763,7 +779,11 @@ def build_crm_tab(app_state: dict):
                         with ui.row().classes("items-center gap-3"):
                             year_select = ui.select(options=["2026", "2025", "2024", "2023"], value="2026", label="Select Year").classes("w-32").props("dense outlined dark")
                             ui.button("🏆 Prepare Yearly Recap Messages", icon="campaign", on_click=lambda: run_prepare_yearly()).props("dense unelevated color=primary")
-                            ui.button("📥 Export Yearly CSV", icon="download", on_click=lambda: ui.download("/api/export/fleet-status?fmt=csv")).props("dense outline color=cyan")
+                            ui.button(
+                                "📥 Export Monthly/Yearly Data",
+                                icon="file_download",
+                                on_click=lambda: show_export_dialog(month=f"{year_select.value}-12", default_dataset="monthly") if show_export_dialog else ui.download("/api/export/fleet-status?fmt=csv")
+                            ).props("dense outline color=cyan").tooltip("Export fleet telemetry with custom column selection as CSV or Excel")
 
                     # 4 Yearly KPI Cards
                     with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):

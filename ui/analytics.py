@@ -5,9 +5,14 @@ from nicegui import ui
 try:
     from pipeline import db
     from core import analytics
+    from ui.export_dialog import show_export_dialog
 except ImportError:
     import db
     import analytics
+    try:
+        from export_dialog import show_export_dialog
+    except ImportError:
+        from ui.export_dialog import show_export_dialog
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +55,25 @@ def build_analytics_tab(app_state: dict):
 
         ui.space()
 
-        ui.button(
-            "CSV",
-            on_click=lambda: ui.download(f"/api/export/fleet-daily?fmt=csv&month={selected_period['month']}"),
-            icon="download"
-        ).props("dense flat color=primary")
+        with ui.button_group().props("dense outline"):
+            ui.button(
+                "Export Data",
+                icon="file_download",
+                on_click=lambda: show_export_dialog(
+                    month=selected_period["month"],
+                    platform=platform_filter.value,
+                    default_dataset="monthly"
+                ),
+            ).props("dense unelevated color=indigo-7 text-color=white font-medium").tooltip("Export Monthly or Daily analytics data with custom column selection as CSV or Excel")
 
-        ui.button(
-            "XLSX",
-            on_click=lambda: ui.download(f"/api/export/fleet-daily?fmt=xlsx&month={selected_period['month']}"),
-            icon="download"
-        ).props("dense flat color=positive")
+            ui.button(
+                "Quick CSV",
+                icon="download",
+                on_click=lambda: ui.download(
+                    f"/api/export/fleet-monthly?fmt=csv&month={selected_period['month']}"
+                    + (f"&source={platform_filter.value}" if platform_filter.value != "All" else "")
+                ),
+            ).props("dense flat text-color=cyan-3").tooltip("Download monthly CSV (11 default columns)")
 
     # Section 1: NASA GHI Generation Baseline & Loss Decomposition Section
     with ui.card().classes("w-full p-5 bg-gray-900 border border-gray-800 mb-6"):
