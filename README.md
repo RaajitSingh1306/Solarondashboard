@@ -783,7 +783,7 @@ Create a `.env` file in the root directory (based on `.env.example`):
 PORT=8000
 HOST=0.0.0.0
 DEBUG=False
-SECRET_KEY=solaron-production-secret-key-2026
+SECRET_KEY=your_production_secret_key_here
 
 # Database File Paths
 DB_PATH=data/solar_analytics.db
