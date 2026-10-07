@@ -25,7 +25,7 @@ from config import settings
 from pipeline import db
 from services import scheduler
 from extractors import excel_parser
-from routes import data_router, export_router, crm_router
+from routes import data_router, export_router, crm_router, gupshup_router
 from ui import build_fleet_tab, build_analytics_tab, build_plant_tab, build_crm_tab, build_fetch_tab
 
 @asynccontextmanager
@@ -57,6 +57,8 @@ app.add_middleware(
 app.include_router(data_router, prefix="/api", tags=["Data"])
 app.include_router(export_router, prefix="/api", tags=["Exports"])
 app.include_router(crm_router, prefix="/api", tags=["CRM"])
+app.include_router(gupshup_router, prefix="/api", tags=["Gupshup Webhook"])
+app.include_router(gupshup_router, prefix="", tags=["Gupshup Webhook Root"])
 
 @ui.page("/")
 def dashboard():

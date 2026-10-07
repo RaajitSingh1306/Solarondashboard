@@ -20,6 +20,7 @@ service-account*.json
 data/*.db
 data/raw/
 data/lake/
+data/bronze/
 
 # Archives and bundles
 *.zip

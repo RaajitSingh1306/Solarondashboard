@@ -5,11 +5,15 @@ from typing import Any, Dict, List, Optional
 from nicegui import ui
 try:
     from pipeline import db
-    from services import crm
+    from services import crm, s3_archive
+    from engines import escalation_state_machine, escalation_categorizer
     from ui.export_dialog import show_export_dialog
 except ImportError:
     import db
     import crm
+    import s3_archive
+    import escalation_state_machine
+    import escalation_categorizer
     try:
         from export_dialog import show_export_dialog
     except ImportError:
@@ -513,6 +517,7 @@ def build_crm_tab(app_state: dict):
             st_yearly = ui.tab("Yearly Milestones", icon="emoji_events")
             st_campaigns = ui.tab("Campaign Manager", icon="rocket_launch")
             st_alerts = ui.tab("Offline Alerts", icon="notifications_active")
+            st_escalation = ui.tab("Escalation Engine", icon="campaign")
 
         with ui.tab_panels(sub_tabs, value=st_telemetry).classes("w-full p-0 bg-transparent"):
             # ─────────────────────────────────────────────────────────────
@@ -941,6 +946,122 @@ def build_crm_tab(app_state: dict):
                         "Team Solaron\n"
                         "सोलरॉन होम्स प्राइवेट लिमिटेड"
                     ).classes("text-xs text-gray-300 font-mono whitespace-pre-line leading-relaxed")
+
+            # ─────────────────────────────────────────────────────────────
+            # SUB-TAB 7: Escalation Engine
+            # ─────────────────────────────────────────────────────────────
+            with ui.tab_panel(st_escalation).classes("p-0 w-full gap-5 flex flex-col"):
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl"):
+                    with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pb-3 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.icon("campaign").classes("text-amber-400 text-2xl")
+                            with ui.column().classes("gap-0"):
+                                ui.label("6-Category × 6-Level Escalation Engine").classes("text-base font-bold text-white")
+                                ui.label("Automated WhatsApp lifecycle tracking, customer replies (YES/NO), and technician dispatch.").classes("text-xs text-gray-400")
+
+                        with ui.row().classes("items-center gap-2 flex-wrap"):
+                            ui.button("⚡ Run Categorization", icon="auto_mode", on_click=lambda: asyncio.create_task(run_fleet_categorization())).props("dense unelevated color=primary").tooltip("Classify all plants into 6 categories based on 30-day baseline")
+                            ui.button("⏩ Advance States", icon="fast_forward", on_click=lambda: asyncio.create_task(run_state_advancement())).props("dense unelevated color=teal-7").tooltip("Advance timers and send scheduled WhatsApp follow-ups")
+                            ui.button("☁️ S3 Bronze Archive", icon="cloud_upload", on_click=lambda: asyncio.create_task(run_s3_archive_sync())).props("dense outline color=cyan").tooltip("Snapshot state machines and audit logs to AWS S3 bronze archive")
+                            ui.button("🔄 Refresh", icon="refresh", on_click=lambda: asyncio.create_task(load_escalation_data())).props("dense outline color=white")
+
+                    # 4 KPI Metrics Cards
+                    with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Active Escalations").classes("text-xs text-gray-400")
+                            esc_total_kpi = ui.label("0").classes("text-xl font-bold text-white")
+                            ui.label("Undergoing active follow-up").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Plant Critical & Inactive").classes("text-xs text-gray-400")
+                            esc_critical_kpi = ui.label("0").classes("text-xl font-bold text-red-400")
+                            ui.label("Hardware faults or 7+ days zero").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Visits Scheduled").classes("text-xs text-gray-400")
+                            esc_visits_kpi = ui.label("0").classes("text-xl font-bold text-emerald-400")
+                            ui.label("Confirmed via WhatsApp YES").classes("text-[10px] text-gray-500")
+
+                        with ui.card().classes("p-3.5 bg-gray-950 border border-gray-800 rounded-lg"):
+                            ui.label("Resolved Cycles").classes("text-xs text-gray-400")
+                            esc_resolved_kpi = ui.label("0").classes("text-xl font-bold text-cyan-400")
+                            ui.label("Improved or completed cycle").classes("text-[10px] text-gray-500")
+
+                    # Filters
+                    with ui.row().classes("w-full items-center justify-between mt-3 flex-wrap gap-3"):
+                        with ui.row().classes("items-center gap-3 flex-wrap"):
+                            esc_search = ui.input(placeholder="🔍 Search plant, customer, phone...").classes("w-60").props("dense outlined dark")
+                            esc_cat_filter = ui.select(
+                                options=["All", "ALL_FINE", "AVERAGE", "CRITICAL_PERF", "OFFLINE", "INACTIVE", "PLANT_CRITICAL"],
+                                value="All", label="Category"
+                            ).classes("w-40").props("dense outlined dark")
+                            esc_lvl_filter = ui.select(
+                                options=["All", "L1", "L2", "L3", "L4", "L5_YES", "L5_NO", "L6_RECHECK", "VISIT_SCHEDULED", "RESOLVED", "TEAM_ESCALATION"],
+                                value="All", label="Level"
+                            ).classes("w-40").props("dense outlined dark")
+
+                # Escalation States Table
+                esc_cols = [
+                    {"name": "plant_id", "label": "Plant ID", "field": "plant_id", "sortable": True, "align": "left"},
+                    {"name": "customer_name", "label": "Customer", "field": "customer_name", "sortable": True, "align": "left"},
+                    {"name": "phone", "label": "Phone Number", "field": "phone", "align": "left"},
+                    {"name": "category", "label": "Category", "field": "category", "sortable": True, "align": "center"},
+                    {"name": "current_level", "label": "Level", "field": "current_level", "sortable": True, "align": "center"},
+                    {"name": "reminder_count", "label": "Cycles", "field": "reminder_count", "sortable": True, "align": "center"},
+                    {"name": "next_action_at", "label": "Next Step Due", "field": "next_action_at", "sortable": True, "align": "center"},
+                    {"name": "notes", "label": "Notes / Diagnostic", "field": "notes", "align": "left"},
+                    {"name": "actions", "label": "Actions", "field": "actions", "align": "center"},
+                ]
+                esc_table = ui.table(columns=esc_cols, rows=[], row_key="id", pagination=15).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                esc_table.add_slot("body-cell-category", """
+                    <q-td :props="props">
+                        <q-chip :color="props.value === 'ALL_FINE' ? 'positive' : props.value === 'AVERAGE' ? 'teal-7' : props.value === 'CRITICAL_PERF' ? 'amber-8' : props.value === 'OFFLINE' ? 'blue-grey-8' : props.value === 'INACTIVE' ? 'deep-orange-9' : 'negative'" text-color="white" size="sm" dense>
+                            {{ props.value }}
+                        </q-chip>
+                    </q-td>
+                """)
+                esc_table.add_slot("body-cell-current_level", """
+                    <q-td :props="props">
+                        <q-badge :color="props.value === 'RESOLVED' ? 'positive' : props.value === 'VISIT_SCHEDULED' ? 'teal-8' : props.value === 'TEAM_ESCALATION' ? 'negative' : props.value === 'L4' ? 'amber-8' : 'indigo-8'">
+                            {{ props.value }}
+                        </q-badge>
+                    </q-td>
+                """)
+                esc_table.add_slot("body-cell-actions", """
+                    <q-td :props="props">
+                        <div class="row items-center justify-center q-gutter-xs">
+                            <q-btn dense flat color="primary" icon="history" label="Log" size="sm" @click="() => $parent.$emit('view-history', props.row)" />
+                            <q-btn dense flat color="amber" icon="tune" label="Override" size="sm" @click="() => $parent.$emit('override-state', props.row)" />
+                        </div>
+                    </q-td>
+                """)
+
+                # Technician Visits Section
+                with ui.card().classes("w-full p-4 bg-gray-900 border border-gray-800 rounded-xl mt-4"):
+                    with ui.row().classes("w-full items-center justify-between pb-2 border-b border-gray-800"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("engineering").classes("text-emerald-400 text-xl")
+                            ui.label("Dispatched & Scheduled Technician Visits").classes("text-sm font-bold text-white")
+                        ui.label("Automated dispatch from customer YES confirmations").classes("text-xs text-gray-400")
+
+                    tech_cols = [
+                        {"name": "id", "label": "Visit #", "field": "id", "align": "center"},
+                        {"name": "plant_id", "label": "Plant ID", "field": "plant_id", "sortable": True, "align": "left"},
+                        {"name": "customer_name", "label": "Customer", "field": "customer_name", "align": "left"},
+                        {"name": "visit_type", "label": "Type", "field": "visit_type", "sortable": True, "align": "center"},
+                        {"name": "scheduled_date", "label": "Scheduled Date", "field": "scheduled_date", "align": "center"},
+                        {"name": "charges_inr", "label": "Charges (₹)", "field": "charges_inr", "sortable": True, "align": "right"},
+                        {"name": "status", "label": "Status", "field": "status", "sortable": True, "align": "center"},
+                        {"name": "notes", "label": "Notes", "field": "notes", "align": "left"},
+                    ]
+                    visits_table = ui.table(columns=tech_cols, rows=[], row_key="id", pagination=10).classes("w-full bg-gray-900 border border-gray-800 rounded-xl")
+                    visits_table.add_slot("body-cell-status", """
+                        <q-td :props="props">
+                            <q-badge :color="props.value === 'COMPLETED' ? 'positive' : props.value === 'CANCELLED' ? 'grey-7' : 'primary'">
+                                {{ props.value }}
+                            </q-badge>
+                        </q-td>
+                    """)
 
     # ─────────────────────────────────────────────────────────────
     # REACTIVE DATA LOADING & EVENT HANDLERS
@@ -1372,6 +1493,184 @@ def build_crm_tab(app_state: dict):
 
     offline_table.on("preview-alert", lambda e: open_preview(e.args, "offline"))
 
+    # Escalation Dialogs
+    esc_history_dialog = ui.dialog()
+    history_container = {"plant_id": "", "rows": []}
+
+    with esc_history_dialog, ui.card().classes("w-[680px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-2xl shadow-2xl"):
+        with ui.row().classes("w-full items-center justify-between mb-3 border-b border-gray-800 pb-2"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("history").classes("text-amber-400 text-2xl")
+                esc_hist_title = ui.label("Escalation Lifecycle History").classes("text-base font-bold text-white")
+            ui.button(icon="close", on_click=esc_history_dialog.close).props("flat round dense size=sm color=white")
+
+        hist_cols = [
+            {"name": "from_level", "label": "From", "field": "from_level", "align": "center"},
+            {"name": "to_level", "label": "To", "field": "to_level", "align": "center"},
+            {"name": "trigger_reason", "label": "Trigger Reason", "field": "trigger_reason", "align": "left"},
+            {"name": "message_template", "label": "Template", "field": "message_template", "align": "center"},
+            {"name": "created_at", "label": "Timestamp", "field": "created_at", "align": "center"},
+        ]
+        hist_table = ui.table(columns=hist_cols, rows=[], row_key="id", pagination=10).classes("w-full bg-gray-950 border border-gray-800 rounded-lg")
+        hist_table.add_slot("body-cell-to_level", """
+            <q-td :props="props">
+                <q-badge color="amber-8">{{ props.value }}</q-badge>
+            </q-td>
+        """)
+
+        with ui.row().classes("w-full justify-end mt-4"):
+            ui.button("Close", on_click=esc_history_dialog.close).props("flat color=white")
+
+    # Manual Override Dialog
+    esc_override_dialog = ui.dialog()
+    override_target = {"plant_id": ""}
+
+    with esc_override_dialog, ui.card().classes("w-[480px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-2xl shadow-2xl"):
+        with ui.row().classes("w-full items-center justify-between mb-3 border-b border-gray-800 pb-2"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("tune").classes("text-amber-400 text-2xl")
+                override_title = ui.label("Manual Operator Override").classes("text-base font-bold text-white")
+            ui.button(icon="close", on_click=esc_override_dialog.close).props("flat round dense size=sm color=white")
+
+        override_level_select = ui.select(
+            options=["L1", "L2", "L3", "L4", "L5_YES", "L5_NO", "L6_RECHECK", "VISIT_SCHEDULED", "RESOLVED", "TEAM_ESCALATION"],
+            value="RESOLVED", label="Target Level"
+        ).classes("w-full mb-3").props("dense outlined dark")
+
+        override_notes_input = ui.input(label="Operator Notes / Reason", placeholder="e.g. Inverter fixed manually by local electrician").classes("w-full mb-4").props("dense outlined dark")
+
+        async def execute_override():
+            pid = override_target["plant_id"]
+            lvl = override_level_select.value
+            notes = override_notes_input.value or "Manual operator override"
+            state = await asyncio.to_thread(escalation_state_machine.get_active_escalation, pid)
+            if not state:
+                ui.notify("Escalation state not found.", type="negative")
+                return
+
+            with db.crm_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE escalation_state
+                    SET current_level = ?, notes = notes || ' | ' || ?, updated_at = datetime('now')
+                    WHERE plant_id = ?;
+                """, [lvl, notes, pid])
+
+            await asyncio.to_thread(
+                escalation_state_machine.log_escalation_transition,
+                plant_id=pid,
+                customer_id=state.get("customer_id"),
+                category=state["category"],
+                from_level=state["current_level"],
+                to_level=lvl,
+                trigger_reason="manual_operator_override",
+                metadata_json=notes
+            )
+            esc_override_dialog.close()
+            ui.notify(f"Overridden {pid} -> {lvl}!", type="positive")
+            await load_escalation_data()
+
+        with ui.row().classes("w-full justify-end gap-3"):
+            ui.button("Cancel", on_click=esc_override_dialog.close).props("flat color=white")
+            ui.button("Apply Override", icon="check", on_click=lambda: asyncio.create_task(execute_override())).props("unelevated color=primary")
+
+    cached_escalation_rows: List[Dict[str, Any]] = []
+
+    def filter_and_render_escalations():
+        q = (esc_search.value or "").strip().lower()
+        c_filt = esc_cat_filter.value
+        l_filt = esc_lvl_filter.value
+
+        filtered = []
+        for r in cached_escalation_rows:
+            if q:
+                p_id = str(r.get("plant_id", "")).lower()
+                c_name = str(r.get("customer_name", "")).lower()
+                ph = str(r.get("phone", "")).lower()
+                if q not in p_id and q not in c_name and q not in ph:
+                    continue
+            if c_filt != "All" and r.get("category") != c_filt:
+                continue
+            if l_filt != "All" and r.get("current_level") != l_filt:
+                continue
+            filtered.append(r)
+        esc_table.rows = filtered
+
+    esc_search.on("update:model-value", lambda e: filter_and_render_escalations())
+    esc_cat_filter.on("update:model-value", lambda e: filter_and_render_escalations())
+    esc_lvl_filter.on("update:model-value", lambda e: filter_and_render_escalations())
+
+    async def open_history_dialog(row: dict):
+        pid = str(row.get("plant_id"))
+        history_container["plant_id"] = pid
+        esc_hist_title.text = f"Escalation History: {pid}"
+        sql = "SELECT * FROM escalation_log WHERE plant_id = ? ORDER BY id DESC;"
+        logs_df = await asyncio.to_thread(db.query_df, sql, [pid], "crm")
+        hist_table.rows = logs_df.to_dict(orient="records") if not logs_df.empty else []
+        esc_history_dialog.open()
+
+    async def open_override_dialog(row: dict):
+        pid = str(row.get("plant_id"))
+        override_target["plant_id"] = pid
+        override_title.text = f"Override: {pid} (Current: {row.get('current_level')})"
+        override_level_select.value = "RESOLVED"
+        override_notes_input.value = ""
+        esc_override_dialog.open()
+
+    esc_table.on("view-history", lambda e: asyncio.create_task(open_history_dialog(e.args)))
+    esc_table.on("override-state", lambda e: asyncio.create_task(open_override_dialog(e.args)))
+
+    # Load Escalation States & Visits
+    async def load_escalation_data():
+        nonlocal cached_escalation_rows
+        sql = """
+        SELECT e.*, c.customer_name, c.phone, c.preferred_lang
+        FROM escalation_state e
+        LEFT JOIN customers c ON e.plant_id = c.plant_id
+        ORDER BY e.updated_at DESC;
+        """
+        df = await asyncio.to_thread(db.query_df, sql, None, "crm")
+        cached_escalation_rows = df.to_dict(orient="records") if not df.empty else []
+        filter_and_render_escalations()
+
+        # Update KPIs
+        total_active = sum(1 for r in cached_escalation_rows if r.get("current_level") not in ("RESOLVED",))
+        critical_count = sum(1 for r in cached_escalation_rows if r.get("category") in ("PLANT_CRITICAL", "INACTIVE"))
+        visits_count = sum(1 for r in cached_escalation_rows if r.get("current_level") == "VISIT_SCHEDULED")
+        resolved_count = sum(1 for r in cached_escalation_rows if r.get("current_level") == "RESOLVED")
+
+        esc_total_kpi.text = str(total_active)
+        esc_critical_kpi.text = str(critical_count)
+        esc_visits_kpi.text = str(visits_count)
+        esc_resolved_kpi.text = str(resolved_count)
+
+        # Load technician visits
+        v_sql = """
+        SELECT v.*, c.customer_name, c.phone
+        FROM technician_visits v
+        LEFT JOIN customers c ON v.plant_id = c.plant_id
+        ORDER BY v.created_at DESC LIMIT 30;
+        """
+        v_df = await asyncio.to_thread(db.query_df, v_sql, None, "crm")
+        visits_table.rows = v_df.to_dict(orient="records") if not v_df.empty else []
+
+    async def run_fleet_categorization():
+        ui.notify("Evaluating fleet generation and baseline metrics...", type="info")
+        res = await asyncio.to_thread(escalation_state_machine.run_daily_categorization)
+        ui.notify(f"Categorized {res['total_plants_evaluated']} plants: {res['newly_triggered']} new triggers, {res['states_advanced']} advanced!", type="positive")
+        await load_escalation_data()
+
+    async def run_state_advancement():
+        ui.notify("Advancing escalation state machine timers...", type="info")
+        adv = await asyncio.to_thread(escalation_state_machine.advance_all_state_machines)
+        ui.notify(f"Advanced {len(adv)} plants along conversation funnel!", type="positive")
+        await load_escalation_data()
+
+    async def run_s3_archive_sync():
+        ui.notify("Executing AWS S3 Bronze backup sync...", type="info")
+        arch = await asyncio.to_thread(s3_archive.run_nightly_archive)
+        ui.notify(f"Archived {arch['escalation_state'].get('count', 0)} escalation states to bronze storage!", type="positive")
+
     # Initial Master Table Load
     async def load_all_crm_data():
         nonlocal cached_telemetry_rows
@@ -1383,6 +1682,7 @@ def build_crm_tab(app_state: dict):
         await load_yearly_milestones()
         await load_campaigns()
         await load_offline_alerts()
+        await load_escalation_data()
 
     # External refresh listener
     async def on_external_update():

@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     aisensy_api_key: str = ""
     freshworks_api_key: str = ""
     gupshup_api_key: str = ""
+    gupshup_app_name: str = "SolaronHomes"
+    gupshup_source_number: str = "919619455207"
+    gupshup_webhook_secret: str = ""
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-south-1"
+    s3_bucket_name: str = "solaron-data"
     support_phone: str = ""
     test_phone_number: str = ""
     price_per_unit: float = 14.0

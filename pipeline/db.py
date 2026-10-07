@@ -636,10 +636,76 @@ def init_db() -> None:
             cooldown_hours INTEGER DEFAULT 24
         );
 
+        -- Escalation Engine: active escalation state machine
+        CREATE TABLE IF NOT EXISTS escalation_state (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id         TEXT NOT NULL UNIQUE,
+            customer_id      INTEGER REFERENCES customers(id),
+            category         TEXT NOT NULL,                  -- ALL_FINE, AVERAGE, CRITICAL_PERF, OFFLINE, INACTIVE, PLANT_CRITICAL
+            current_level    TEXT NOT NULL DEFAULT 'L1',     -- L1..L6, RESOLVED, VISIT_SCHEDULED, TEAM_ESCALATION
+            level_entered_at TEXT NOT NULL,                  -- ISO timestamp
+            reminder_count   INTEGER DEFAULT 0,             -- how many L2-L4 repeat cycles
+            max_reminders    INTEGER DEFAULT 2,             -- after this -> team escalation
+            next_action_at   TEXT,                          -- ISO timestamp for next scheduled step
+            last_message_id  TEXT,                          -- Gupshup message ID for tracking
+            notes            TEXT DEFAULT '',
+            created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Escalation Engine: immutable transition and audit log
+        CREATE TABLE IF NOT EXISTS escalation_log (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id         TEXT NOT NULL,
+            customer_id      INTEGER,
+            category         TEXT NOT NULL,
+            from_level       TEXT,
+            to_level         TEXT NOT NULL,
+            trigger_reason   TEXT,                          -- 'categorizer', 'customer_reply_YES', 'customer_reply_NO', 'timer_expired', etc.
+            message_template TEXT,                          -- which template was sent
+            gupshup_msg_id   TEXT,                          -- Gupshup API response message ID
+            metadata_json    TEXT,                          -- JSON blob: generation data, ratio, fault codes
+            created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Gupshup webhook raw inbound log
+        CREATE TABLE IF NOT EXISTS gupshup_inbound_log (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone            TEXT NOT NULL,
+            message_text     TEXT,
+            message_type     TEXT,                          -- text, button, quick_reply
+            gupshup_event    TEXT,                          -- message, message-event
+            raw_payload      TEXT,                          -- full JSON from webhook
+            processed        INTEGER DEFAULT 0,             -- 0=pending, 1=processed
+            created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        -- Scheduled & dispatched technician visits
+        CREATE TABLE IF NOT EXISTS technician_visits (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id         TEXT NOT NULL,
+            customer_id      INTEGER,
+            escalation_id    INTEGER REFERENCES escalation_state(id),
+            visit_type       TEXT DEFAULT 'standard',       -- standard, priority, immediate
+            scheduled_date   TEXT,
+            status           TEXT DEFAULT 'SCHEDULED',       -- SCHEDULED, COMPLETED, CANCELLED
+            charges_inr      REAL DEFAULT 0.0,
+            notes            TEXT DEFAULT '',
+            created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_customers_plant ON customers(plant_id);
         CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
         CREATE INDEX IF NOT EXISTS idx_queue_status ON message_queue(status);
         CREATE INDEX IF NOT EXISTS idx_alert_log_plant ON alert_send_log(plant_id, alert_type);
+        CREATE INDEX IF NOT EXISTS idx_escalation_plant ON escalation_state(plant_id);
+        CREATE INDEX IF NOT EXISTS idx_escalation_cat ON escalation_state(category);
+        CREATE INDEX IF NOT EXISTS idx_escalation_lvl ON escalation_state(current_level);
+        CREATE INDEX IF NOT EXISTS idx_escalation_next ON escalation_state(next_action_at);
+        CREATE INDEX IF NOT EXISTS idx_escalation_log_plant ON escalation_log(plant_id);
+        CREATE INDEX IF NOT EXISTS idx_gupshup_phone ON gupshup_inbound_log(phone);
+        CREATE INDEX IF NOT EXISTS idx_tech_visits_plant ON technician_visits(plant_id);
         """)
 
 if __name__ == "__main__":

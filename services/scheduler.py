@@ -6,10 +6,14 @@ try:
     from pipeline import pipeline
     from core import analytics
     from services import crm
+    from services import s3_archive
+    from engines import escalation_state_machine
 except ImportError:
     import pipeline
     import analytics
     import crm
+    import s3_archive
+    import escalation_state_machine
 
 scheduler = BackgroundScheduler()
 
@@ -67,6 +71,36 @@ def setup_scheduler():
         trigger=CronTrigger(day=1, hour=2, minute=30),  # 08:00 IST on 1st of month
         id="monthly_campaign_prep",
         name="Monthly WhatsApp Statement Campaign Preparation",
+        coalesce=True,
+        max_instances=1,
+        replace_existing=True
+    )
+    # 6. Escalation engine: classify all plants daily at 07:00 IST (01:30 UTC)
+    scheduler.add_job(
+        escalation_state_machine.run_daily_categorization,
+        trigger=CronTrigger(hour=1, minute=30),  # 07:00 IST
+        id="daily_escalation_categorize",
+        name="Daily Plant Categorization (6 Categories)",
+        coalesce=True,
+        max_instances=1,
+        replace_existing=True
+    )
+    # 7. Escalation engine: advance state machines every 2 hours
+    scheduler.add_job(
+        escalation_state_machine.advance_all_state_machines,
+        trigger=IntervalTrigger(hours=2),
+        id="escalation_state_advance",
+        name="Escalation State Machine Advancement",
+        coalesce=True,
+        max_instances=1,
+        replace_existing=True
+    )
+    # 8. Nightly S3 bronze archive at 02:00 IST (20:30 UTC previous day)
+    scheduler.add_job(
+        s3_archive.run_nightly_archive,
+        trigger=CronTrigger(hour=20, minute=30),  # 02:00 IST
+        id="nightly_s3_archive",
+        name="Nightly S3 Bronze Archive",
         coalesce=True,
         max_instances=1,
         replace_existing=True
