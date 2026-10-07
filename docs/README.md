@@ -14,6 +14,7 @@ Welcome to the Solaron Platform technical documentation repository. This directo
 | **Backend Architecture** | [`BACKEND.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/BACKEND.md) | **Backend Engineers.** FastAPI REST API endpoints, SQLite schema migrations, data sanitization firewalls, and pipeline orchestrators. |
 | **Frontend Architecture** | [`FRONTEND.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/FRONTEND.md) | **Frontend Engineers.** NiceGUI component hierarchy, client-side reactive state management, Tailwind styling, and Apache ECharts integration. |
 | **Security & Compliance** | [`SECURITY.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/SECURITY.md) | **DevOps & SecOps.** Credential isolation, encrypted environment storage, network firewalls, and rate-limiting protocols. |
+| **Gupshup WhatsApp Templates** | [`GUPSHUP_TEMPLATES_GUIDE.md`](file:///c:/Users/raaji/Downloads/Solaron/Solarondashboard/docs/GUPSHUP_TEMPLATES_GUIDE.md) | **Customer Ops & Integrations.** WhatsApp template specifications, multilinguality (en/hi/mr), and variables. |
 
 ---
 
