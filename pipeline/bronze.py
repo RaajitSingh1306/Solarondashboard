@@ -54,6 +54,7 @@ def archive_raw_response(
     """
     if not date_str:
         date_str = datetime.date.today().isoformat()
+    clean_source = source.lower().strip()
 
     # Serialize payload to bytes
     if isinstance(data, (dict, list)):
@@ -72,25 +73,45 @@ def archive_raw_response(
 
     target_dir = get_bronze_dir(source, date_str)
 
+    file_path = None
     if compress:
-        file_path = target_dir / f"{clean_endpoint}_{now_ts}_{content_hash}.json.gz"
-        # Check if identical hash file already exists in partition
         existing = list(target_dir.glob(f"{clean_endpoint}_*_{content_hash}.json.gz"))
         if existing:
-            return existing[0]
-
-        with gzip.open(file_path, "wb") as f:
-            f.write(payload_bytes)
+            file_path = existing[0]
+        else:
+            file_path = target_dir / f"{clean_endpoint}_{now_ts}_{content_hash}.json.gz"
+            with gzip.open(file_path, "wb") as f:
+                f.write(payload_bytes)
     else:
-        file_path = target_dir / f"{clean_endpoint}_{now_ts}_{content_hash}.json"
         existing = list(target_dir.glob(f"{clean_endpoint}_*_{content_hash}.json"))
         if existing:
-            return existing[0]
-
-        with open(file_path, "wb") as f:
-            f.write(payload_bytes)
+            file_path = existing[0]
+        else:
+            file_path = target_dir / f"{clean_endpoint}_{now_ts}_{content_hash}.json"
+            with open(file_path, "wb") as f:
+                f.write(payload_bytes)
 
     logger.info(f"Archived bronze record: {file_path}")
+
+    # Mirror to AWS S3 raw lake with date-based metadata
+    try:
+        from services import s3_archive
+        s3_key = f"raw/{clean_source}/{date_str}/{file_path.name}"
+        s3_archive.upload_file_to_s3(
+            file_path,
+            s3_key,
+            overwrite_if_empty_only=True,
+            metadata={
+                "source": clean_source,
+                "endpoint": clean_endpoint,
+                "date": date_str,
+                "content_hash": content_hash,
+                "type": "raw_vendor_scrape"
+            }
+        )
+    except Exception as s3_err:
+        logger.debug(f"S3 bronze upload skipped or failed: {s3_err}")
+
     return file_path
 
 

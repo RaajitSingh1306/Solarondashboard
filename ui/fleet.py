@@ -105,6 +105,30 @@ def build_fleet_tab(app_state: dict):
         tot_kwp_label.text = f"{tot_kwp:.2f} MWp"
         inverters_label.text = f"{active_fleet_count} Inverters ({total_plants} Total Tracked)"
 
+    # Portal and S3 sync status indicators
+    sync_badges_row = ui.row().classes("w-full items-center gap-2 mb-3 px-1 text-xs flex-wrap")
+    async def render_sync_badges():
+        sync_badges_row.clear()
+        sync_info = await asyncio.to_thread(db.get_last_sync_by_portal)
+        with sync_badges_row:
+            ui.label("Sync Status:").classes("text-gray-400 font-semibold mr-1 self-center")
+            for portal, name in [("growatt", "Growatt"), ("isolarcloud", "iSolarCloud"), ("suryalog", "SuryaLog")]:
+                info = sync_info.get(portal, {})
+                t_str = info.get("completed_at", "Never")
+                cnt = info.get("items_count", 0)
+                status = info.get("status", "unknown")
+                is_ok = (status == "success")
+                badge_color = "bg-emerald-950/80 border-emerald-700/60 text-emerald-300" if is_ok else "bg-rose-950/80 border-rose-700/60 text-rose-300"
+                dot_color = "bg-emerald-400" if is_ok else "bg-rose-400"
+                with ui.element("div").classes(f"flex items-center gap-1.5 px-2.5 py-1 rounded-md border {badge_color}"):
+                    ui.element("span").classes(f"w-2 h-2 rounded-full {dot_color}")
+                    t_display = t_str[-8:] if len(t_str) >= 8 else t_str
+                    ui.label(f"{name}: {cnt} plants ({t_display})").classes("font-mono font-medium")
+            # AWS S3 badge
+            with ui.element("div").classes("flex items-center gap-1.5 px-2.5 py-1 rounded-md border bg-indigo-950/80 border-indigo-700/60 text-indigo-300 ml-auto"):
+                ui.element("span").classes("w-2 h-2 rounded-full bg-indigo-400")
+                ui.label("AWS S3: Connected (solaron-dashboard-data)").classes("font-medium")
+
     with ui.row().classes("w-full items-center gap-3 mb-4"):
         # Month selector inside tab
         avail_months = db.get_available_months()
@@ -344,10 +368,11 @@ def build_fleet_tab(app_state: dict):
         ) m ON p.plant_id = m.plant_id
         ORDER BY p.plant_name ASC;
         """
-        # Run table query and KPI calculation concurrently in background thread pool
-        df, _ = await asyncio.gather(
+        # Run table query, KPI calculation, and sync badge refresh concurrently
+        df, _, _ = await asyncio.gather(
             asyncio.to_thread(db.query_df, sql, [d_start, d_end, m], "analytics"),
-            render_kpis()
+            render_kpis(),
+            render_sync_badges()
         )
         all_rows = df.to_dict(orient="records") if not df.empty else []
         apply_filters()
@@ -443,6 +468,14 @@ def build_fleet_tab(app_state: dict):
         def on_fleet_progress(msg: str, pct: float):
             backend_status["msg"] = msg
 
+        try:
+            from services import scheduler
+            if not scheduler.acquire_sync_lock("manual_fleet_sync"):
+                ui.notify("⚠️ Another sync operation is currently running in the background. Please wait for it to complete.", type="warning")
+                return
+        except Exception:
+            pass
+
         with client:
             live_sync_btn.disable()
             live_sync_btn.props("loading")
@@ -502,6 +535,11 @@ def build_fleet_tab(app_state: dict):
                     sync_status_label.set_text("Sync Error")
                     ui.notify(f"Live Sync Error: {e}", type="negative")
         finally:
+            try:
+                from services import scheduler
+                scheduler.release_sync_lock()
+            except Exception:
+                pass
             stop_fleet_timer.set()
             try:
                 timer_task.cancel()

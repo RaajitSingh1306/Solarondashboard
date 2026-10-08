@@ -210,12 +210,10 @@ class SuryaLogExtractor(BaseExtractor):
 
                             # Sanity check: B1 - Prevent total lifetime energy from overwriting monthly energy
                             max_month_limit = cap * 220.0
-                            if live_month is not None and (live_month > max_month_limit or (live_total is not None and live_total > 0 and abs(live_month - live_total) < 1.0 and live_month > max_month_limit)):
-                                logger.warning(f"SuryaLog plant {p_text}: #PMKWH value {live_month} appears to be lifetime total, ignoring as monthly.")
-                                matched_rec["total_energy_kwh"] = live_month
-                                if (matched_rec.get("month_energy_kwh") or 0) > max_month_limit:
-                                    matched_rec["month_energy_kwh"] = round(cap * 90.0, 1)
-                            elif live_month is not None and live_month > 0:
+                            if live_month is not None and live_month > max_month_limit:
+                                logger.warning(f"SuryaLog plant {p_text}: value {live_month} exceeds capacity limit ({max_month_limit} kWh), rejecting.")
+                                matched_rec["month_energy_kwh"] = None
+                            elif live_month is not None and live_month >= 0:
                                 matched_rec["month_energy_kwh"] = live_month
                             elif is_stale_date:
                                 matched_rec["month_energy_kwh"] = 0.0

@@ -78,6 +78,8 @@ class BaseExtractor(ABC):
 
     @classmethod
     def plant_id(cls, source_prefix: str, raw_id: Any) -> str:
-        """Generate unique plant ID with prefix: growatt_12345, isc_Name, syr_Name."""
+        """Generate unique plant ID with prefix: growatt_12345, isolarcloud_SG-001, etc."""
         raw_clean = re.sub(r"[^\w-]", "_", str(raw_id).strip())
+        if raw_clean.startswith(f"{source_prefix}_"):
+            return raw_clean
         return f"{source_prefix}_{raw_clean}"

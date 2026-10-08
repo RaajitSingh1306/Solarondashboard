@@ -1,4 +1,6 @@
 import datetime
+import logging
+import re
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from config import settings
@@ -77,10 +79,10 @@ MONTH_NAMES = {
 MSG_ACTIVE_EN = (
     "Greetings From Solaron Homes Pvt Ltd,\n\n"
     "Dear Sir/Madam,\n"
-    "Your solar plant generated {energy} units in the previous month {month_name} {year}\n"
-    "You have saved approximately ₹{savings}\n"
+    "Your solar plant generated {energy} units in the previous month {month_name} {year}!\n"
+    "You have saved approximately ₹{savings} (calculated at ₹14/unit).\n\n"
     "Kindly ensure regular cleaning of your plant maximizes your savings.\n"
-    "If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us.\n\n"
+    "If you want to buy cleaning equipment like telescopic poles, or have any other query, please reach out to us at 9619455207.\n\n"
     "Thank You,\n"
     "Team Solaron"
 )
@@ -88,93 +90,68 @@ MSG_ACTIVE_EN = (
 MSG_ACTIVE_HI = (
     "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
     "प्रिय महोदय/मैम,\n"
-    "आपके सोलर प्लांट ने पिछले महीने {month_name} {year} में {energy} यूनिट बिजली बनाई।\n"
-    "आपने लगभग ₹{savings} की बचत की है।\n"
+    "आपके सोलर प्लांट ने पिछले महीने {month_name} {year} में {energy} यूनिट बिजली बनाई!\n"
+    "आपने लगभग ₹{savings} की बचत की है (₹14/यूनिट की दर से)।\n\n"
     "कृपया ध्यान दें कि प्लांट की नियमित सफाई से आपकी बचत अधिकतम होती है।\n"
-    "यदि आप टेलीस्कोपिक पोल जैसे सफाई उपकरण खरीदना चाहते हैं, या कोई अन्य प्रश्न है, तो कृपया हमसे संपर्क करें।\n\n"
+    "यदि आप टेलीस्कोपिक पोल जैसे सफाई उपकरण खरीदना चाहते हैं, या कोई अन्य प्रश्न है, तो कृपया हमसे ९६१९४५५२०७ पर संपर्क करें।\n\n"
     "धन्यवाद,\n"
     "टीम सोलरॉन"
 )
 
-MSG_ACTIVE_MR = (
-    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
-    "प्रिय महोदय/मॅडम,\n"
-    "आपल्या सोलर प्लांटने मागील महिन्यात {month_name} {year} मध्ये {energy} युनिट्स वीज निर्मिती केली.\n"
-    "आपली अंदाजे बचत ₹{savings} झाली आहे.\n"
-    "कृपया लक्षात ठेवा की प्लांटची नियमित स्वच्छता आपल्या बचतीत वाढ करते.\n"
-    "आपण टेलिस्कोपिक पोलसारखी स्वच्छता उपकरणे खरेदी करू इच्छित असल्यास, किंवा इतर कोणतीही शंका असल्यास, कृपया आमच्याशी संपर्क साधा.\n\n"
-    "धन्यवाद,\n"
-    "टीम सोलरॉन"
-)
-
-MSG_OFFLINE_DEFAULT = (
-    "Greetings From Solaron Homes Pvt Ltd,\n\n"
-    "Dear Sir/Madam,\n"
-    "your solar plant is offline. please check once physically...\n\n"
-    "If any queries, please connect with our team at {support_phone}\n\n"
-    "Team solaron,\n\n"
-    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं\n\n"
-    "प्रिय महोदय/मैम,\n"
-    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें...\n\n"
-    "यदि कोई प्रश्न हैं, तो कृपया हमारी टीम को कॉल कीजिए {support_phone}\n\n"
-    "टीम सोलरॉन"
-)
+MSG_ACTIVE_MR = MSG_ACTIVE_EN
 
 MSG_OFFLINE_EN = (
-    "Greetings From Solaron Homes Pvt Ltd,\n\n"
-    "Dear Sir/Madam,\n"
-    "your solar plant is offline. please check once physically...\n\n"
-    "If any queries, please connect with our team at {support_phone}\n\n"
+    "Greetings From Solaron Homes Pvt Ltd ,\n\n"
+    "Dear sir /Mam,\n"
+    "your solar plant is offline. please check once physically - either your plant is not working or your data logger has got spoilt or the wifi connection is not available any longer. If you want we will arrange our representative to check your plant and carry out the troubleshooting for your plant .\n"
+    "We will check all parameter of your solar plant and share visit report with you. We can also carry out a cleaning cycle at additional cost if you want.\n\n"
+    "If any queries , please connect with our team at {support_phone}\n\n"
     "Team solaron"
 )
 
 MSG_OFFLINE_HI = (
-    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं\n\n"
     "प्रिय महोदय/मैम,\n"
-    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें...\n\n"
+    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें - या तो आपका प्लांट काम नहीं कर रहा है या आपका डेटा लॉगर खराब हो गया है या वाईफ़ाई कनेक्शन अब उपलब्ध नहीं है। यदि आप चाहें तो हम आपके प्लांट की जाँच करने और आपके प्लांट के लिए समस्या निवारण करने के लिए अपने प्रतिनिधि की व्यवस्था करेंगे।\n"
+    "हम आपके सोलर प्लांट के सभी पैरामीटर की जाँच करेंगे और आपको एक रिपोर्ट साझा करेंगे। यदि आप चाहें तो हम अतिरिक्त लागत पर सफाई चक्र भी चला सकते हैं।\n\n"
     "यदि कोई प्रश्न हैं, तो कृपया हमारी टीम को कॉल कीजिए {support_phone}\n\n"
     "टीम सोलरॉन"
 )
 
-MSG_OFFLINE_MR = (
-    "Greetings From Solaron Homes Pvt Ltd,\n\n"
-    "Dear Sir/Madam,\n"
-    "your solar plant is offline. please check once physically...\n\n"
-    "If any queries, please connect with our team at {support_phone}\n\n"
+MSG_OFFLINE_DEFAULT = (
+    "Greetings From Solaron Homes Pvt Ltd ,\n\n"
+    "Dear sir /Mam,\n"
+    "your solar plant is offline. please check once physically - either your plant is not working or your data logger has got spoilt or the wifi connection is not available any longer. If you want we will arrange our representative to check your plant and carry out the troubleshooting for your plant .\n"
+    "We will check all parameter of your solar plant and share visit report with you. We can also carry out a cleaning cycle at additional cost if you want.\n\n"
+    "If any queries , please connect with our team at {support_phone}\n\n"
     "Team solaron,\n\n"
-    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार\n\n"
-    "प्रिय महोदय/मॅडम,\n"
-    "आपला सोलर प्लांट ऑफलाइन आहे. कृपया एकदा प्रत्यक्ष तपासणी करा...\n\n"
-    "काही शंका असल्यास, कृपया आमच्या टीमशी संपर्क साधा {support_phone}\n\n"
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं\n\n"
+    "प्रिय महोदय/मैम,\n"
+    "आपका सोलर प्लांट ऑफ़लाइन है। कृपया एक बार भौतिक रूप से जाँच लें - या तो आपका प्लांट काम नहीं कर रहा है या आपका डेटा लॉगर खराब हो गया है या वाईफ़ाई कनेक्शन अब उपलब्ध नहीं है। यदि आप चाहें तो हम आपके प्लांट की जाँच करने और आपके प्लांट के लिए समस्या निवारण करने के लिए अपने प्रतिनिधि की व्यवस्था करेंगे।\n"
+    "हम आपके सोलर प्लांट के सभी पैरामीटर की जाँच करेंगे और आपको एक रिपोर्ट साझा करेंगे। यदि आप चाहें तो हम अतिरिक्त लागत पर सफाई चक्र भी चला सकते हैं।\n\n"
+    "यदि कोई प्रश्न हैं, तो कृपया हमारी टीम को कॉल कीजिए {support_phone}\n\n"
     "टीम सोलरॉन"
 )
 
+MSG_OFFLINE_MR = MSG_OFFLINE_EN
+
 MSG_MONSOON_EN = (
-    "Greetings From Solaron Homes Pvt Ltd,\n\n"
+    "from Solaron Homes Pvt Ltd ,\n\n"
     "Dear Sir/Madam,\n"
-    "The monsoon season is going to start soon. We advise a thorough check of your solar plant's earthing and wiring.\n"
-    "Ensure there is no water accumulation near the electrical panels.\n\n"
-    "Thank You,\n"
+    "The monsoon season is going to start soon and this will result in wind speed going up. We strongly recommend that you’ll carry out the pre monsoon check up for your solar plants. As part of the pre monsoon check up we shall check the overall plant working and also tighten any loose nuts and bolts. Please contact us for a single visit or for the annual service contracts.\n\n"
+    "Thank You\n"
     "Team Solaron"
 )
 
 MSG_MONSOON_HI = (
-    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+    "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से,\n\n"
     "प्रिय महोदय/मैम,\n"
-    "मानसून का मौसम जल्द ही शुरू होने वाला है। हम आपके सोलर प्लांट के अर्थिंग और वायरिंग की गहन जांच की सलाह देते हैं।\n"
-    "सुनिश्चित करें कि इलेक्ट्रिकल पैनलों के पास पानी जमा न हो।\n\n"
+    "मानसून का मौसम जल्द ही शुरू होने वाला है और इसके कारण हवा की गति बढ़ जाएगी। हम दृढ़ता से अनुशंसा करते हैं कि आप अपने सोलर प्लांट की प्री-मानसून जांच अवश्य करवाएं। प्री-मानसून जांच के हिस्से के रूप में हम प्लांट के समग्र कामकाज की जांच करेंगे और किसी भी ढीले नट-बोल्ट को कसेंगे। कृपया एक विजिट या वार्षिक सेवा अनुबंध (AMC) के लिए हमसे संपर्क करें।\n\n"
     "धन्यवाद,\n"
     "टीम सोलरॉन"
 )
 
-MSG_MONSOON_MR = (
-    "सोलरॉन होम्स प्रायव्हेट लिमिटेड कडून सस्नेह नमस्कार,\n\n"
-    "प्रिय महोदय/मॅडम,\n"
-    "पावसाळा लवकरच सुरू होत आहे. आम्ही आपल्या सोलर प्लांटचे अर्थिंग आणि वायरिंग नीट तपासण्याचा सल्ला देतो.\n"
-    "इलेक्ट्रिकल पॅनेलजवळ पाणी साचणार नाही याची काळजी घ्या.\n\n"
-    "धन्यवाद,\n"
-    "टीम सोलरॉन"
-)
+MSG_MONSOON_MR = MSG_MONSOON_EN
 
 MSG_DAILY_EN = (
     "Greetings From Solaron Homes Pvt Ltd,\n\n"
@@ -344,6 +321,94 @@ def format_offline_whatsapp_message(
     else:
         return MSG_OFFLINE_EN.format(support_phone=phone)
 
+
+def build_gupshup_monthly_statement_params(
+    customer_name: str,
+    plant_name: str,
+    capacity_kwp: float,
+    month: str,
+    kwh: float,
+    revenue_inr: float,
+    yield_per_day: Optional[float] = None,
+    tier: str = "Good",
+    lang: str = "english",
+) -> List[str]:
+    """
+    Builds the exact sequential parameters list [{{1}}, {{2}}, ... {{8}}]
+    for Meta Gupshup template 'solaron_monthly_statement'.
+    """
+    resolved_lang = _resolve_lang(lang)
+    cap = f"{capacity_kwp:.1f} kWp" if capacity_kwp else "5.0 kWp"
+
+    parts = month.split("-") if month and "-" in month else ["2026", "09"]
+    yr = parts[0]
+    m_num = parts[1] if len(parts) > 1 else "09"
+    m_name = MONTH_NAMES.get(resolved_lang, MONTH_NAMES["english"]).get(m_num, "September")
+    period_str = f"{m_name} {yr}"
+
+    energy_str = f"{kwh:,.1f}" if (kwh % 1 != 0) else f"{round(kwh):,}"
+    savings_str = f"{round(revenue_inr or (kwh * 14.0)):,}"
+
+    if yield_per_day is not None and yield_per_day > 0:
+        ypd = f"{yield_per_day:.2f}"
+    else:
+        denom = (capacity_kwp or 5.0) * 30.0
+        ypd = f"{(kwh / denom):.2f}" if denom > 0 else "3.6"
+
+    if resolved_lang == "marathi":
+        yield_str = f"{ypd} युनिट/kWp/दिवस"
+        status_str = f"{tier} (योग्य कार्यक्षमता)"
+    elif resolved_lang == "hindi":
+        yield_str = f"{ypd} यूनिट/kWp/दिन"
+        status_str = f"{tier} (सक्रिय स्थिति)"
+    else:
+        yield_str = f"{ypd} units/kWp/day"
+        status_str = f"{tier} (Optimal Performance)"
+
+    return [
+        str(customer_name or "Solar Customer"),
+        str(plant_name or "Solar Rooftop"),
+        cap,
+        period_str,
+        energy_str,
+        savings_str,
+        yield_str,
+        status_str,
+    ]
+
+
+def build_gupshup_offline_alert_params(
+    customer_name: str,
+    plant_name: str,
+    inverter_model: str,
+    last_log_time: str,
+    hours_offline: int = 4,
+    support_phone: str = "",
+    lang: str = "english",
+) -> List[str]:
+    """
+    Builds the exact sequential parameters list [{{1}}, {{2}}, ... {{6}}]
+    for Meta Gupshup template 'solaron_offline_alert'.
+    """
+    resolved_lang = _resolve_lang(lang)
+    phone = support_phone or getattr(settings, "support_phone", "") or "+91 96194 55207"
+
+    if resolved_lang == "marathi":
+        dur_str = f"{hours_offline} तास"
+    elif resolved_lang == "hindi":
+        dur_str = f"{hours_offline} घंटे"
+    else:
+        dur_str = f"{hours_offline} hours"
+
+    return [
+        str(customer_name or "Solar Customer"),
+        str(plant_name or "Solar Rooftop"),
+        str(inverter_model or "Solar Inverter"),
+        str(last_log_time or "Recently"),
+        dur_str,
+        phone,
+    ]
+
 def format_monsoon_whatsapp_message(
     support_phone: str = "",
     lang: str = "english"
@@ -484,7 +549,31 @@ def get_yearly_milestones(year: str = "2026") -> List[Dict[str, Any]]:
     merged["days_powered"] = (merged["annual_kwh"] / 30.0).round(0).astype(int)
     return merged.to_dict(orient="records")
 
+def normalize_phone(phone: Any) -> Optional[str]:
+    """
+    Normalizes phone string:
+    - Strips '.0' float artifact (e.g. '917020188095.0' -> '917020188095')
+    - Strips non-digits
+    - If 10 digits starting with 6-9, prepends '91'
+    - If 12 digits starting with 91, keeps as is
+    - If 11 digits starting with 0, replaces with 91
+    """
+    if not phone:
+        return None
+    s = str(phone).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    digits = re.sub(r"\D", "", s)
+    if len(digits) == 10 and digits[0] in "6789":
+        return f"91{digits}"
+    elif len(digits) == 12 and digits.startswith("91") and digits[2] in "6789":
+        return digits
+    elif len(digits) == 11 and digits.startswith("0") and digits[1] in "6789":
+        return f"91{digits[1:]}"
+    return digits if len(digits) >= 10 else None
+
 def upsert_customer(plant_id: str, name: str, phone: str, email: str = "", lang: str = "english", opt_in: str = "active") -> int:
+    clean_phone = normalize_phone(phone) or ""
     sql = """
     INSERT INTO customers (plant_id, customer_name, phone, email, preferred_lang, opt_in_status)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -495,7 +584,7 @@ def upsert_customer(plant_id: str, name: str, phone: str, email: str = "", lang:
         preferred_lang = excluded.preferred_lang,
         opt_in_status = excluded.opt_in_status;
     """
-    return db.execute(sql, (plant_id, name, phone, email, lang.lower(), opt_in.lower()), db="crm")
+    return db.execute(sql, (plant_id, name, clean_phone, email, lang.lower(), opt_in.lower()), db="crm")
 
 def get_customer_profile(cust_id: int) -> Dict[str, Any]:
     df = db.query_df("SELECT * FROM customers WHERE id = ?", [cust_id], db="crm")

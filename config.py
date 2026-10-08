@@ -33,6 +33,19 @@ class Settings(BaseSettings):
     playwright_headless: bool = True
     app_port: int = 8000
     export_api_key: str = ""
+    gupshup_send_mode: str = "test_only"  # off | test_only | live
+
+    # --- Gupshup Approved Template IDs ---
+    gupshup_tpl_active: str = "solaron_active"
+    gupshup_tpl_average: str = "solaron_average"
+    gupshup_tpl_critical_perf: str = "solaron_critical_perf"
+    gupshup_tpl_offline: str = "solaron_offline"
+    gupshup_tpl_inactive: str = "solaron_inactive"
+    gupshup_tpl_plant_critical: str = "solaron_plant_critical"
+    gupshup_tpl_offer_visit: str = "solaron_offer_visit"
+    gupshup_tpl_wait_recheck: str = "solaron_wait_recheck"
+    gupshup_tpl_reminder: str = "solaron_reminder"
+    gupshup_tpl_monthly: str = "solaron_monthly_statement"
 
     # --- Message Templates ---
     msg_active: str = ""

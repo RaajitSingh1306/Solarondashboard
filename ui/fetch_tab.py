@@ -1,18 +1,17 @@
 import asyncio
 import datetime
 import time
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
+
 from nicegui import ui
-try:
-    from pipeline import db, pipeline
-except ImportError:
-    import db
-    import pipeline
+
+from pipeline import db, pipeline
 
 def build_fetch_tab(
-    app_state: Dict[str, Any],
-    switch_tab: Optional[Callable[[str], None]] = None,
-    open_upload_modal: Optional[Callable[[], None]] = None
+    app_state: dict[str, Any],
+    switch_tab: Callable[[str], None] | None = None,
+    open_upload_modal: Callable[[], None] | None = None
 ):
     """
     Dedicated Data Fetch & Extraction Workbench tab.
@@ -139,7 +138,7 @@ def build_fetch_tab(
                             "Expected Fetch Time: ~1 - 3 seconds (instant local telemetry & offline cache)"
                         ).classes("text-xs font-semibold text-cyan-300 font-mono")
 
-                def compute_est_seconds(is_force: bool, platform: Optional[str], site: Optional[str]) -> float:
+                def compute_est_seconds(is_force: bool, platform: str | None, site: str | None) -> float:
                     if not is_force:
                         return 3.0
                     if site and site != "All":
@@ -213,23 +212,26 @@ def build_fetch_tab(
 
                 cache_toggle.on("update:model-value", lambda e: update_strategy_desc())
 
-                fetch_btn = ui.button(
-                    "⚡ Live Fetch All Portals (Growatt, iSolarCloud, SuryaLog)",
-                    icon="bolt"
-                ).props("color=amber-6 text-color=black font-bold unelevated px-6").tooltip("Extract and ingest telemetry directly from ALL portals (Growatt, iSolarCloud, SuryaLog)")
+                fetch_btn = ui.button("", icon="bolt")
 
                 def update_fetch_btn_label():
+                    is_force = (cache_toggle.value == "force")
                     p_val = platform_select.value
-                    if p_val == "All" or not p_val:
-                        fetch_btn.set_text("⚡ Live Fetch All Portals (Growatt, iSolarCloud, SuryaLog)")
-                        fetch_btn.tooltip("Extract and ingest telemetry directly from ALL portals (Growatt, iSolarCloud, SuryaLog)")
+                    p_name = "All Portals" if (p_val == "All" or not p_val) else f"{p_val.title()} Portal"
+                    if is_force:
+                        fetch_btn.set_text(f"🔄 Live Scrape & Ingest ({p_name})")
+                        fetch_btn.props("color=amber-6 text-color=black font-bold unelevated px-6")
+                        fetch_btn.tooltip(f"Connects live to inverter gateways for {p_name} and extracts real-time telemetry (~1-10m)")
                     else:
-                        fetch_btn.set_text(f"⚡ Live Fetch ({p_val.title()} Portal)")
-                        fetch_btn.tooltip(f"Extract and ingest telemetry directly from {p_val.title()} portal")
+                        fetch_btn.set_text(f"⚡ Ingest from Local Cache ({p_name})")
+                        fetch_btn.props("color=emerald-6 text-color=black font-bold unelevated px-6")
+                        fetch_btn.tooltip(f"Loads existing local database records and offline JSON cache for {p_name} instantly (~1-3s)")
                     update_strategy_desc()
 
+                cache_toggle.on("update:model-value", lambda e: update_fetch_btn_label())
                 platform_select.on("update:model-value", lambda e: update_fetch_btn_label())
                 site_select.on("update:model-value", lambda e: update_strategy_desc())
+                update_fetch_btn_label()
 
         # 2B. Lifetime Historical Backfill Engine Card
         with ui.card().classes("w-full p-5 bg-gradient-to-br from-gray-900 via-indigo-950/20 to-gray-900 border border-indigo-800/40 rounded-xl shadow-lg"):
@@ -358,7 +360,7 @@ def build_fetch_tab(
         # 4. Results & Post-Pull Initial Analysis Section
         results_container = ui.column().classes("w-full gap-5")
 
-        def render_initial_analysis(data: Dict[str, Any]):
+        def render_initial_analysis(data: dict[str, Any]):
             results_container.clear()
             with results_container:
                 # Summary Banner
@@ -592,7 +594,7 @@ def build_fetch_tab(
             est_seconds = compute_est_seconds(is_force, target_src, target_site)
             est_formatted = format_duration(est_seconds)
 
-            backend_state: Dict[str, Any] = {
+            backend_state: dict[str, Any] = {
                 "msg": "Phase 1/4: Initializing pipeline & connecting to portal gateways...",
                 "pct": 0.06
             }

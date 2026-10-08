@@ -33,6 +33,75 @@ CITY_GHI_DEFAULT = {
 _LAST_ISC_SCRAPE_TS: float = 0.0
 _LAST_ISC_SCRAPE_CACHE: List[Dict[str, Any]] = []
 
+def _parse_isc_power(s: Any) -> Optional[float]:
+    if s is None:
+        return None
+    s_str = str(s).strip()
+    if not s_str or s_str in ("--", "-", "null", "None", ""):
+        return None
+    m = re.search(r'[-+]?\d*\.?\d+', s_str)
+    if not m:
+        return None
+    val = float(m.group())
+    s_low = s_str.lower()
+    if "mw" in s_low:
+        return round(val * 1000.0, 3)
+    if "w" in s_low and "kw" not in s_low:
+        return round(val / 1000.0, 3)
+    return round(val, 3)
+
+def _parse_isc_energy(s: Any) -> Optional[float]:
+    if s is None:
+        return None
+    s_str = str(s).strip()
+    if not s_str or s_str in ("--", "-", "null", "None", ""):
+        return None
+    m = re.search(r'[-+]?\d*\.?\d+', s_str)
+    if not m:
+        return None
+    val = float(m.group())
+    s_low = s_str.lower()
+    if "mwh" in s_low:
+        return round(val * 1000.0, 2)
+    return round(val, 2)
+
+def _resolve_isc_plant_id(token: str, plant_name: str) -> str:
+    try:
+        from pipeline import db
+    except ImportError:
+        import db
+
+    if token:
+        existing = db.get_plant_by_portal_token("isolarcloud", token)
+        if existing:
+            return existing
+
+    try:
+        with db.analytics_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT plant_id FROM plants WHERE source='isolarcloud' AND lower(trim(plant_name)) = lower(trim(?))", [plant_name])
+            row = cur.fetchone()
+            if row:
+                pid = str(row[0])
+                if token:
+                    db.save_plant_portal_token("isolarcloud", token, pid)
+                return pid
+
+            cur.execute("SELECT plant_id FROM plants WHERE source='isolarcloud'")
+            rows = cur.fetchall()
+            max_num = 0
+            for (r_id,) in rows:
+                m = re.search(r'SG-(\d+)', str(r_id))
+                if m:
+                    max_num = max(max_num, int(m.group(1)))
+            next_pid = f"isolarcloud_SG-{max_num + 1:03d}"
+            if token:
+                db.save_plant_portal_token("isolarcloud", token, next_pid)
+            return next_pid
+    except Exception as e:
+        logger.debug(f"DB lookup error in resolve_isc_plant_id: {e}")
+        return f"isolarcloud_{re.sub(r'[^\w-]', '_', plant_name.strip())}"
+
 class ISolarCloudExtractor(BaseExtractor):
     """
     iSolarCloud (Sungrow) Platform Extractor.
@@ -109,63 +178,115 @@ class ISolarCloudExtractor(BaseExtractor):
                 page.evaluate("() => { document.querySelectorAll('.el-overlay, .questionnaire-dialog').forEach(e => e.remove()); }")
                 time.sleep(1)
 
-                raw_rows = []
-                def get_rows():
-                    for r in page.locator("tbody tr, .el-table__row").all():
-                        lines = [l.strip() for l in r.inner_text().split("\n") if l.strip()]
-                        if lines and lines not in raw_rows:
-                            raw_rows.append(lines)
+                # Attempt setting page size to 50/100 to fetch all plants on a single page
+                try:
+                    size_select = page.locator(".el-pagination .el-select, .el-pagination .el-input").first
+                    if size_select.is_visible():
+                        size_select.click()
+                        time.sleep(1)
+                        opt = page.locator(".el-select-dropdown__item:has-text('50'), .el-select-dropdown__item:has-text('100')").first
+                        if opt.is_visible():
+                            opt.click()
+                            time.sleep(2)
+                except Exception as e:
+                    logger.debug(f"Could not change iSolarCloud page size dropdown: {e}")
 
-                get_rows()
-                # Iterate pages up to 5 times to retrieve all plants across pages
-                for _ in range(5):
-                    try:
-                        prev_len = len(raw_rows)
-                        clicked = page.evaluate("""() => {
-                            const n = document.querySelector('.btn-next, button.btn-next, li.number.active + li');
-                            if (n && !n.disabled && !n.classList.contains('disabled')) {
-                                n.click();
-                                return true;
-                            }
-                            return false;
-                        }""")
-                        if not clicked:
-                            break
-                        time.sleep(3)
-                        get_rows()
-                        if len(raw_rows) == prev_len:
-                            break
-                    except Exception:
-                        break
+                # Read total plants count reported by portal
+                total_portal_count = 29
+                try:
+                    pag_text = page.locator(".el-pagination").inner_text()
+                    m_tot = re.search(r"Total\s+(\d+)", pag_text)
+                    if m_tot:
+                        total_portal_count = int(m_tot.group(1))
+                except Exception:
+                    pass
+
+                # Read table headers dynamically
+                header_names = page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('th')).map(th => th.innerText.trim().toLowerCase());
+                }""")
+                def find_col(keywords: List[str], default_idx: int) -> int:
+                    for kw in keywords:
+                        for idx, h in enumerate(header_names):
+                            if kw in h:
+                                return idx
+                    return default_idx
+
+                c_name = find_col(["plant name", "name"], 0)
+                c_status = find_col(["status"], 1)
+                c_type = find_col(["plant type", "type"], 2)
+                c_cap = find_col(["installed power", "capacity"], 3)
+                c_power = find_col(["real-time power", "power"], 4)
+                c_today = find_col(["yield today", "today"], 5)
+                c_month = find_col(["monthly yield", "month"], 6)
+                c_total = find_col(["total yield", "total"], 8)
+
+                def extract_page_rows():
+                    return page.evaluate("""() => {
+                        const trs = document.querySelectorAll('tbody tr, .el-table__row');
+                        return Array.from(trs).map(tr => {
+                            const tds = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
+                            const link = tr.querySelector('a');
+                            const href = link ? link.getAttribute('href') : '';
+                            return { tds, href };
+                        });
+                    }""")
+
+                raw_items = []
+                seen_keys = set()
+                for r in extract_page_rows():
+                    k = r.get("href") or (r.get("tds", [""])[0])
+                    if k and k not in seen_keys:
+                        seen_keys.add(k)
+                        raw_items.append(r)
+
+                # If still less than total_portal_count, click through page numbers
+                pager_btns = page.locator(".el-pager li.number").all()
+                if len(raw_items) < total_portal_count and len(pager_btns) > 1:
+                    for p_num in range(2, len(pager_btns) + 1):
+                        btn = page.locator(f".el-pager li.number:has-text('{p_num}')").first
+                        if btn.is_visible():
+                            btn.click()
+                            time.sleep(3)
+                            for r in extract_page_rows():
+                                k = r.get("href") or (r.get("tds", [""])[0])
+                                if k and k not in seen_keys:
+                                    seen_keys.add(k)
+                                    raw_items.append(r)
 
                 context.close()
                 browser.close()
 
-                if raw_rows:
+                if len(raw_items) != total_portal_count:
+                    logger.warning(f"iSolarCloud plant count mismatch: read {len(raw_items)} plants, portal reports {total_portal_count}")
+
+                if raw_items:
                     structured = []
-                    for idx, p in enumerate(raw_rows):
-                        name = p[0].replace('\u00a0', ' ').strip()
-                        addr = p[1].replace('\u00a0', ' ').strip() if len(p) > 1 else ''
-                        status = p[2].strip() if len(p) > 2 else 'Normal'
-                        ptype = p[3].strip() if len(p) > 3 else 'Residential PV'
+                    for idx, item in enumerate(raw_items):
+                        tds = item.get("tds", [])
+                        href = item.get("href", "")
+                        token = href.split("?", 1)[1] if "?" in href else href
 
-                        cap_str = p[4] if len(p) > 4 else '3.0'
-                        m_cap = re.search(r'[-+]?\d*\.?\d+', cap_str)
-                        cap = float(m_cap.group()) if m_cap else 3.0
+                        name_cell = tds[c_name] if len(tds) > c_name else ""
+                        name_parts = [p.replace('\u00a0', ' ').strip() for p in name_cell.split('\n') if p.strip()]
+                        name = name_parts[0] if name_parts else f"Sungrow Plant {idx+1}"
+                        addr = ', '.join(name_parts[1:]) if len(name_parts) > 1 else ''
 
-                        pwr_str = p[5] if len(p) > 5 else '0'
-                        m_pwr = re.search(r'[-+]?\d*\.?\d+', pwr_str)
-                        pwr_val = float(m_pwr.group()) if m_pwr else 0.0
-                        pwr_kw = round(pwr_val / 1000.0, 3) if ('w' in pwr_str.lower() and 'kw' not in pwr_str.lower()) else round(pwr_val, 3)
+                        status = tds[c_status].strip() if len(tds) > c_status else 'Normal'
+                        ptype = tds[c_type].strip() if len(tds) > c_type else 'Residential PV'
 
-                        day_str = p[6] if len(p) > 6 else '0'
-                        m_day = re.search(r'[-+]?\d*\.?\d+', day_str)
-                        day_kwh = float(m_day.group()) if m_day else 0.0
+                        cap_val = _parse_isc_energy(tds[c_cap]) if len(tds) > c_cap else 3.0
+                        cap = float(cap_val or 3.0)
 
-                        m_str = p[7] if len(p) > 7 else '0'
-                        m_m = re.search(r'[-+]?\d*\.?\d+', m_str)
-                        month_val = float(m_m.group()) if m_m else 0.0
-                        month_kwh = round(month_val * 1000.0, 1) if 'mwh' in m_str.lower() else round(month_val, 1)
+                        pwr_kw = _parse_isc_power(tds[c_power]) if len(tds) > c_power else None
+                        day_kwh = _parse_isc_energy(tds[c_today]) if len(tds) > c_today else None
+                        month_kwh = _parse_isc_energy(tds[c_month]) if len(tds) > c_month else None
+                        total_kwh = _parse_isc_energy(tds[c_total]) if len(tds) > c_total else None
+
+                        # Ingestion guard: reject month value > capacity * 220
+                        if month_kwh is not None and cap > 0 and month_kwh > (cap * 220.0):
+                            logger.warning(f"Rejected anomalous month yield {month_kwh} kWh for {name} (cap={cap} exceeds 220 kWh/kWp)")
+                            month_kwh = None
 
                         city = 'Pune'
                         for c in ['Pune', 'Nagpur', 'Gondia', 'Katol', 'Bilaspur', 'Raipur', 'Bhilai', 'Pimpri-Chinchwad', 'Wakad', 'Fulchur', 'Bhukum']:
@@ -173,15 +294,19 @@ class ISolarCloudExtractor(BaseExtractor):
                                 city = c
                                 break
 
+                        # Stable dynamic ID resolution via portal token
+                        assigned_pid = _resolve_isc_plant_id(token, name)
+
                         structured.append({
-                            'plant_id': f'SG-{idx+1:03d}',
+                            'plant_id': assigned_pid,
                             'plant_name': name,
                             'capacity_kwp': cap,
                             'installed_power': cap,
                             'ac_capacity_kw': cap,
-                            'current_power_kw': pwr_kw,
+                            'current_power_kw': pwr_kw if pwr_kw is not None else 0.0,
                             'today_energy_kwh': day_kwh,
                             'month_energy_kwh': month_kwh,
+                            'total_energy_kwh': total_kwh,
                             'address': addr,
                             'city': city,
                             'status': 'Normal' if 'normal' in status.lower() else ('Offline' if 'offline' in status.lower() else status),
@@ -189,6 +314,19 @@ class ISolarCloudExtractor(BaseExtractor):
                             'inverter_model': 'SG' + str(cap).replace('.0', '') + 'RS' if cap < 10 else 'SG15RT',
                             'last_log_time': update_time,
                         })
+
+                    # Mark plants absent from scrape as inactive in database
+                    try:
+                        from pipeline import db
+                        scraped_pids = {p['plant_id'] for p in structured}
+                        with db.analytics_conn() as conn:
+                            cur = conn.cursor()
+                            cur.execute("SELECT plant_id FROM plants WHERE source='isolarcloud'")
+                            for (db_pid,) in cur.fetchall():
+                                if db_pid not in scraped_pids:
+                                    cur.execute("UPDATE plants SET operational_status='inactive' WHERE plant_id=?", [db_pid])
+                    except Exception as e:
+                        logger.debug(f"Could not mark missing plants inactive: {e}")
 
                     self.raw_file.parent.mkdir(parents=True, exist_ok=True)
                     with open(self.raw_file, "w", encoding="utf-8") as f:
@@ -255,7 +393,7 @@ class ISolarCloudExtractor(BaseExtractor):
                     "panel_model": "Tier-1 Mono PERC",
                     "last_log_time": str(p.get("last_log_time") or ""),
                     "status": str(p.get("status") or "Normal"),
-                    "total_energy_kwh": self.safe_float(p.get("total_energy_kwh") or p.get("month_energy_kwh") or 0.0),
+                    "total_energy_kwh": self.safe_float(p.get("total_energy_kwh")),
                 })
             return plants
 
@@ -301,13 +439,13 @@ class ISolarCloudExtractor(BaseExtractor):
 
             # Only emit records for dates with actual portal telemetry (today)
             d_str = f"{year_month}-{target_day:02d}"
-            if is_offline:
-                kwh = 0.0
-                cur_kw = 0.0
-                rec_log = log_time
-            elif cached_today_kwh is not None:
+            if cached_today_kwh is not None:
                 kwh = max(0.0, round(cached_today_kwh, 2))
                 cur_kw = max(0.0, round(cached_cur_kw, 2)) if cached_cur_kw is not None else 0.0
+                rec_log = log_time
+            elif is_offline:
+                kwh = 0.0
+                cur_kw = 0.0
                 rec_log = log_time
             elif cached_cur_kw is not None and cached_cur_kw > 0:
                 kwh = 0.0
@@ -315,6 +453,7 @@ class ISolarCloudExtractor(BaseExtractor):
                 rec_log = log_time
             else:
                 # No portal telemetry for this plant today
+                continue
                 continue
 
             sy = round(kwh / cap, 3) if cap > 0 else 0.0
@@ -386,6 +525,10 @@ class ISolarCloudExtractor(BaseExtractor):
                 explanation = f"Plant offline in {month_str}"
             else:
                 # For past months or missing monthly cache, do not fabricate synthetic numbers!
+                continue
+
+            if cap > 0 and monthly_kwh > (cap * 220.0):
+                logger.warning(f"Rejected anomalous monthly yield {monthly_kwh} kWh for {pid} (cap={cap} exceeds 220 kWh/kWp)")
                 continue
 
             sy = round(monthly_kwh / cap, 2) if cap > 0 else 0.0

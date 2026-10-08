@@ -384,6 +384,90 @@ ESCALATION_TEMPLATES: Dict[str, Dict[str, str]] = {
             "टीम सोलरॉन"
         ),
     },
+
+    # Offline Follow-Up Tree (F1 to F6)
+    "solaron_offline_f1": {
+        "english": (
+            "Greetings From Solaron Homes Pvt Ltd,\n\n"
+            "Dear Sir/Madam,\n"
+            "Your solar plant has been offline for {days} days and no generation data is being received. You may be losing savings every day.\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "सोलरॉन होम्स प्राइवेट लिमिटेड की ओर से आपको शुभकामनाएं,\n\n"
+            "प्रिय महोदय/मैम,\n"
+            "आपका सोलर प्लांट {days} दिनों से ऑफ़लाइन है और कोई डेटा प्राप्त नहीं हो रहा। इससे आपकी बचत का नुकसान हो रहा है।\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
+    "solaron_offline_f2": {
+        "english": (
+            "Dear Sir/Madam,\n"
+            "Please check: inverter display/green light, wifi router, MCB switch.\n"
+            "Also clean your panels (dust, bird droppings) and remove any shade. Dirty panels reduce generation.\n"
+            "If it is still offline after this, contact us at {phone}\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "प्रिय महोदय/मैम,\n"
+            "कृपया जाँचें: इन्वर्टर डिस्प्ले/हरी लाइट, वाईफ़ाई राउटर, MCB स्विच।\n"
+            "साथ ही पैनलों की सफाई करें (धूल, पक्षियों की बीट) और छाया हटाएं। गंदे पैनल उत्पादन घटाते हैं।\n"
+            "इसके बाद भी ऑफ़लाइन रहे तो संपर्क करें: {phone}\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
+    "solaron_offline_f3": {
+        "english": (
+            "Dear Sir/Madam,\n"
+            "We can send a technician to inspect and restore your plant. Visit charges: ₹{charges}. A cleaning cycle can be added at extra cost.\n"
+            "Reply YES to book or NO to wait. Contact: {phone}\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "प्रिय महोदय/मैम,\n"
+            "हम आपके प्लांट की जाँच और मरम्मत के लिए तकनीशियन भेज सकते हैं। विजिट शुल्क: ₹{charges}। अतिरिक्त शुल्क पर सफाई भी जोड़ी जा सकती है।\n"
+            "बुक करने के लिए YES, प्रतीक्षा के लिए NO लिखें। संपर्क: {phone}\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
+    "solaron_offline_f4": {
+        "english": (
+            "Thank you. Your technician visit is booked for {visit_date}, {time_slot}.\n"
+            "Charges: ₹{charges} (payable after service).\n"
+            "Technician: {tech_name}, {tech_phone}\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "धन्यवाद। आपकी तकनीशियन विजिट {visit_date}, {time_slot} को बुक हो गई है।\n"
+            "शुल्क: ₹{charges} (सेवा के बाद देय)।\n"
+            "तकनीशियन: {tech_name}, {tech_phone}\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
+    "solaron_offline_f5": {
+        "english": (
+            "Understood. We will check your plant status again in 3 days. To book a visit earlier, reply YES or call {phone}\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "ठीक है। हम 3 दिन बाद आपके प्लांट की स्थिति दोबारा जाँचेंगे। जल्दी विजिट के लिए YES लिखें या कॉल करें: {phone}\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
+    "solaron_offline_f6": {
+        "english": (
+            "Dear Sir/Madam,\n"
+            "Reminder: your solar plant is still offline. Please check and clean your plant, or book a technician visit (₹{charges}).\n"
+            "Our team will call you shortly. Contact: {phone}\n\n"
+            "Team Solaron"
+        ),
+        "hindi": (
+            "प्रिय महोदय/मैम,\n"
+            "स्मरण: आपका सोलर प्लांट अभी भी ऑफ़लाइन है। कृपया प्लांट की जाँच व सफाई करें या तकनीशियन विजिट (₹{charges}) बुक करें।\n"
+            "हमारी टीम जल्द आपको कॉल करेगी। संपर्क: {phone}\n\n"
+            "टीम सोलरॉन"
+        ),
+    },
 }
 
 # Standard category-specific checklists for L3

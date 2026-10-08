@@ -334,14 +334,19 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
             nom_cap = float(row["capacity_kwp"] or 3.3)
             eff_cap = float(row.get("capacity_effective") or nom_cap)
             is_suspect = bool(row.get("capacity_suspect"))
-            cap = eff_cap if is_suspect and eff_cap > 0 else nom_cap
+            cap = eff_cap if (is_suspect or eff_cap != nom_cap) and eff_cap > 0 else nom_cap
             if cap <= 0:
                 cap = 3.3
             lat = float(row["latitude"] or 19.07)
             lon = float(row["longitude"] or 72.87)
             ghi = get_ghi(lat, lon, month)
             kwh = float(row["kwh"] or 0.0)
-            theoretical = ghi * eval_days * cap
+            plant_source = str(row.get("source") or "").lower()
+            if month == "2026-09" and plant_source in ("isolarcloud", "suryalog"):
+                plant_eval_days = 24
+            else:
+                plant_eval_days = eval_days
+            theoretical = ghi * plant_eval_days * cap
             pr = round((kwh / theoretical) * 100.0, 1) if theoretical > 0 else 0.0
             pr = min(150.0, max(0.0, pr))
             pr_list.append(pr)
@@ -519,7 +524,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         nom_cap = float(row["capacity_kwp"] or 3.3)
         eff_cap = float(row.get("capacity_effective") or nom_cap)
         is_suspect = bool(row.get("capacity_suspect"))
-        cap = eff_cap if is_suspect and eff_cap > 0 else nom_cap
+        cap = eff_cap if (is_suspect or eff_cap != nom_cap) and eff_cap > 0 else nom_cap
         if cap <= 0:
             cap = 3.3
         actual_kwh = float(row["actual_kwh"] or 0.0)
@@ -530,6 +535,12 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         ghi = get_ghi(lat, lon, month)
         if not ghi or ghi <= 0:
             ghi = INDIA_MONTHLY_GHI_DEFAULTS.get(m_key, 4.5)
+
+        plant_source = str(row.get("source") or "").lower()
+        if month == "2026-09" and plant_source in ("isolarcloud", "suryalog"):
+            plant_eval_days = 24
+        else:
+            plant_eval_days = eval_days
 
         # Decommissioned plants are extracted and listed, but excluded from loss analysis
         if row.get("operational_status") == "decommissioned":
@@ -564,7 +575,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
             continue
 
         # Baseline expected kWh = GHI * Days * Capacity * Benchmark PR (0.75)
-        expected_kwh = round(ghi * eval_days * cap * STANDARD_PR_BENCHMARK, 2)
+        expected_kwh = round(ghi * plant_eval_days * cap * STANDARD_PR_BENCHMARK, 2)
         expected_rows.append({
             "plant_id": pid,
             "month": month,
@@ -575,7 +586,7 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         })
 
         # Performance Ratio & Realization Rate
-        theoretical_energy = ghi * eval_days * cap
+        theoretical_energy = ghi * plant_eval_days * cap
         pr = round((actual_kwh / theoretical_energy) * 100.0, 1) if theoretical_energy > 0 else 0.0
         pr = min(150.0, max(0.0, pr))
         realization = round((actual_kwh / expected_kwh) * 100.0, 1) if expected_kwh > 0 else 0.0

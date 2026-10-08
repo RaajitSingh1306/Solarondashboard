@@ -18,9 +18,11 @@ service-account*.json
 *.sqlite
 *.sqlite3
 data/*.db
+data/*.json
 data/raw/
 data/lake/
 data/bronze/
+data/backups/
 
 # Archives and bundles
 *.zip

@@ -1,12 +1,14 @@
 import datetime
-import os
 import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 import pandas as pd
+
 from config import settings
+
 
 def _ensure_dir(path: str):
     p = Path(path)
@@ -15,7 +17,7 @@ def _ensure_dir(path: str):
 class SafeRow:
     """Row wrapper that behaves like sqlite3.Row for iteration and indexing,
     while supporting .get(), dict conversion, and dictionary key access."""
-    __slots__ = ('_cursor', '_row', '_fields', '_dict')
+    __slots__ = ('_cursor', '_dict', '_fields', '_row')
     def __init__(self, cursor, row):
         self._cursor = cursor
         self._row = row
@@ -88,9 +90,9 @@ def get_conn(db: str = "analytics"):
 
 get_connection = analytics_conn
 
-def get_plants(source: Optional[str] = None, include_decommissioned: bool = False) -> List[Dict[str, Any]]:
+def get_plants(source: str | None = None, include_decommissioned: bool = False) -> list[dict[str, Any]]:
     sql = "SELECT plant_id, source, plant_name, capacity_kwp, capacity_effective, capacity_suspect, latitude, longitude, city, install_date, inverter_model, panel_model, operational_status, geocode_level FROM plants WHERE 1=1"
-    params: List[Any] = []
+    params: list[Any] = []
     if not include_decommissioned:
         sql += " AND (operational_status IS NULL OR operational_status != 'decommissioned')"
     if source and source.lower() != "all":
@@ -102,7 +104,7 @@ def get_plants(source: Optional[str] = None, include_decommissioned: bool = Fals
         return []
     return df.to_dict(orient="records")
 
-def query_df(sql: str, params: Optional[Union[tuple, list, dict]] = None, db: str = "analytics") -> pd.DataFrame:
+def query_df(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> pd.DataFrame:
     with get_conn(db) as conn:
         try:
             df = pd.read_sql_query(sql, conn, params=params or [])
@@ -112,13 +114,13 @@ def query_df(sql: str, params: Optional[Union[tuple, list, dict]] = None, db: st
         except Exception:
             return pd.DataFrame()
 
-def execute(sql: str, params: Optional[Union[tuple, list, dict]] = None, db: str = "analytics") -> int:
+def execute(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> int:
     with get_conn(db) as conn:
         cur = conn.cursor()
         cur.execute(sql, params or [])
         return cur.rowcount
 
-def executemany(sql: str, rows: List[Union[tuple, list, dict]], db: str = "analytics") -> int:
+def executemany(sql: str, rows: list[tuple | list | dict], db: str = "analytics") -> int:
     if not rows:
         return 0
     with get_conn(db) as conn:
@@ -126,11 +128,8 @@ def executemany(sql: str, rows: List[Union[tuple, list, dict]], db: str = "analy
         cur.executemany(sql, rows)
         return cur.rowcount
 
-def upsert_plant(row: Dict[str, Any]) -> None:
-    try:
-        from core import data_quality
-    except ImportError:
-        import data_quality
+def upsert_plant(row: dict[str, Any]) -> None:
+    from core import data_quality
     row_copy = dict(row)
     if data_quality.is_decommissioned(row_copy.get("plant_id", "")) or row_copy.get("operational_status") == "decommissioned":
         row_copy["operational_status"] = "decommissioned"
@@ -171,8 +170,7 @@ def upsert_plant(row: Dict[str, Any]) -> None:
     """
     execute(sql, row_copy, db="analytics")
 
-def upsert_daily(rows: List[Dict[str, Any]]) -> int:
-    import datetime
+def upsert_daily(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     today_str = datetime.date.today().isoformat()
@@ -195,21 +193,9 @@ def upsert_daily(rows: List[Dict[str, Any]]) -> int:
         :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time, :source_type
     )
     ON CONFLICT(plant_id, date) DO UPDATE SET
-        kwh = CASE 
-            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.kwh
-            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.kwh
-            ELSE daily_generation.kwh 
-        END,
-        revenue_inr = CASE 
-            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.revenue_inr
-            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.revenue_inr
-            ELSE daily_generation.revenue_inr 
-        END,
-        specific_yield = CASE 
-            WHEN excluded.last_log_time IS NOT NULL AND trim(excluded.last_log_time) != '' THEN excluded.specific_yield
-            WHEN daily_generation.last_log_time IS NULL OR trim(daily_generation.last_log_time) = '' THEN excluded.specific_yield
-            ELSE daily_generation.specific_yield 
-        END,
+        kwh = coalesce(excluded.kwh, daily_generation.kwh),
+        revenue_inr = coalesce(excluded.revenue_inr, daily_generation.revenue_inr),
+        specific_yield = coalesce(excluded.specific_yield, daily_generation.specific_yield),
         yield_per_day = coalesce(excluded.yield_per_day, daily_generation.yield_per_day),
         live_power_kw = coalesce(excluded.live_power_kw, daily_generation.live_power_kw),
         status = excluded.status,
@@ -221,7 +207,7 @@ def upsert_daily(rows: List[Dict[str, Any]]) -> int:
     clear_available_months_cache()
     return res
 
-def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
+def upsert_monthly(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     sql = """
@@ -231,10 +217,10 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
         :plant_id, :month, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :pr_pct, :tier, :percentile, :anomaly_score, :anomaly_flag, :source_type
     )
     ON CONFLICT(plant_id, month) DO UPDATE SET
-        kwh = excluded.kwh,
-        revenue_inr = excluded.revenue_inr,
-        specific_yield = excluded.specific_yield,
-        yield_per_day = excluded.yield_per_day,
+        kwh = coalesce(excluded.kwh, monthly_generation.kwh),
+        revenue_inr = coalesce(excluded.revenue_inr, monthly_generation.revenue_inr),
+        specific_yield = coalesce(excluded.specific_yield, monthly_generation.specific_yield),
+        yield_per_day = coalesce(excluded.yield_per_day, monthly_generation.yield_per_day),
         pr_pct = coalesce(excluded.pr_pct, monthly_generation.pr_pct),
         tier = coalesce(excluded.tier, monthly_generation.tier),
         percentile = coalesce(excluded.percentile, monthly_generation.percentile),
@@ -257,7 +243,7 @@ def upsert_monthly(rows: List[Dict[str, Any]]) -> int:
     clear_available_months_cache()
     return res
 
-def upsert_snapshots(rows: List[Dict[str, Any]]) -> int:
+def upsert_snapshots(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     sql = """
@@ -278,7 +264,7 @@ def upsert_snapshots(rows: List[Dict[str, Any]]) -> int:
     """
     return executemany(sql, rows, db="analytics")
 
-def upsert_expected_generation(rows: List[Dict[str, Any]]) -> int:
+def upsert_expected_generation(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     sql = """
@@ -296,7 +282,7 @@ def upsert_expected_generation(rows: List[Dict[str, Any]]) -> int:
     """
     return executemany(sql, rows, db="analytics")
 
-def upsert_loss_analysis(rows: List[Dict[str, Any]]) -> int:
+def upsert_loss_analysis(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     sql = """
@@ -327,13 +313,13 @@ def upsert_loss_analysis(rows: List[Dict[str, Any]]) -> int:
     """
     return executemany(sql, rows, db="analytics")
 
-_cached_available_months: Optional[List[str]] = None
+_cached_available_months: list[str] | None = None
 
 def clear_available_months_cache() -> None:
     global _cached_available_months
     _cached_available_months = None
 
-def get_available_months(force_refresh: bool = False) -> List[str]:
+def get_available_months(force_refresh: bool = False) -> list[str]:
     global _cached_available_months
     if _cached_available_months and not force_refresh:
         return list(_cached_available_months)
@@ -365,7 +351,7 @@ def get_available_months(force_refresh: bool = False) -> List[str]:
     _cached_available_months = res
     return list(res)
 
-def get_cache_metadata() -> Dict[str, Any]:
+def get_cache_metadata() -> dict[str, Any]:
     """Returns latest dates, record counts, and sync timestamps for cached data across analytics db."""
     res = {
         "latest_daily_date": "N/A",
@@ -410,7 +396,7 @@ def log_anomaly_feedback(
     date_or_month: str,
     flag_type: str,
     technician_label: str,
-    notes: Optional[str] = None,
+    notes: str | None = None,
     logged_by: str = "operator",
 ) -> int:
     """Log ground-truth feedback / label on an algorithmic anomaly flag."""
@@ -425,7 +411,7 @@ def log_anomaly_feedback(
         return cur.lastrowid or 0
 
 
-def get_anomaly_feedback(plant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_anomaly_feedback(plant_id: str | None = None) -> list[dict[str, Any]]:
     """Retrieve logged anomaly labels and ground-truth outcomes."""
     init_db()
     sql = "SELECT id, plant_id, date_or_month, flag_type, technician_label, notes, logged_by, created_at FROM anomaly_feedback"
@@ -552,6 +538,30 @@ def init_db() -> None:
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
         );
+
+        CREATE TABLE IF NOT EXISTS sync_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            run_type TEXT NOT NULL,
+            status TEXT NOT NULL,
+            items_count INTEGER DEFAULT 0,
+            started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            duration_sec REAL,
+            error_message TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS plant_portal_tokens (
+            source TEXT NOT NULL,
+            portal_token TEXT NOT NULL,
+            plant_id TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (source, portal_token)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sync_runs_status ON sync_runs(status);
+        CREATE INDEX IF NOT EXISTS idx_sync_runs_source ON sync_runs(source, started_at);
+        CREATE INDEX IF NOT EXISTS idx_portal_tokens ON plant_portal_tokens(source, portal_token);
 
         CREATE INDEX IF NOT EXISTS idx_feedback_plant ON anomaly_feedback(plant_id);
 
@@ -707,6 +717,143 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_gupshup_phone ON gupshup_inbound_log(phone);
         CREATE INDEX IF NOT EXISTS idx_tech_visits_plant ON technician_visits(plant_id);
         """)
+
+def record_sync_start(source: str, run_type: str) -> int:
+    init_db()
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO sync_runs (source, run_type, status, started_at) VALUES (?, ?, 'running', CURRENT_TIMESTAMP)",
+            [source, run_type]
+        )
+        return int(cur.lastrowid)
+
+def record_sync_finish(run_id: int, status: str, items_count: int = 0, error_message: str | None = None):
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE sync_runs
+            SET status = ?,
+                items_count = ?,
+                completed_at = CURRENT_TIMESTAMP,
+                duration_sec = ROUND((julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 86400, 2),
+                error_message = ?
+            WHERE id = ?
+            """,
+            [status, items_count, error_message, run_id]
+        )
+
+def get_plant_by_portal_token(source: str, portal_token: str) -> str | None:
+    init_db()
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT plant_id FROM plant_portal_tokens WHERE source = ? AND portal_token = ?", [source, portal_token])
+        row = cur.fetchone()
+        return str(row[0]) if row else None
+
+def save_plant_portal_token(source: str, portal_token: str, plant_id: str):
+    init_db()
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT OR REPLACE INTO plant_portal_tokens (source, portal_token, plant_id) VALUES (?, ?, ?)",
+            [source, portal_token, plant_id]
+        )
+
+def get_all_portal_tokens(source: str) -> dict[str, str]:
+    init_db()
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT portal_token, plant_id FROM plant_portal_tokens WHERE source = ?", [source])
+        rows = cur.fetchall()
+        return {str(r[0]): str(r[1]) for r in rows}
+
+
+def get_last_sync_by_portal() -> dict[str, dict[str, Any]]:
+    init_db()
+    with analytics_conn() as conn:
+        cur = conn.cursor()
+
+        # 1. Clean up any stale sync runs left in 'running' state for > 15 minutes
+        try:
+            cur.execute("""
+                UPDATE sync_runs
+                SET status = 'interrupted',
+                    completed_at = CURRENT_TIMESTAMP,
+                    error_message = 'Sync process interrupted or timed out'
+                WHERE status = 'running'
+                  AND (julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 1440 > 15;
+            """)
+        except Exception:
+            pass
+
+        # 2. Get active plant count from plants table as ground truth fallback
+        cur.execute("""
+            SELECT lower(source), count(*)
+            FROM plants
+            WHERE (operational_status IS NULL OR operational_status != 'decommissioned')
+            GROUP BY lower(source)
+        """)
+        actual_plant_counts = {str(r[0]): int(r[1]) for r in cur.fetchall()}
+
+        # 3. For each portal, get the latest successful sync run
+        result = {}
+        for portal in ["growatt", "isolarcloud", "suryalog"]:
+            # Prefer latest completed run with success
+            cur.execute("""
+                SELECT source, status, items_count, completed_at, error_message, duration_sec
+                FROM sync_runs
+                WHERE lower(source) = ? AND status = 'success' AND completed_at IS NOT NULL
+                ORDER BY id DESC LIMIT 1
+            """, [portal])
+            row = cur.fetchone()
+
+            # If no success row, pick latest completed row of any status
+            if not row:
+                cur.execute("""
+                    SELECT source, status, items_count, completed_at, error_message, duration_sec
+                    FROM sync_runs
+                    WHERE lower(source) = ? AND completed_at IS NOT NULL
+                    ORDER BY id DESC LIMIT 1
+                """, [portal])
+                row = cur.fetchone()
+
+            # Fallback to any latest row
+            if not row:
+                cur.execute("""
+                    SELECT source, status, items_count, completed_at, error_message, duration_sec
+                    FROM sync_runs
+                    WHERE lower(source) = ?
+                    ORDER BY id DESC LIMIT 1
+                """, [portal])
+                row = cur.fetchone()
+
+            fallback_plants = actual_plant_counts.get(portal, 0)
+
+            if row:
+                cnt = int(row[2] or 0)
+                # If items_count was 0 (e.g. non-fleet sync with 0), use actual fleet plant count
+                if cnt == 0 and fallback_plants > 0:
+                    cnt = fallback_plants
+                result[portal] = {
+                    "source": portal,
+                    "status": str(row[1] or "unknown"),
+                    "items_count": cnt,
+                    "completed_at": str(row[3] or "Never"),
+                    "error_message": str(row[4] or ""),
+                    "duration_sec": float(row[5] or 0.0),
+                }
+            else:
+                result[portal] = {
+                    "source": portal,
+                    "status": "ready",
+                    "items_count": fallback_plants,
+                    "completed_at": "Never",
+                    "error_message": "",
+                    "duration_sec": 0.0,
+                }
+        return result
 
 if __name__ == "__main__":
     init_db()

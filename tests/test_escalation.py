@@ -398,7 +398,7 @@ def test_s3_bronze_archival():
     assert "escalation_state" in archive_res
     assert "escalation_log" in archive_res
     assert "daily_generation" in archive_res
-    assert archive_res["escalation_state"]["status"] in ("uploaded", "local_mirror", "local_fallback")
+    assert archive_res["escalation_state"]["status"] in ("uploaded", "local_mirror", "local_fallback", "preserved_existing")
 
 
 def test_crm_escalation_api_endpoints():

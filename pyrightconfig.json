@@ -1,0 +1,20 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    ".",
+    "core",
+    "engines",
+    "pipeline",
+    "services",
+    "extractors",
+    "routes",
+    "ui"
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
+}

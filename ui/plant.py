@@ -540,15 +540,23 @@ def build_plant_tab(app_state: dict):
             today_kwh = f"{float(daily[-1]['kwh']):,.2f} kWh"
         else:
             today_kwh = "—"
-        month_kwh_val = float(monthly_row.get("kwh") or 0.0)
-        month_kwh = f"{month_kwh_val:,.1f} kWh" if month_kwh_val > 0 else "0 kWh"
-        total_kwh_str = f"{lifetime_val:,.1f} kWh" if lifetime_val > 0 else "0.0 kWh"
+        has_monthly_row = bool(monthly_row and monthly_row.get("kwh") is not None)
+        if has_monthly_row:
+            month_kwh_val = float(monthly_row["kwh"])
+            month_kwh = f"{month_kwh_val:,.1f} kWh" if month_kwh_val > 0 else "0 kWh"
+            savings_inr = f"₹{float(monthly_row.get('revenue_inr') or (month_kwh_val * 14.0)):,.0f}"
+            sy_val = monthly_row.get("specific_yield")
+            sy_str = f"{sy_val:.1f} kWh/kWp" if sy_val else "—"
+            ypd_val = monthly_row.get("yield_per_day")
+            ypd_str = f"{float(ypd_val):.2f} u/kWp/d" if (ypd_val is not None and float(ypd_val) > 0) else "—"
+        else:
+            month_kwh_val = None
+            month_kwh = "No data for this month"
+            savings_inr = "—"
+            sy_str = "—"
+            ypd_str = "—"
 
-        savings_inr = f"₹{float(monthly_row.get('revenue_inr') or (month_kwh_val * 14.0)):,.0f}"
-        sy_val = monthly_row.get("specific_yield")
-        sy_str = f"{sy_val:.1f} kWh/kWp" if sy_val else "—"
-        ypd_val = monthly_row.get("yield_per_day")
-        ypd_str = f"{float(ypd_val):.2f} u/kWp/d" if (ypd_val is not None and float(ypd_val) > 0) else "—"
+        total_kwh_str = f"{lifetime_val:,.1f} kWh" if lifetime_val > 0 else "0.0 kWh"
 
         op_status = plant.get("operational_status", "active")
         if op_status == "decommissioned":

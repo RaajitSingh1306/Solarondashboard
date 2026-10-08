@@ -25,9 +25,9 @@ MIN_DAILY_YIELD_KWH_KWP = 0.0
 MAX_MONTHLY_YIELD_KWH_KWP = 220.0
 MIN_MONTHLY_YIELD_KWH_KWP = 0.0
 
-# Noise floor: any generation <= 0.05 kWh/day or <= 0.5 kWh/month is considered zero/noise
+# Noise floor: any generation <= 0.05 kWh/day or <= 0.05 kWh/month is considered zero/noise
 NOISE_FLOOR_DAILY_KWH = 0.05
-NOISE_FLOOR_MONTHLY_KWH = 1.0
+NOISE_FLOOR_MONTHLY_KWH = 0.05
 
 # Bootstrap seed set used strictly for initial database provisioning when plants table is empty.
 # In production, operational status is dynamically fetched from servers & stored in SQLite.
@@ -577,10 +577,18 @@ def validate_monthly_record(
     eval_cap = eff_cap if (is_capacity_suspect or out.get("capacity_suspect")) and eff_cap and eff_cap > 0 else raw_cap
 
     if eval_cap and eval_cap > 0 and out["kwh"] is not None:
-        raw_sy = round(out["kwh"] / eval_cap, 2)
-        out["specific_yield"] = min(raw_sy, MAX_MONTHLY_YIELD_KWH_KWP)
-        ypd = round(out["specific_yield"] / float(elapsed_days), 2) if elapsed_days > 0 else 0.0
-        out["yield_per_day"] = min(ypd, MAX_DAILY_YIELD_KWH_KWP)
+        if out["kwh"] > (eval_cap * MAX_MONTHLY_YIELD_KWH_KWP):
+            logger.warning(
+                f"Rejected monthly generation {out['kwh']} kWh for plant {out.get('plant_id')}: "
+                f"exceeds limit ({eval_cap} kWp * {MAX_MONTHLY_YIELD_KWH_KWP} = {eval_cap * MAX_MONTHLY_YIELD_KWH_KWP:.1f} kWh)"
+            )
+            out["kwh"] = None
+            out["specific_yield"] = None
+            out["yield_per_day"] = None
+        else:
+            out["specific_yield"] = round(out["kwh"] / eval_cap, 2)
+            ypd = round(out["specific_yield"] / float(elapsed_days), 2) if elapsed_days > 0 else 0.0
+            out["yield_per_day"] = round(ypd, 2)
     else:
         out["specific_yield"] = out.get("specific_yield") or 0.0
         out["yield_per_day"] = 0.0
@@ -660,7 +668,7 @@ def audit_and_update_plant_capacities(db_name: str = "analytics") -> Dict[str, A
         cur.execute("""
             SELECT plant_id, kwh
             FROM daily_generation
-            WHERE kwh > 0.1
+            WHERE kwh > 0.1 AND kwh < 2000
             ORDER BY plant_id, kwh ASC
         """)
         daily_kwh_by_plant: Dict[str, List[float]] = {}
@@ -684,17 +692,17 @@ def audit_and_update_plant_capacities(db_name: str = "analytics") -> Dict[str, A
                 p95_kwh = kwh_list[idx]
 
             is_suspect = False
-            # Check 1: Live AC power exceeds nominal capacity by >25%
-            if peak_ac > (nom_cap * 1.25):
+            # Check 1: Live AC power exceeds nominal capacity by >20%
+            if peak_ac > (nom_cap * 1.20):
                 is_suspect = True
-            # Check 2: 95th percentile daily kWh exceeds 7.5 kWh/kWp
-            if nom_cap > 0 and (p95_kwh / nom_cap) > 7.5:
+            # Check 2: 95th percentile daily kWh exceeds 5.5 kWh/kWp
+            if nom_cap > 0 and (p95_kwh / nom_cap) > 5.5:
                 is_suspect = True
 
             if is_suspect:
                 suspect_count += 1
                 inferred_from_ac = peak_ac / 0.85 if peak_ac > 0 else 0.0
-                inferred_from_kwh = p95_kwh / 5.2 if p95_kwh > 0 else 0.0
+                inferred_from_kwh = p95_kwh / 4.5 if p95_kwh > 0 else 0.0
                 eff_cap = round(max(inferred_from_ac, inferred_from_kwh, nom_cap), 1)
                 updates.append((eff_cap, 1, pid))
             else:

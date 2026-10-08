@@ -1,23 +1,22 @@
 import argparse
 import datetime
+import logging
 import os
 import re
 from pathlib import Path
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import pandas as pd
-try:
-    from pipeline import db
-    from core import data_quality
-    from services import geocode
-except ImportError:
-    import db
-    import data_quality
-    import geocode
+
+from pipeline import db
+from core import data_quality
+from services import geocode
 from extractors.base import BaseExtractor
 from extractors.growatt import GrowattExtractor
 from extractors.isolarcloud import ISolarCloudExtractor
 from extractors.suryalog import SuryaLogExtractor
+
+logger = logging.getLogger(__name__)
 
 def get_extractors(sources: Optional[List[str]] = None):
     all_ext = [
@@ -61,15 +60,19 @@ def run_fleet(sources: Optional[List[str]] = None, force_refresh: bool = False) 
     db.init_db()
     count = 0
     for ext in get_extractors(sources):
+        run_id = db.record_sync_start(ext.source, "fleet")
+        ext_count = 0
         try:
             plants = ext.fetch_fleet(force_refresh=force_refresh)
             for p in plants:
                 norm = normalize_plant_record(p)
                 db.upsert_plant(norm)
+                ext_count += 1
                 count += 1
+            db.record_sync_finish(run_id, "success", ext_count)
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error in run_fleet for {ext.source}: {e}")
+            logger.error(f"Error in run_fleet for {ext.source}: {e}", exc_info=True)
+            db.record_sync_finish(run_id, "error", ext_count, str(e))
     data_quality.invalidate_decommissioned_cache()
     return count
 
@@ -86,10 +89,12 @@ def run_daily(date_str: Optional[str] = None, sources: Optional[List[str]] = Non
             for pid, cap in cur.fetchall():
                 if cap is not None:
                     plant_caps[str(pid)] = float(cap)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Could not load plant capacities for run_daily: {e}")
 
     for ext in get_extractors(sources):
+        run_id = db.record_sync_start(ext.source, "daily")
+        ext_total = 0
         try:
             records = ext.fetch_daily(date_str, force_refresh=force_refresh)
             norm_records = [
@@ -97,11 +102,17 @@ def run_daily(date_str: Optional[str] = None, sources: Optional[List[str]] = Non
                 for r in records
             ]
             norm_records = [r for r in norm_records if r is not None]
-            total += db.upsert_daily(norm_records)
+            ext_total = db.upsert_daily(norm_records)
+            total += ext_total
+            db.record_sync_finish(run_id, "success", ext_total)
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error in run_daily for {ext.source}: {e}")
+            logger.error(f"Error in run_daily for {ext.source}: {e}", exc_info=True)
     data_quality.scan_and_flag_stuck_values()
+    try:
+        from services import s3_archive
+        s3_archive.archive_daily_generation(date_str)
+    except Exception as s3_err:
+        logger.debug(f"S3 archive daily error: {s3_err}")
     return total
 
 def run_monthly(month_str: Optional[str] = None, sources: Optional[List[str]] = None, force_refresh: bool = False) -> int:
@@ -117,30 +128,46 @@ def run_monthly(month_str: Optional[str] = None, sources: Optional[List[str]] = 
             for pid, cap in cur.fetchall():
                 if cap is not None:
                     plant_caps[str(pid)] = float(cap)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Could not load plant capacities for run_monthly: {e}")
 
     for ext in get_extractors(sources):
+        run_id = db.record_sync_start(ext.source, "monthly")
+        ext_total = 0
         try:
             records = ext.fetch_monthly(month_str, force_refresh=force_refresh)
-            norm_records = [
-                normalize_monthly_record(r, capacity_kwp=r.get("capacity_kwp") or plant_caps.get(str(r.get("plant_id"))))
-                for r in records
-            ]
-            total += db.upsert_monthly(norm_records)
-        except Exception:
-            pass
+            norm_records = []
+            for r in records:
+                norm = normalize_monthly_record(r, capacity_kwp=r.get("capacity_kwp") or plant_caps.get(str(r.get("plant_id"))))
+                if norm and norm.get("kwh") is not None:
+                    norm_records.append(norm)
+            ext_total = db.upsert_monthly(norm_records)
+            total += ext_total
+            db.record_sync_finish(run_id, "success", ext_total)
+        except Exception as e:
+            logger.error(f"Error in run_monthly for {ext.source}: {e}", exc_info=True)
+            db.record_sync_finish(run_id, "error", ext_total, str(e))
+    try:
+        from services import s3_archive
+        s3_archive.archive_monthly_generation(month_str)
+    except Exception as s3_err:
+        logger.debug(f"S3 archive monthly error: {s3_err}")
     return total
 
 def run_snapshots(sources: Optional[List[str]] = None, force_refresh: bool = False) -> int:
     db.init_db()
     total = 0
     for ext in get_extractors(sources):
+        run_id = db.record_sync_start(ext.source, "snapshots")
+        ext_total = 0
         try:
             snaps = ext.fetch_snapshots(force_refresh=force_refresh)
-            total += db.upsert_snapshots(snaps)
-        except Exception:
-            pass
+            ext_total = db.upsert_snapshots(snaps)
+            total += ext_total
+            db.record_sync_finish(run_id, "success", ext_total)
+        except Exception as e:
+            logger.error(f"Error in run_snapshots for {ext.source}: {e}", exc_info=True)
+            db.record_sync_finish(run_id, "error", ext_total, str(e))
     return total
 
 def run_full_extract(
@@ -201,6 +228,8 @@ def run_full_extract(
 
     if prev_month_needs_sync:
         run_monthly(prev_month, sources=sources, force_refresh=False)
+        analytics.classify_all(prev_month)
+        analytics.calculate_loss_analysis(prev_month)
 
     report("Collecting live inverter telemetry snapshots...", 0.70)
     s_count = run_snapshots(sources=sources, force_refresh=force_refresh)
@@ -212,11 +241,9 @@ def run_full_extract(
     # Run performance classification and NASA GHI loss attribution
     report("Benchmarking solar insolation & classifying health tiers...", 0.85)
     cls_res = analytics.classify_all(month_str)
-    analytics.classify_all(prev_month)
 
     report("Calculating NASA POWER GHI loss attribution...", 0.95)
     loss_res = analytics.calculate_loss_analysis(month_str)
-    analytics.calculate_loss_analysis(prev_month)
 
     elapsed = round(time.time() - start_time, 2)
     report(f"Extraction complete in {elapsed}s", 1.0)
