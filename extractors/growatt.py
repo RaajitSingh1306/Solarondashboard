@@ -108,37 +108,73 @@ class GrowattExtractor(BaseExtractor):
             self.logged_in = False
             return False
 
-    def _get_raw_plant_list(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
-        if self.cached_plants and not force_refresh:
-            return self.cached_plants
-
-        # 1. If force_refresh and API login works, pull fresh live plant list (all 449 plants)
-        if force_refresh and self.login():
+    def _fetch_all_pages_live(self) -> List[Dict[str, Any]]:
+        if not self.login():
+            return []
+        all_plants = []
+        seen_ids = set()
+        page_num = 1
+        page_size = 500
+        while True:
             try:
                 resp = self.api.session.post(
                     self.api.get_url("newTwoPlantAPI.do"),
                     params={"op": "getAllPlantListTwo"},
                     data={
                         "language": "1",
-                        "pageSize": "500",
+                        "pageSize": str(page_size),
                         "order": "1",
-                        "toPageNum": "1"
+                        "toPageNum": str(page_num)
                     },
-                    timeout=25
+                    timeout=30
                 )
                 data = resp.json()
-                plants = data.get("PlantList") or []
-                if plants:
-                    self.cached_plants = plants
-                    self.raw_dir.mkdir(parents=True, exist_ok=True)
-                    try:
-                        with open(self.raw_dir / "plant_list_live.json", "w", encoding="utf-8") as f:
-                            json.dump(plants, f)
-                    except Exception:
-                        pass
-                    return plants
+                page_plants = data.get("PlantList") or []
+                if not page_plants:
+                    break
+                new_added = 0
+                for p in page_plants:
+                    pid = str(p.get("plantId") or p.get("id") or "")
+                    if pid and pid not in seen_ids:
+                        seen_ids.add(pid)
+                        all_plants.append(p)
+                        new_added += 1
+                    elif not pid:
+                        all_plants.append(p)
+                        new_added += 1
+                if len(page_plants) < page_size or new_added == 0:
+                    break
+                page_num += 1
             except Exception as e:
-                logger.error(f"Failed to fetch live Growatt plant list via newTwoPlantAPI: {e}")
+                logger.error(f"Error fetching Growatt page {page_num}: {e}")
+                break
+        return all_plants
+
+    def _get_raw_plant_list(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        if self.cached_plants and not force_refresh:
+            return self.cached_plants
+
+        # 1. If force_refresh and API login works, pull fresh live plant list across all pages
+        if force_refresh and self.login():
+            plants = self._fetch_all_pages_live()
+            if plants:
+                self.cached_plants = plants
+                self.raw_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    with open(self.raw_dir / "plant_list_live.json", "w", encoding="utf-8") as f:
+                        json.dump(plants, f)
+                except Exception:
+                    pass
+                try:
+                    from services import s3_archive
+                    s3_archive.upload_content_to_s3(
+                        f"solaron/raw/growatt/plant_list_{datetime.date.today().isoformat()}.json",
+                        json.dumps(plants, indent=2),
+                        metadata={"source": "growatt", "count": str(len(plants))}
+                    )
+                except Exception as s3_err:
+                    logger.debug(f"S3 archive raw growatt list error: {s3_err}")
+                return plants
 
         # 2. Fallback to disk cache if live fetch failed or force_refresh is False
         if self.raw_dir.exists():
@@ -161,27 +197,10 @@ class GrowattExtractor(BaseExtractor):
 
         # 3. Fallback to live API
         if self.login():
-            try:
-                resp = self.api.session.post(
-                    self.api.get_url("newTwoPlantAPI.do"),
-                    params={"op": "getAllPlantListTwo"},
-                    data={
-                        "language": "1",
-                        "pageSize": "500",
-                        "order": "1",
-                        "toPageNum": "1"
-                    },
-                    timeout=25
-                )
-                data = resp.json()
-                plants = data.get("PlantList") or []
-                if plants:
-                    self.cached_plants = plants
-                    return plants
-            except Exception:
-                pass
-            except Exception as e:
-                logger.error(f"Failed to fetch live Growatt plant list: {e}")
+            plants = self._fetch_all_pages_live()
+            if plants:
+                self.cached_plants = plants
+                return plants
 
         return []
 

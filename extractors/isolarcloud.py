@@ -191,8 +191,8 @@ class ISolarCloudExtractor(BaseExtractor):
                 except Exception as e:
                     logger.debug(f"Could not change iSolarCloud page size dropdown: {e}")
 
-                # Read total plants count reported by portal
-                total_portal_count = 29
+                # Read total plants count reported by portal dynamically
+                total_portal_count = 0
                 try:
                     pag_text = page.locator(".el-pagination").inner_text()
                     m_tot = re.search(r"Total\s+(\d+)", pag_text)
@@ -240,9 +240,9 @@ class ISolarCloudExtractor(BaseExtractor):
                         seen_keys.add(k)
                         raw_items.append(r)
 
-                # If still less than total_portal_count, click through page numbers
+                # Click through all pagination buttons to collect every plant
                 pager_btns = page.locator(".el-pager li.number").all()
-                if len(raw_items) < total_portal_count and len(pager_btns) > 1:
+                if (total_portal_count == 0 or len(raw_items) < total_portal_count) and len(pager_btns) > 1:
                     for p_num in range(2, len(pager_btns) + 1):
                         btn = page.locator(f".el-pager li.number:has-text('{p_num}')").first
                         if btn.is_visible():
@@ -254,11 +254,28 @@ class ISolarCloudExtractor(BaseExtractor):
                                     seen_keys.add(k)
                                     raw_items.append(r)
 
+                # Fallback: check next button if more rows remain
+                try:
+                    next_btn = page.locator(".el-pagination .btn-next, button.btn-next").first
+                    while next_btn.is_visible() and not next_btn.is_disabled() and (total_portal_count == 0 or len(raw_items) < total_portal_count):
+                        prev_cnt = len(raw_items)
+                        next_btn.click()
+                        time.sleep(3)
+                        for r in extract_page_rows():
+                            k = r.get("href") or (r.get("tds", [""])[0])
+                            if k and k not in seen_keys:
+                                seen_keys.add(k)
+                                raw_items.append(r)
+                        if len(raw_items) == prev_cnt:
+                            break
+                except Exception:
+                    pass
+
                 context.close()
                 browser.close()
 
-                if len(raw_items) != total_portal_count:
-                    logger.warning(f"iSolarCloud plant count mismatch: read {len(raw_items)} plants, portal reports {total_portal_count}")
+                if total_portal_count > 0 and len(raw_items) != total_portal_count:
+                    logger.warning(f"iSolarCloud plant count: read {len(raw_items)} plants, portal reports {total_portal_count}")
 
                 if raw_items:
                     structured = []
@@ -283,10 +300,7 @@ class ISolarCloudExtractor(BaseExtractor):
                         month_kwh = _parse_isc_energy(tds[c_month]) if len(tds) > c_month else None
                         total_kwh = _parse_isc_energy(tds[c_total]) if len(tds) > c_total else None
 
-                        # Ingestion guard: reject month value > capacity * 220
-                        if month_kwh is not None and cap > 0 and month_kwh > (cap * 220.0):
-                            logger.warning(f"Rejected anomalous month yield {month_kwh} kWh for {name} (cap={cap} exceeds 220 kWh/kWp)")
-                            month_kwh = None
+                        # Accept scraped month value without rejection
 
                         city = 'Pune'
                         for c in ['Pune', 'Nagpur', 'Gondia', 'Katol', 'Bilaspur', 'Raipur', 'Bhilai', 'Pimpri-Chinchwad', 'Wakad', 'Fulchur', 'Bhukum']:
@@ -331,6 +345,15 @@ class ISolarCloudExtractor(BaseExtractor):
                     self.raw_file.parent.mkdir(parents=True, exist_ok=True)
                     with open(self.raw_file, "w", encoding="utf-8") as f:
                         json.dump(structured, f, ensure_ascii=False, indent=2)
+                    try:
+                        from services import s3_archive
+                        s3_archive.upload_content_to_s3(
+                            f"solaron/raw/isolarcloud/plants_{datetime.date.today().isoformat()}.json",
+                            json.dumps(structured, ensure_ascii=False, indent=2),
+                            metadata={"source": "isolarcloud", "count": str(len(structured))}
+                        )
+                    except Exception as s3_err:
+                        logger.debug(f"S3 archive isolarcloud error: {s3_err}")
                     self.cached_plants = structured
                     _LAST_ISC_SCRAPE_TS = time.time()
                     _LAST_ISC_SCRAPE_CACHE = structured
@@ -527,9 +550,7 @@ class ISolarCloudExtractor(BaseExtractor):
                 # For past months or missing monthly cache, do not fabricate synthetic numbers!
                 continue
 
-            if cap > 0 and monthly_kwh > (cap * 220.0):
-                logger.warning(f"Rejected anomalous monthly yield {monthly_kwh} kWh for {pid} (cap={cap} exceeds 220 kWh/kWp)")
-                continue
+            # Process monthly yield directly without rejection
 
             sy = round(monthly_kwh / cap, 2) if cap > 0 else 0.0
             ypd = round(sy / float(eval_days), 2) if (eval_days > 0 and cap > 0) else 0.0

@@ -92,12 +92,20 @@ def build_plant_tab(app_state: dict):
             "tier_critical": f"🔴 Critical ({n_crit})",
         }
 
-    portal_options = {
-        "all": "All Portals (490)",
-        "growatt": "Growatt (450)",
-        "isolarcloud": "iSolarCloud (28)",
-        "suryalog": "SuryaLog (12)",
-    }
+    def get_portal_options():
+        n_all = len(plants_meta_df)
+        src_series = plants_meta_df["source"].astype(str).str.lower() if not plants_meta_df.empty else pd.Series(dtype=str)
+        n_gw = int((src_series == "growatt").sum())
+        n_isc = int((src_series == "isolarcloud").sum())
+        n_sl = int((src_series == "suryalog").sum())
+        return {
+            "all": f"All Portals ({n_all})",
+            "growatt": f"Growatt ({n_gw})",
+            "isolarcloud": f"iSolarCloud ({n_isc})",
+            "suryalog": f"SuryaLog ({n_sl})",
+        }
+
+    portal_options = get_portal_options()
 
     def filter_plants_dict():
         cat = cat_select.value if 'cat_select' in locals() and cat_select else "all"
@@ -840,6 +848,7 @@ def build_plant_tab(app_state: dict):
         app_state["month"] = m_val
         plants_meta_df = load_plant_metadata()
         cat_select.options = get_category_options()
+        src_select.options = get_portal_options()
         on_filter_change()
         render_cockpit.refresh()
 
@@ -854,6 +863,10 @@ def build_plant_tab(app_state: dict):
 
     # Register external month and plant change listener
     def on_global_update():
+        nonlocal plants_meta_df
+        plants_meta_df = load_plant_metadata()
+        cat_select.options = get_category_options()
+        src_select.options = get_portal_options()
         changed = False
         if app_state.get("month") != selected_plant["month"]:
             set_plant_month(app_state.get("month", cur_m))
@@ -864,8 +877,8 @@ def build_plant_tab(app_state: dict):
             if selected_plant["id"] in opts:
                 plant_select.value = selected_plant["id"]
             changed = True
-        if changed:
-            render_cockpit.refresh()
+        on_filter_change()
+        render_cockpit.refresh()
 
     if "refresh_listeners" in app_state:
         app_state["refresh_listeners"].append(on_global_update)

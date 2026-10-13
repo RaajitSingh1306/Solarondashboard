@@ -314,31 +314,157 @@ def archive_database_backups(date_str: Optional[str] = None) -> Dict[str, Any]:
     return results
 
 
+def archive_fleet_plants(date_str: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Backs up all fleet plant metadata from the local database to S3 bronze layer:
+    s3://{bucket}/solaron/bronze/fleet/plants_{date_str}.json and updates latest.json.
+    """
+    if not date_str:
+        date_str = datetime.date.today().isoformat()
+
+    sql = "SELECT * FROM plants ORDER BY plant_id ASC;"
+    df = db.query_df(sql, db="analytics")
+    records = df.to_dict(orient="records") if not df.empty else []
+
+    payload = {
+        "date": date_str,
+        "total_plants": len(records),
+        "sources": {
+            "growatt": sum(1 for r in records if str(r.get("source", "")).lower() == "growatt"),
+            "isolarcloud": sum(1 for r in records if str(r.get("source", "")).lower() == "isolarcloud"),
+            "suryalog": sum(1 for r in records if str(r.get("source", "")).lower() == "suryalog"),
+            "other": sum(1 for r in records if str(r.get("source", "")).lower() not in ("growatt", "isolarcloud", "suryalog")),
+        },
+        "archived_at": datetime.datetime.now().isoformat(),
+        "plants": records
+    }
+    content = json.dumps(payload, indent=2, default=str)
+    s3_key = f"solaron/bronze/fleet/plants_{date_str}.json"
+    res = upload_content_to_s3(s3_key, content, metadata={"date": date_str, "type": "fleet_plants", "total_plants": str(len(records))})
+
+    # Also update latest pointer
+    try:
+        upload_content_to_s3("solaron/bronze/fleet/latest.json", content, overwrite_if_empty_only=False, metadata={"date": date_str, "type": "fleet_latest"})
+    except Exception as e:
+        logger.debug("Could not update latest fleet S3 pointer: %s", e)
+
+    res["count"] = len(records)
+    return res
+
+
+def archive_inverter_snapshots(date_str: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Backs up inverter telemetry snapshots to S3 bronze layer:
+    s3://{bucket}/solaron/bronze/snapshots/{date_str}.json
+    """
+    if not date_str:
+        date_str = datetime.date.today().isoformat()
+
+    sql = "SELECT * FROM inverter_snapshots ORDER BY id DESC LIMIT 2000;"
+    df = db.query_df(sql, db="analytics")
+    records = df.to_dict(orient="records") if not df.empty else []
+
+    payload = {
+        "date": date_str,
+        "total_records": len(records),
+        "archived_at": datetime.datetime.now().isoformat(),
+        "snapshots": records
+    }
+    content = json.dumps(payload, indent=2, default=str)
+    s3_key = f"solaron/bronze/snapshots/{date_str}.json"
+    res = upload_content_to_s3(s3_key, content, metadata={"date": date_str, "type": "inverter_snapshots", "total_records": str(len(records))})
+    res["count"] = len(records)
+    return res
+
+
+def archive_excel_upload(local_file_path: Path, month_str: str, parsed_records: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    Uploads raw uploaded Excel report and parsed records to S3:
+    Raw: s3://{bucket}/solaron/raw/excel/{month_str}/{filename}
+    Parsed: s3://{bucket}/solaron/bronze/excel/{month_str}.json
+    """
+    results = {}
+    if local_file_path.exists():
+        s3_raw_key = f"solaron/raw/excel/{month_str}/{local_file_path.name}"
+        res_file = upload_file_to_s3(local_file_path, s3_raw_key, overwrite_if_empty_only=False, metadata={"month": month_str, "type": "raw_excel_report"})
+        results["raw_file"] = res_file
+
+    if parsed_records:
+        payload = {
+            "month": month_str,
+            "filename": local_file_path.name,
+            "total_records": len(parsed_records),
+            "archived_at": datetime.datetime.now().isoformat(),
+            "records": parsed_records
+        }
+        content = json.dumps(payload, indent=2, default=str)
+        s3_json_key = f"solaron/bronze/excel/{month_str}_{local_file_path.stem}.json"
+        res_json = upload_content_to_s3(s3_json_key, content, overwrite_if_empty_only=False, metadata={"month": month_str, "type": "parsed_excel_records"})
+        results["parsed_records"] = res_json
+
+    return results
+
+
+def archive_full_sync(target_date: Optional[str] = None, month_str: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Performs full archival of local DB data to S3:
+    Fleet metadata, Daily generation, Monthly generation, Inverter snapshots, and SQLite DB backups.
+    """
+    if not target_date:
+        target_date = datetime.date.today().isoformat()
+    if not month_str:
+        month_str = target_date[:7]
+
+    logger.info("Starting full S3 archival sync for date=%s, month=%s", target_date, month_str)
+    r_fleet = archive_fleet_plants(target_date)
+    r_daily = archive_daily_generation(target_date)
+    r_monthly = archive_monthly_generation(month_str)
+    r_snaps = archive_inverter_snapshots(target_date)
+    r_db = archive_database_backups(target_date)
+
+    summary = {
+        "target_date": target_date,
+        "month": month_str,
+        "fleet": r_fleet,
+        "daily_generation": r_daily,
+        "monthly_generation": r_monthly,
+        "inverter_snapshots": r_snaps,
+        "database_backups": r_db,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+    logger.info("Full S3 sync completed successfully: %s", summary)
+    return summary
+
+
 def run_nightly_archive(target_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Orchestrates nightly execution across all archival targets:
-    State, logs, daily gen, monthly gen, and online database backups.
+    Fleet, state, logs, daily gen, monthly gen, snapshots, and online database backups.
     """
     if not target_date:
         target_date = datetime.date.today().isoformat()
     month = target_date[:7]
 
     logger.info("Starting nightly bronze archive for date=%s, month=%s", target_date, month)
+    r_fleet = archive_fleet_plants(target_date)
     r_state = archive_escalation_state(target_date)
     r_log = archive_escalation_log(month)
     r_inbound = archive_inbound_log(month)
     r_daily = archive_daily_generation(target_date)
     r_monthly = archive_monthly_generation(month)
+    r_snaps = archive_inverter_snapshots(target_date)
     r_db = archive_database_backups(target_date)
 
     summary = {
         "target_date": target_date,
         "month": month,
+        "fleet": r_fleet,
         "escalation_state": r_state,
         "escalation_log": r_log,
         "gupshup_inbound": r_inbound,
         "daily_generation": r_daily,
         "monthly_generation": r_monthly,
+        "inverter_snapshots": r_snaps,
         "database_backups": r_db,
         "timestamp": datetime.datetime.now().isoformat(),
     }

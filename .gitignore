@@ -23,6 +23,8 @@ data/raw/
 data/lake/
 data/bronze/
 data/backups/
+data/crm_plants_*
+*.xlsx
 
 # Archives and bundles
 *.zip

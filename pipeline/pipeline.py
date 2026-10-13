@@ -15,6 +15,8 @@ from extractors.base import BaseExtractor
 from extractors.growatt import GrowattExtractor
 from extractors.isolarcloud import ISolarCloudExtractor
 from extractors.suryalog import SuryaLogExtractor
+from extractors.fronius import FroniusExtractor
+from extractors.injectsolar import InjectSolarExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,8 @@ def get_extractors(sources: Optional[List[str]] = None):
         GrowattExtractor(),
         ISolarCloudExtractor(),
         SuryaLogExtractor(),
+        FroniusExtractor(),
+        InjectSolarExtractor(),
     ]
     if not sources or "All" in sources or "all" in sources:
         return all_ext
@@ -74,6 +78,11 @@ def run_fleet(sources: Optional[List[str]] = None, force_refresh: bool = False) 
             logger.error(f"Error in run_fleet for {ext.source}: {e}", exc_info=True)
             db.record_sync_finish(run_id, "error", ext_count, str(e))
     data_quality.invalidate_decommissioned_cache()
+    try:
+        from services import s3_archive
+        s3_archive.archive_fleet_plants()
+    except Exception as s3_err:
+        logger.debug(f"S3 archive fleet error: {s3_err}")
     return count
 
 def run_daily(date_str: Optional[str] = None, sources: Optional[List[str]] = None, force_refresh: bool = False) -> int:
@@ -168,6 +177,11 @@ def run_snapshots(sources: Optional[List[str]] = None, force_refresh: bool = Fal
         except Exception as e:
             logger.error(f"Error in run_snapshots for {ext.source}: {e}", exc_info=True)
             db.record_sync_finish(run_id, "error", ext_total, str(e))
+    try:
+        from services import s3_archive
+        s3_archive.archive_inverter_snapshots()
+    except Exception as s3_err:
+        logger.debug(f"S3 archive snapshots error: {s3_err}")
     return total
 
 def run_full_extract(
@@ -310,6 +324,14 @@ def run_full_extract(
         cur.execute(p_query, p_params)
         preview_rows = [dict(r) for r in cur.fetchall()]
 
+    s3_status = "synced"
+    try:
+        from services import s3_archive
+        s3_archive.archive_database_backups()
+    except Exception as s3_err:
+        logger.debug(f"S3 archive database backups error: {s3_err}")
+        s3_status = f"local_mirror ({s3_err})"
+
     tot_kwh = float(row.get("total_kwh") or 0.0)
     return {
         "status": "success",
@@ -334,6 +356,7 @@ def run_full_extract(
         "snapshots": s_count,
         "classified": cls_res.get("classified_count", 0),
         "loss_calculated": loss_res.get("plants_calculated", 0),
+        "s3_status": s3_status,
     }
 
 def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
@@ -687,6 +710,12 @@ def run_historical_backfill(
 
     report("Syncing decommissioned plants & finalizing fleet metrics...", 0.95)
     analytics.sync_decommissioned_plants()
+
+    try:
+        from services import s3_archive
+        s3_archive.archive_full_sync(month_str=end_year_month)
+    except Exception as s3_err:
+        logger.debug(f"S3 archive backfill sync error: {s3_err}")
 
     elapsed = round(time.time() - start_time, 2)
     report(f"Historical backfill complete in {elapsed}s: {total_monthly_records} monthly records across {total_months} months.", 1.0)

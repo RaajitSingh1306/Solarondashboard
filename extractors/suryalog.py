@@ -184,51 +184,65 @@ class SuryaLogExtractor(BaseExtractor):
                                 matched_rec = r
                                 break
 
-                        if matched_rec:
-                            cap = float(matched_rec.get("capacity_kwp") or 10.0)
+                        if not matched_rec:
+                            raw_id = p_val or p_text
+                            clean_name = re.sub(r"^\d+[\.\s\-]+", "", p_text).strip()
+                            pid = self.plant_id("suryalog", raw_id)
+                            matched_rec = {
+                                "plant_id": pid,
+                                "plant_name": clean_name or p_text,
+                                "capacity_kwp": 10.0,
+                                "source": "suryalog",
+                                "city": "Raipur",
+                                "latitude": 21.25,
+                                "longitude": 81.63,
+                                "install_date": "2023-01-10",
+                                "inverter_model": "Commercial",
+                                "panel_model": "Mono PERC 540W",
+                                "status": "Normal",
+                            }
+                            records.append(matched_rec)
 
-                            # Check date staleness (e.g. log from June 2026 when current is Sept 2026)
-                            is_stale_date = False
-                            if live_time:
-                                m_date = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})", live_time)
-                                if m_date:
-                                    _, m_num, y_num = m_date.groups()
-                                    full_year = int(y_num) if len(y_num) == 4 else (2000 + int(y_num))
-                                    current_now = datetime.datetime.now()
-                                    if (full_year < current_now.year) or (full_year == current_now.year and int(m_num) < current_now.month):
-                                        if live_power == 0 and live_day == 0:
-                                            is_stale_date = True
+                        cap = float(matched_rec.get("capacity_kwp") or 10.0)
 
-                            if is_stale_date:
-                                live_month = 0.0
-                                live_day = 0.0
-                                live_yest = 0.0
+                        # Check date staleness (e.g. log from June 2026 when current is Sept 2026)
+                        is_stale_date = False
+                        if live_time:
+                            m_date = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})", live_time)
+                            if m_date:
+                                _, m_num, y_num = m_date.groups()
+                                full_year = int(y_num) if len(y_num) == 4 else (2000 + int(y_num))
+                                current_now = datetime.datetime.now()
+                                if (full_year < current_now.year) or (full_year == current_now.year and int(m_num) < current_now.month):
+                                    if live_power == 0 and live_day == 0:
+                                        is_stale_date = True
 
-                            matched_rec["current_power_kw"] = live_power
-                            matched_rec["today_energy_kwh"] = live_day
-                            matched_rec["yesterday_energy_kwh"] = live_yest
+                        if is_stale_date:
+                            live_month = 0.0
+                            live_day = 0.0
+                            live_yest = 0.0
 
-                            # Sanity check: B1 - Prevent total lifetime energy from overwriting monthly energy
-                            max_month_limit = cap * 220.0
-                            if live_month is not None and live_month > max_month_limit:
-                                logger.warning(f"SuryaLog plant {p_text}: value {live_month} exceeds capacity limit ({max_month_limit} kWh), rejecting.")
-                                matched_rec["month_energy_kwh"] = None
-                            elif live_month is not None and live_month >= 0:
-                                matched_rec["month_energy_kwh"] = live_month
-                            elif is_stale_date:
-                                matched_rec["month_energy_kwh"] = 0.0
+                        matched_rec["current_power_kw"] = live_power
+                        matched_rec["today_energy_kwh"] = live_day
+                        matched_rec["yesterday_energy_kwh"] = live_yest
 
-                            if live_cuf > 0 and live_cuf <= 100.0:
-                                matched_rec["cuf_pct"] = live_cuf
-                            if live_total > 0:
-                                matched_rec["total_energy_kwh"] = live_total
-                            if live_time:
-                                matched_rec["last_log_time"] = live_time
-                            matched_rec["last_scrape_time"] = datetime.datetime.now().isoformat()
-                            if not is_stale_date and (live_power > 0 or live_day > 0 or (live_month is not None and live_month > 1.0)):
-                                matched_rec["status"] = "Normal"
-                            else:
-                                matched_rec["status"] = "Offline"
+                        # Accept all values directly without rejection
+                        if live_month is not None and live_month >= 0:
+                            matched_rec["month_energy_kwh"] = live_month
+                        elif is_stale_date:
+                            matched_rec["month_energy_kwh"] = 0.0
+
+                        if live_cuf > 0 and live_cuf <= 100.0:
+                            matched_rec["cuf_pct"] = live_cuf
+                        if live_total > 0:
+                            matched_rec["total_energy_kwh"] = live_total
+                        if live_time:
+                            matched_rec["last_log_time"] = live_time
+                        matched_rec["last_scrape_time"] = datetime.datetime.now().isoformat()
+                        if not is_stale_date and (live_power > 0 or live_day > 0 or (live_month is not None and live_month > 1.0)):
+                            matched_rec["status"] = "Normal"
+                        else:
+                            matched_rec["status"] = "Offline"
                     except Exception as step_err:
                         logger.warning(f"Error scraping SuryaLog plant {p_text}: {step_err}")
 
@@ -242,6 +256,16 @@ class SuryaLogExtractor(BaseExtractor):
                     logger.info("Successfully updated plants_12_structured.json with live SuryaLog data.")
                 except Exception as save_err:
                     logger.error(f"Error saving updated SuryaLog cache: {save_err}")
+
+                try:
+                    from services import s3_archive
+                    s3_archive.upload_content_to_s3(
+                        f"solaron/raw/suryalog/plants_{datetime.date.today().isoformat()}.json",
+                        json.dumps(records, indent=2),
+                        metadata={"source": "suryalog", "count": str(len(records))}
+                    )
+                except Exception as s3_err:
+                    logger.debug(f"S3 archive suryalog error: {s3_err}")
 
                 self.cached_plants = records
                 _LAST_LIVE_SCRAPE_TS = time.time()

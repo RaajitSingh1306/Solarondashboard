@@ -127,6 +127,14 @@ def parse_and_ingest_excel(filepath: str) -> Dict[str, Any]:
             if cap <= 0 and existing.iloc[0]["capacity_kwp"]:
                 cap = float(existing.iloc[0]["capacity_kwp"])
                 sy = round(kwh / cap, 2) if cap > 0 else sy
+        else:
+            db.upsert_plant({
+                "plant_id": pid,
+                "source": "excel",
+                "plant_name": p_name,
+                "capacity_kwp": cap,
+                "operational_status": "active" if kwh > 0 else "offline",
+            })
 
         monthly_rows.append({
             "plant_id": pid,
@@ -143,10 +151,21 @@ def parse_and_ingest_excel(filepath: str) -> Dict[str, Any]:
     if monthly_rows:
         db.upsert_monthly(monthly_rows)
 
+    # S3 Platform Archival: store raw report file and bronze monthly records on S3
+    s3_res = {}
+    try:
+        from services import s3_archive
+        s3_res = s3_archive.archive_excel_upload(path, month_str, monthly_rows)
+        s3_archive.archive_monthly_generation(month_str)
+        s3_archive.archive_fleet_plants()
+    except Exception as s3_err:
+        logger.debug(f"S3 archive excel error: {s3_err}")
+
     return {
         "status": "success",
         "month": month_str,
         "month_label": month_label,
         "plants_ingested": plants_updated,
         "file": str(path.name),
+        "s3_synced": bool(s3_res),
     }

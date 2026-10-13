@@ -202,8 +202,17 @@ def build_fetch_tab(
                         est_duration_label.classes(replace="text-amber-300", remove="text-cyan-300")
 
                 def refresh_cache_meta_ui():
-                    nonlocal cache_meta
+                    nonlocal cache_meta, plants_raw
                     cache_meta = db.get_cache_metadata()
+                    plants_raw = db.get_plants()
+                    sync_badge.set_text(f"{len(plants_raw)} Plants Synced")
+                    p_opts = {"All": "🌐 All Sites (Fleet-wide)"}
+                    for p in plants_raw:
+                        pid = p["plant_id"]
+                        pname = p.get("plant_name") or pid
+                        src = p.get("source", "").title()
+                        p_opts[pid] = f"[{src}] {pname} ({p.get('capacity_kwp', 0):.1f} kWp)"
+                    site_select.options = p_opts
                     cache_badge.set_text(f"Cached: {cache_meta['latest_daily_date']}")
                     cache_meta_label.set_text(
                         f"Latest Cached Date: {cache_meta['latest_daily_date']} ({cache_meta['plants_on_latest_day']} plants) · Month: {cache_meta['latest_month']} · Synced: {cache_meta['last_sync_timestamp']}"
@@ -243,7 +252,7 @@ def build_fetch_tab(
                         ui.label("Backfill historical monthly & daily generation from plant commissioning date (2017–2026) to present.").classes("text-xs text-gray-400")
                 
                 with ui.row().classes("items-center gap-2"):
-                    ui.badge("490 Plants Synced", color="indigo-8").classes("text-xs font-semibold px-2.5 py-1 rounded")
+                    sync_badge = ui.badge(f"{len(plants_raw)} Plants Synced", color="indigo-8").classes("text-xs font-semibold px-2.5 py-1 rounded")
                     ui.badge("Commissioning Range: 2017 - 2026", color="emerald-9").classes("text-xs font-semibold px-2.5 py-1 rounded")
 
             with ui.row().classes("w-full items-center gap-4 mt-3 flex-wrap"):
@@ -374,7 +383,7 @@ def build_fetch_tab(
                             ui.label(f"Data Successfully Extracted for {data.get('month')}").classes("text-sm font-bold text-white")
                             ui.label(
                                 f"Strategy: {mode_badge} • Completed in {data.get('elapsed_seconds', 0):.2f}s • "
-                                f"{data.get('plants', 0)} Plants Processed • {data.get('loss_calculated', 0)} Loss Records Analyzed"
+                                f"{data.get('plants', 0)} Plants Processed • Stored in Local DB & Synced to AWS S3"
                             ).classes("text-xs text-gray-400")
 
                     with ui.row().classes("items-center gap-2"):
@@ -383,6 +392,11 @@ def build_fetch_tab(
                             color="amber-9" if "Force" in mode_badge else "emerald-9",
                             text_color="white"
                         ).props("dense")
+                        ui.chip(
+                            "☁️ S3 & Local DB Synced",
+                            color="cyan-9",
+                            text_color="white"
+                        ).props("dense").tooltip("Data stored in SQLite local DB and synchronized to AWS S3 bucket")
                         if switch_tab:
                             ui.button(
                                 "Go to Full Fleet Analytics →",

@@ -1,13 +1,16 @@
 import datetime
+import logging
 import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_dir(path: str):
@@ -102,7 +105,7 @@ def get_plants(source: str | None = None, include_decommissioned: bool = False) 
     df = query_df(sql, params, db="analytics")
     if df.empty:
         return []
-    return df.to_dict(orient="records")
+    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
 
 def query_df(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> pd.DataFrame:
     with get_conn(db) as conn:
@@ -111,7 +114,8 @@ def query_df(sql: str, params: tuple | list | dict | None = None, db: str = "ana
             if not df.empty:
                 return df.astype(object).where(pd.notnull(df), None)
             return df
-        except Exception:
+        except (sqlite3.Error, Exception) as e:  # noqa: BLE001
+            logger.debug("query_df exception: %s", e)
             return pd.DataFrame()
 
 def execute(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> int:
@@ -173,7 +177,7 @@ def upsert_plant(row: dict[str, Any]) -> None:
 def upsert_daily(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
-    today_str = datetime.date.today().isoformat()
+    today_str = datetime.date.today().isoformat()  # noqa: DTZ011
     rows = [r for r in rows if str(r.get("date", "")) <= today_str]
     if not rows:
         return 0
@@ -335,7 +339,7 @@ def get_available_months(force_refresh: bool = False) -> list[str]:
     if not df.empty and len(df) > 0:
         months = [str(m) for m in df["month"].dropna().tolist() if re.match(r"^\d{4}-\d{2}$", str(m))]
         if months:
-            res = sorted(list(set(months)), reverse=True)
+            res = sorted(set(months), reverse=True)
             _cached_available_months = res
             return list(res)
 
@@ -343,7 +347,7 @@ def get_available_months(force_refresh: bool = False) -> list[str]:
     if not df_d.empty:
         months = [str(m) for m in df_d["month"].dropna().tolist() if re.match(r"^\d{4}-\d{2}$", str(m))]
         if months:
-            res = sorted(list(set(months)), reverse=True)
+            res = sorted(set(months), reverse=True)
             _cached_available_months = res
             return list(res)
 
@@ -376,7 +380,7 @@ def get_cache_metadata() -> dict[str, Any]:
                 res["latest_month"] = str(row[0])
                 res["total_monthly_records"] = int(row[1] or 0)
 
-            cur.execute("SELECT MAX(updated_at) FROM plants")
+            cur.execute("SELECT datetime(MAX(updated_at), 'localtime') FROM plants")
             row = cur.fetchone()
             if row and row[0]:
                 res["last_sync_timestamp"] = str(row[0])
@@ -386,8 +390,8 @@ def get_cache_metadata() -> dict[str, Any]:
                 row = cur.fetchone()
                 if row and row[0]:
                     res["plants_on_latest_day"] = int(row[0])
-    except Exception:
-        pass
+    except (sqlite3.Error, Exception) as e:  # noqa: BLE001
+        logger.debug("get_cache_metadata exception: %s", e)
     return res
 
 
@@ -423,7 +427,7 @@ def get_anomaly_feedback(plant_id: str | None = None) -> list[dict[str, Any]]:
     df = query_df(sql, params, db="analytics")
     if df.empty:
         return []
-    return df.to_dict(orient="records")
+    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
 
 def init_db() -> None:
     with analytics_conn() as conn:
@@ -599,8 +603,8 @@ def init_db() -> None:
         ]:
             try:
                 cur.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {ctype};")
-            except Exception:
-                pass
+            except (sqlite3.Error, Exception) as e:  # noqa: BLE001
+                logger.debug("ALTER TABLE %s ADD COLUMN %s exception: %s", tbl, col, e)
 
     with crm_conn() as conn:
         cur = conn.cursor()
@@ -785,8 +789,8 @@ def get_last_sync_by_portal() -> dict[str, dict[str, Any]]:
                 WHERE status = 'running'
                   AND (julianday(CURRENT_TIMESTAMP) - julianday(started_at)) * 1440 > 15;
             """)
-        except Exception:
-            pass
+        except (sqlite3.Error, Exception) as e:  # noqa: BLE001
+            logger.debug("cleanup stale sync_runs exception: %s", e)
 
         # 2. Get active plant count from plants table as ground truth fallback
         cur.execute("""
