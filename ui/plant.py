@@ -5,9 +5,11 @@ from nicegui import ui
 try:
     from pipeline import db
     from core import analytics
+    from core import platforms
 except ImportError:
     import db
     import analytics
+    import platforms  # type: ignore
 
 def build_plant_tab(app_state: dict):
     client = ui.context.client
@@ -95,15 +97,11 @@ def build_plant_tab(app_state: dict):
     def get_portal_options():
         n_all = len(plants_meta_df)
         src_series = plants_meta_df["source"].astype(str).str.lower() if not plants_meta_df.empty else pd.Series(dtype=str)
-        n_gw = int((src_series == "growatt").sum())
-        n_isc = int((src_series == "isolarcloud").sum())
-        n_sl = int((src_series == "suryalog").sum())
-        return {
-            "all": f"All Portals ({n_all})",
-            "growatt": f"Growatt ({n_gw})",
-            "isolarcloud": f"iSolarCloud ({n_isc})",
-            "suryalog": f"SuryaLog ({n_sl})",
-        }
+        counts = {k: int((src_series == k).sum()) for k in platforms.platform_keys()}
+        opts = {"all": f"All Portals ({n_all})"}
+        for k in platforms.platform_keys():
+            opts[k] = f"{platforms.label(k)} ({counts.get(k, 0)})"
+        return opts
 
     portal_options = get_portal_options()
 
@@ -113,7 +111,7 @@ def build_plant_tab(app_state: dict):
 
         df_f = plants_meta_df
         if src != "all":
-            df_f = df_f[df_f["source"] == src]
+            df_f = df_f[df_f["source"].astype(str).str.lower() == str(src).lower()]
 
         if cat == "active":
             df_f = df_f[df_f["op_status"] == "active"]

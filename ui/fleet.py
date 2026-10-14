@@ -5,9 +5,13 @@ from typing import Any, Dict
 from nicegui import ui
 try:
     from pipeline import db
+    from core import platforms
+    from core import fleet_intelligence
     from ui.export_dialog import show_export_dialog
 except ImportError:
     import db
+    import platforms  # type: ignore
+    import fleet_intelligence  # type: ignore
     try:
         from export_dialog import show_export_dialog
     except ImportError:
@@ -112,7 +116,8 @@ def build_fleet_tab(app_state: dict):
         sync_info = await asyncio.to_thread(db.get_last_sync_by_portal)
         with sync_badges_row:
             ui.label("Sync Status:").classes("text-gray-400 font-semibold mr-1 self-center")
-            for portal, name in [("growatt", "Growatt"), ("isolarcloud", "iSolarCloud"), ("suryalog", "SuryaLog")]:
+            for portal in platforms.platform_keys():
+                name = platforms.label(portal)
                 info = sync_info.get(portal, {})
                 t_str = info.get("completed_at", "Never")
                 cnt = info.get("items_count", 0)
@@ -144,7 +149,7 @@ def build_fleet_tab(app_state: dict):
             ui.button(f"Prev Month ({prev_name})", on_click=lambda: asyncio.create_task(set_month(prev_m))).props("dense text-color=white")
 
         source_filter = ui.select(
-            options=["All", "growatt", "isolarcloud", "suryalog"],
+            options=platforms.options(include_all=True),
             value=app_state.get("source", "All"),
             label="Platform"
         ).classes("w-36").props("dense outlined dark options-dense")
@@ -194,7 +199,7 @@ def build_fleet_tab(app_state: dict):
         live_sync_btn = ui.button(
             "⚡ Live Fetch All Portals",
             icon="cloud_sync"
-        ).props("dense unelevated color=amber-6 text-color=black font-bold px-3").tooltip("Scrape live generation directly from all portals (Growatt, iSolarCloud, SuryaLog) and update fleet")
+        ).props("dense unelevated color=amber-6 text-color=black font-bold px-3").tooltip(f"Scrape live generation directly from all portals ({platforms.names_sentence()}) and update fleet")
 
         refresh_btn = ui.button(
             "Reload View",
@@ -284,11 +289,10 @@ def build_fleet_tab(app_state: dict):
     """)
 
     # Custom chip rendering for platform
-    # Custom chip rendering for platform
-    fleet_table.add_slot("body-cell-source", """
+    fleet_table.add_slot("body-cell-source", f"""
         <q-td :props="props">
-            <q-badge :color="props.value === 'growatt' ? 'indigo-7' : props.value === 'isolarcloud' ? 'cyan-8' : props.value === 'suryalog' ? 'orange-8' : 'grey-8'">
-                {{ props.value }}
+            <q-badge :color="{platforms.vue_color_expr('props.value')}">
+                {{{{ {platforms.vue_label_expr('props.value')} }}}}
             </q-badge>
         </q-td>
     """)
@@ -413,10 +417,11 @@ def build_fleet_tab(app_state: dict):
         src_val = source_filter.value
         if src_val == "All" or not src_val:
             live_sync_btn.set_text("⚡ Live Fetch All Portals")
-            live_sync_btn.tooltip("Scrape live generation directly from all portals (Growatt, iSolarCloud, SuryaLog) and update fleet")
+            live_sync_btn.tooltip(f"Scrape live generation directly from all portals ({platforms.names_sentence()}) and update fleet")
         else:
-            live_sync_btn.set_text(f"⚡ Live Fetch ({src_val.title()})")
-            live_sync_btn.tooltip(f"Scrape live generation directly from {src_val.title()} portal and update fleet")
+            lbl = platforms.label(src_val)
+            live_sync_btn.set_text(f"⚡ Live Fetch ({lbl})")
+            live_sync_btn.tooltip(f"Scrape live generation directly from {lbl} portal and update fleet")
 
     source_filter.on("update:model-value", lambda: (update_sync_btn_label(), apply_filters()))
     status_filter.on("update:model-value", lambda: apply_filters())
@@ -446,18 +451,9 @@ def build_fleet_tab(app_state: dict):
 
         src = source_filter.value
         srcs = [src] if src != "All" else None
-        target_name = "ALL Portals (Growatt, iSolarCloud, SuryaLog)" if src == "All" else f"{src.title()} Portal"
+        target_name = f"ALL Portals ({platforms.names_sentence()})" if src == "All" else f"{platforms.label(src)} Portal"
 
-        p = (src or "all").lower()
-        if p == "growatt":
-            est_t = 75.0
-        elif p == "isolarcloud":
-            est_t = 60.0
-        elif p == "suryalog":
-            est_t = 180.0
-        else:
-            est_t = 600.0
-
+        est_t = platforms.est_sync_seconds(src)
         secs_int = int(round(est_t))
         est_fmt = f"{secs_int // 60}m {secs_int % 60:02d}s" if secs_int >= 60 else f"{secs_int}s"
 
@@ -514,6 +510,11 @@ def build_fleet_tab(app_state: dict):
             stop_fleet_timer.set()
             try:
                 timer_task.cancel()
+            except Exception:
+                pass
+
+            try:
+                fleet_intelligence.clear_cache()
             except Exception:
                 pass
 

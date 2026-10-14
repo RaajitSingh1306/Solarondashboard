@@ -7,6 +7,7 @@ from typing import Any
 from nicegui import ui
 
 from pipeline import db, pipeline
+from core import platforms, fleet_intelligence
 
 def build_fetch_tab(
     app_state: dict[str, Any],
@@ -64,7 +65,7 @@ def build_fetch_tab(
                     ui.icon("cloud_download").classes("text-amber-400 text-2xl")
                     ui.label("Data Extraction & Ingestion Engine").classes("text-xl font-bold text-white")
                 ui.label(
-                    "Fetch real-time or cached telemetry from inverter portals (Growatt, iSolarCloud, SuryaLog), "
+                    f"Fetch real-time or cached telemetry from inverter portals ({platforms.names_sentence()}), "
                     "apply NASA POWER GHI benchmarks, and inspect post-pull health."
                 ).classes("text-xs text-gray-400")
 
@@ -93,7 +94,7 @@ def build_fetch_tab(
                 with ui.column().classes("gap-1 min-w-[170px]"):
                     ui.label("Telemetry Portal").classes("text-xs font-medium text-gray-400")
                     platform_select = ui.select(
-                        options=["All", "growatt", "isolarcloud", "suryalog"],
+                        options=platforms.options(include_all=True),
                         value=workbench_state["selected_platform"],
                     ).props("dense outlined dark options-dense").classes("w-full")
 
@@ -143,16 +144,7 @@ def build_fetch_tab(
                         return 3.0
                     if site and site != "All":
                         return 15.0
-                    p = (platform or "all").lower()
-                    if p == "growatt":
-                        return 75.0
-                    elif p == "isolarcloud":
-                        return 60.0
-                    elif p == "suryalog":
-                        return 180.0
-                    else:
-                        # Full fleet across all 3 portals (~10 mins)
-                        return 600.0
+                    return platforms.est_sync_seconds(platform)
 
                 def format_duration(seconds: float) -> str:
                     secs = int(round(seconds))
@@ -189,15 +181,12 @@ def build_fetch_tab(
                             )
                         elif p_val == "All" or not p_val:
                             est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} (full fleet across Growatt, iSolarCloud & SuryaLog)"
-                            )
-                        elif p_val.lower() == "growatt":
-                            est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} (Growatt residential fleet - 449 plants)"
+                                f"Expected Fetch Time: ~{est_str} (full fleet across {platforms.names_sentence()})"
                             )
                         else:
+                            lbl = platforms.label(p_val)
                             est_duration_label.set_text(
-                                f"Expected Fetch Time: ~{est_str} for {p_val.title()} portal telemetry"
+                                f"Expected Fetch Time: ~{est_str} for {lbl} portal telemetry"
                             )
                         est_duration_label.classes(replace="text-amber-300", remove="text-cyan-300")
 
@@ -363,7 +352,8 @@ def build_fetch_tab(
                 fetch_progress_bar = ui.linear_progress(value=0.05, show_value=False).props("color=amber-6 track-color=grey-9 stripe rounded").classes("w-full h-2.5")
 
                 with ui.row().classes("w-full items-center justify-between text-[11px] text-gray-500 mt-1"):
-                    ui.label("Portals: Growatt (Residential) • iSolarCloud (Commercial) • SuryaLog (Industrial)").classes("text-gray-500")
+                    portals_line = ", ".join(f"{m['label']} ({m['segment']})" for m in platforms.PLATFORMS.values())
+                    ui.label(f"Portals: {portals_line}").classes("text-gray-500")
                     ui.label("Real-time NASA POWER GHI Solar Insolation Benchmark Engine").classes("text-gray-500")
 
         # 4. Results & Post-Pull Initial Analysis Section
@@ -704,6 +694,11 @@ def build_fetch_tab(
                         listener()
                     except Exception:
                         pass
+
+                try:
+                    fleet_intelligence.clear_cache()
+                except Exception:
+                    pass
 
                 if not getattr(client, '_deleted', False):
                     with client:

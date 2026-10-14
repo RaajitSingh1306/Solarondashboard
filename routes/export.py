@@ -6,8 +6,12 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 try:
     from pipeline import db
+    from core import platforms
+    from core import fleet_intelligence
 except ImportError:
     import db
+    import platforms  # type: ignore
+    import fleet_intelligence  # type: ignore
 
 router = APIRouter(prefix="/export")
 
@@ -308,16 +312,28 @@ DAILY_COLUMNS = {
     },
 }
 
+WEEKLY_COLUMNS = fleet_intelligence.agg_columns_for_level("plant")
+YEARLY_COLUMNS = fleet_intelligence.agg_columns_for_level("plant")
+
 @router.get("/columns")
-def get_export_columns(dataset: str = Query("monthly", description="monthly or daily")):
+def get_export_columns(dataset: str = Query("monthly", description="monthly, daily, weekly, or yearly")):
     """Return available export column definitions with grouping and default selections."""
-    registry = MONTHLY_COLUMNS if dataset == "monthly" else DAILY_COLUMNS
+    dataset_clean = str(dataset or "").lower()
+    if dataset_clean == "daily":
+        registry = DAILY_COLUMNS
+    elif dataset_clean == "weekly":
+        registry = WEEKLY_COLUMNS
+    elif dataset_clean == "yearly":
+        registry = YEARLY_COLUMNS
+    else:
+        registry = MONTHLY_COLUMNS
+
     return [
         {
             "key": k,
             "label": meta["label"],
-            "group": meta["group"],
-            "default": meta["default"],
+            "group": meta.get("group", "General"),
+            "default": meta.get("default", False),
         }
         for k, meta in registry.items()
     ]
@@ -393,7 +409,7 @@ def export_fleet_monthly(
     month: Optional[str] = Query(None, description="Target month YYYY-MM"),
     start_month: Optional[str] = Query(None, description="Start month YYYY-MM"),
     end_month: Optional[str] = Query(None, description="End month YYYY-MM"),
-    source: Optional[str] = Query(None, description="Platform filter: growatt, isolarcloud, suryalog"),
+    source: Optional[str] = Query(None, description="Platform filter: growatt, isolarcloud, suryalog, fronius, injectsolar"),
     include_decom: bool = Query(True, description="Whether to include decommissioned plants"),
 ):
     fmt_str = str(_get_val(fmt, "csv")).lower()
@@ -445,6 +461,99 @@ def export_fleet_monthly(
     df = db.query_df(sql, params, db="analytics")
     prefix = f"fleet_monthly_{month_val}" if (month_val and month_val != "All") else "fleet_monthly"
     return df_to_response(df, prefix, fmt_str)
+
+@router.get("/fleet-weekly")
+def export_fleet_weekly(
+    fmt: str = Query("csv", description="csv or xlsx"),
+    cols: Optional[str] = Query(None, description="Comma-separated column keys"),
+    start: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
+    end: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
+    source: Optional[str] = Query(None, description="Platform filter"),
+    include_decom: bool = Query(True, description="Whether to include decommissioned plants"),
+):
+    fmt_str = str(_get_val(fmt, "csv")).lower()
+    source_val = _get_val(source)
+    src_filter = source_val.lower() if (source_val and source_val != "All") else None
+    include_decom_val = bool(_get_val(include_decom, True))
+
+    df = fleet_intelligence.aggregate_generation(
+        granularity="weekly",
+        start=_get_val(start),
+        end=_get_val(end),
+        level="plant",
+        source=src_filter,
+        include_decom=include_decom_val,
+    )
+
+    cols_val = _get_val(cols)
+    if cols_val:
+        req_keys = [c.strip() for c in cols_val.split(",") if c.strip() in WEEKLY_COLUMNS]
+    else:
+        req_keys = [k for k, meta in WEEKLY_COLUMNS.items() if meta.get("default")]
+
+    if req_keys and not df.empty:
+        valid_cols = [c for c in req_keys if c in df.columns]
+        df = df[valid_cols].rename(columns={c: WEEKLY_COLUMNS[c]["label"] for c in valid_cols})
+
+    return df_to_response(df, "fleet_weekly", fmt_str)
+
+@router.get("/fleet-yearly")
+def export_fleet_yearly(
+    fmt: str = Query("csv", description="csv or xlsx"),
+    cols: Optional[str] = Query(None, description="Comma-separated column keys"),
+    start: Optional[str] = Query(None, description="Start year YYYY"),
+    end: Optional[str] = Query(None, description="End year YYYY"),
+    source: Optional[str] = Query(None, description="Platform filter"),
+    include_decom: bool = Query(True, description="Whether to include decommissioned plants"),
+):
+    fmt_str = str(_get_val(fmt, "csv")).lower()
+    source_val = _get_val(source)
+    src_filter = source_val.lower() if (source_val and source_val != "All") else None
+    include_decom_val = bool(_get_val(include_decom, True))
+
+    df = fleet_intelligence.aggregate_generation(
+        granularity="yearly",
+        start=_get_val(start),
+        end=_get_val(end),
+        level="plant",
+        source=src_filter,
+        include_decom=include_decom_val,
+    )
+
+    cols_val = _get_val(cols)
+    if cols_val:
+        req_keys = [c.strip() for c in cols_val.split(",") if c.strip() in YEARLY_COLUMNS]
+    else:
+        req_keys = [k for k, meta in YEARLY_COLUMNS.items() if meta.get("default")]
+
+    if req_keys and not df.empty:
+        valid_cols = [c for c in req_keys if c in df.columns]
+        df = df[valid_cols].rename(columns={c: YEARLY_COLUMNS[c]["label"] for c in valid_cols})
+
+    return df_to_response(df, "fleet_yearly", fmt_str)
+
+@router.get("/fleet-period")
+def export_fleet_period(
+    granularity: str = Query("monthly", description="daily, weekly, monthly, yearly"),
+    level: str = Query("plant", description="plant, platform, fleet"),
+    fmt: str = Query("csv", description="csv or xlsx"),
+    cols: Optional[str] = Query(None, description="Comma-separated column keys"),
+    start: Optional[str] = Query(None, description="Start date/month/year"),
+    end: Optional[str] = Query(None, description="End date/month/year"),
+    source: Optional[str] = Query(None, description="Platform filter"),
+    include_decom: bool = Query(True, description="Whether to include decommissioned plants"),
+):
+    gran_clean = str(_get_val(granularity, "monthly")).lower()
+    if gran_clean == "daily":
+        return export_fleet_daily(fmt=fmt, cols=cols, start=start, end=end, source=source, include_decom=include_decom)
+    elif gran_clean == "monthly":
+        return export_fleet_monthly(fmt=fmt, cols=cols, start_month=start, end_month=end, source=source, include_decom=include_decom)
+    elif gran_clean == "weekly":
+        return export_fleet_weekly(fmt=fmt, cols=cols, start=start, end=end, source=source, include_decom=include_decom)
+    elif gran_clean == "yearly":
+        return export_fleet_yearly(fmt=fmt, cols=cols, start=start, end=end, source=source, include_decom=include_decom)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported granularity: {gran_clean}")
 
 @router.get("/fleet-status")
 def export_fleet_status(fmt: str = Query("csv")):

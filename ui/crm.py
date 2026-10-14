@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from nicegui import ui
 try:
     from pipeline import db
+    from core import platforms
     from services import crm, s3_archive
     from engines import escalation_state_machine, escalation_categorizer
     from ui.export_dialog import show_export_dialog
@@ -549,7 +550,7 @@ def build_crm_tab(app_state: dict):
                     with ui.row().classes("w-full items-center justify-between flex-wrap gap-3 pt-2"):
                         with ui.row().classes("items-center gap-3 flex-wrap"):
                             search_input = ui.input(placeholder="🔍 Search customer or plant...").classes("w-56").props("dense outlined dark")
-                            source_filter = ui.select(options=["All", "growatt", "isolarcloud", "suryalog"], value="All", label="Platform").classes("w-36").props("dense outlined dark")
+                            source_filter = ui.select(options=platforms.options(include_all=True), value="All", label="Platform").classes("w-36").props("dense outlined dark")
                             status_filter = ui.select(
                                 options=["All", "Active Only", "Not Working / Fault", "Offline Only", "Underperforming (< -15%)", "Phone Verified"],
                                 value="All", label="Plant Status"

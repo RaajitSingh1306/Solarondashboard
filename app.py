@@ -23,6 +23,7 @@ from nicegui import ui, events
 
 from config import settings
 from pipeline import db
+from core import platforms
 from services import scheduler
 from extractors import excel_parser
 from routes import data_router, export_router, crm_router, gupshup_router
@@ -183,7 +184,7 @@ def dashboard():
 
         # Platform Filter in Header
         header_source_select = ui.select(
-            options=["All", "growatt", "isolarcloud", "suryalog"],
+            options=platforms.options(include_all=True),
             value=app_state["source"],
             label="Platform"
         ).props("dense outlined dark options-dense").classes("w-32")
@@ -252,7 +253,7 @@ if __name__ == "__main__":
     print(f"  Open in browser: http://localhost:{settings.app_port} or http://127.0.0.1:{settings.app_port}")
     print("=" * 60 + "\n")
     app_target = "solaron.app:app" if (Path.cwd() / "solaron").exists() else "app:app"
-    enable_reload = os.environ.get("RELOAD", "false").lower() in ("1", "true", "yes")
+    enable_reload = os.environ.get("RELOAD", "true").lower() in ("1", "true", "yes")
     uvicorn.run(
         app_target,
         host="127.0.0.1",

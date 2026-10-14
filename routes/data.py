@@ -1,10 +1,12 @@
 import datetime
 from typing import Any, Dict, List, Optional
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 try:
     from pipeline import db, pipeline
-    from core import analytics, forecasting
+    from core import analytics, forecasting, platforms, fleet_intelligence
     from services import scheduler
 except ImportError:
     import db
@@ -12,13 +14,15 @@ except ImportError:
     import pipeline
     import scheduler
     import forecasting
+    import platforms  # type: ignore
+    import fleet_intelligence  # type: ignore
 
 router = APIRouter()
 
 @router.get("/fleet")
 def get_fleet(
     month: Optional[str] = Query(None, description="Month filter: YYYY-MM"),
-    source: Optional[str] = Query(None, description="Platform filter: growatt, isolarcloud, suryalog"),
+    source: Optional[str] = Query(None, description="Platform filter: growatt, isolarcloud, suryalog, fronius, injectsolar"),
     status: Optional[str] = Query(None, description="Status filter: active, offline, fault"),
 ):
     if hasattr(month, "default"):
@@ -303,4 +307,42 @@ def get_plant_forecast(
         "capacity_kwp": cap,
         "prediction": pred,
     }
+
+
+@router.get("/intelligence/kpis")
+@router.get("/data/intelligence/kpis")
+def get_intelligence_kpis(month: Optional[str] = Query(None), source: Optional[str] = Query(None)):
+    """IEC 61724-1 capacity-weighted fleet KPIs and cross-platform benchmarks."""
+    m_val = month or datetime.date.today().strftime("%Y-%m")
+    src = source.lower() if (source and source != "All") else None
+    return fleet_intelligence.fleet_kpis(month=m_val, source=src)
+
+
+@router.get("/intelligence/forecast")
+@router.get("/data/intelligence/forecast")
+def get_intelligence_forecast(horizon: int = Query(14), source: Optional[str] = Query(None)):
+    """Holt ETS damped-trend forecast with P10/P50/P90 prediction intervals."""
+    src = source.lower() if (source and source != "All") else None
+    return fleet_intelligence.forecast_fleet(horizon=horizon, source=src)
+
+
+@router.get("/intelligence/month-projection")
+@router.get("/data/intelligence/month-projection")
+def get_intelligence_month_projection(month: Optional[str] = Query(None), source: Optional[str] = Query(None)):
+    """Moving-block bootstrap month-end energy and revenue projection."""
+    m_val = month or datetime.date.today().strftime("%Y-%m")
+    src = source.lower() if (source and source != "All") else None
+    return fleet_intelligence.project_month_end(month=m_val, source=src)
+
+
+@router.get("/intelligence/health")
+@router.get("/data/intelligence/health")
+def get_intelligence_health(source: Optional[str] = Query(None)):
+    """Plant health diagnostics, RPI drift, and CUSUM change detection."""
+    src = source.lower() if (source and source != "All") else None
+    res = dict(fleet_intelligence.plant_health_matrix(source=src))
+    if isinstance(res.get("plants"), pd.DataFrame):
+        df_p = res["plants"].replace({np.nan: None})
+        res["plants"] = df_p.to_dict(orient="records")
+    return res
 

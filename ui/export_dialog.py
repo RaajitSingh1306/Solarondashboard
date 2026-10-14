@@ -7,10 +7,12 @@ from nicegui import ui
 
 try:
     from pipeline import db
-    from routes.export import MONTHLY_COLUMNS, DAILY_COLUMNS
+    from core import platforms
+    from routes.export import MONTHLY_COLUMNS, DAILY_COLUMNS, WEEKLY_COLUMNS, YEARLY_COLUMNS
 except ImportError:
     import db
-    from routes.export import MONTHLY_COLUMNS, DAILY_COLUMNS
+    import platforms  # type: ignore
+    from routes.export import MONTHLY_COLUMNS, DAILY_COLUMNS, WEEKLY_COLUMNS, YEARLY_COLUMNS
 
 PREFS_FILE = Path(__file__).resolve().parent.parent / "data" / "export_preferences.json"
 
@@ -50,24 +52,52 @@ DAILY_PRESETS = {
     ],
 }
 
+WEEKLY_PRESETS = {
+    "⚡ Weekly Generation": [
+        "period", "period_start", "period_end", "plant_id", "plant_name", "source",
+        "capacity_kwp", "kwh", "specific_yield", "yield_per_day", "revenue_inr"
+    ],
+    "📊 IEC 61724-1 Audit": [
+        "period", "plant_id", "plant_name", "source", "capacity_kwp", "kwh",
+        "reference_yield_h", "pr_pct", "cuf_pct", "availability_pct", "producing_days"
+    ],
+    "📋 Comprehensive": [
+        "period", "plant_id", "plant_name", "source", "city", "capacity_kwp",
+        "kwh", "specific_yield", "pr_pct", "cuf_pct", "expected_kwh", "realization_pct",
+        "days_reported", "producing_days", "availability_pct", "revenue_inr", "co2_kg"
+    ],
+}
+
+YEARLY_PRESETS = {
+    "🏆 Annual Performance": [
+        "period", "plant_id", "plant_name", "source", "capacity_kwp", "kwh",
+        "specific_yield", "pr_pct", "cuf_pct", "availability_pct", "revenue_inr", "co2_kg"
+    ],
+    "📋 Complete Annual Ledger": [
+        "period", "plant_id", "plant_name", "source", "city", "capacity_kwp",
+        "kwh", "specific_yield", "yield_per_day", "cuf_pct", "pr_pct",
+        "expected_kwh", "realization_pct", "days_reported", "producing_days",
+        "availability_pct", "revenue_inr", "co2_kg"
+    ],
+}
+
 def _load_persisted_cols() -> Dict[str, Set[str]]:
     defaults = {
         "monthly": {k for k, meta in MONTHLY_COLUMNS.items() if meta["default"]},
         "daily": {k for k, meta in DAILY_COLUMNS.items() if meta["default"]},
+        "weekly": {k for k, meta in WEEKLY_COLUMNS.items() if meta.get("default")},
+        "yearly": {k for k, meta in YEARLY_COLUMNS.items() if meta.get("default")},
     }
     if PREFS_FILE.exists():
         try:
             with open(PREFS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    if "monthly" in data and isinstance(data["monthly"], list):
-                        valid_m = {k for k in data["monthly"] if k in MONTHLY_COLUMNS}
-                        if valid_m:
-                            defaults["monthly"] = valid_m
-                    if "daily" in data and isinstance(data["daily"], list):
-                        valid_d = {k for k in data["daily"] if k in DAILY_COLUMNS}
-                        if valid_d:
-                            defaults["daily"] = valid_d
+                    for ds, reg in [("monthly", MONTHLY_COLUMNS), ("daily", DAILY_COLUMNS), ("weekly", WEEKLY_COLUMNS), ("yearly", YEARLY_COLUMNS)]:
+                        if ds in data and isinstance(data[ds], list):
+                            val = {k for k in data[ds] if k in reg}
+                            if val:
+                                defaults[ds] = val
         except Exception:
             pass
     return defaults
@@ -133,15 +163,20 @@ def show_export_dialog(
             with ui.row().classes("w-full items-center gap-4 flex-wrap"):
                 # Granularity Selector
                 dataset_radio = ui.radio(
-                    {"monthly": "Monthly Yield (Aggregated)", "daily": "Daily Telemetry (Granular)"},
+                    {
+                        "monthly": "Monthly Yield (Aggregated)",
+                        "daily": "Daily Telemetry (Granular)",
+                        "weekly": "Weekly IEC Performance",
+                        "yearly": "Yearly Performance & CUF",
+                    },
                     value=state["dataset"],
                 ).props("dense inline color=cyan dark")
 
                 platform_select = ui.select(
-                    options=["All", "growatt", "isolarcloud", "suryalog"],
+                    options=platforms.options(include_all=True),
                     value=state["platform"],
                     label="Platform",
-                ).classes("w-36").props("dense outlined dark options-dense")
+                ).classes("w-40").props("dense outlined dark options-dense")
 
                 decom_checkbox = ui.checkbox("Include Decommissioned", value=state["include_decom"]).props("dense dark").classes("text-xs text-gray-300")
 
@@ -191,7 +226,14 @@ def show_export_dialog(
         count_label = ui.label("").classes("text-xs font-semibold text-amber-400")
 
         def get_active_registry():
-            return MONTHLY_COLUMNS if dataset_radio.value == "monthly" else DAILY_COLUMNS
+            ds = dataset_radio.value
+            if ds == "daily":
+                return DAILY_COLUMNS
+            elif ds == "weekly":
+                return WEEKLY_COLUMNS
+            elif ds == "yearly":
+                return YEARLY_COLUMNS
+            return MONTHLY_COLUMNS
 
         def refresh_column_ui():
             columns_container.clear()
@@ -250,7 +292,15 @@ def show_export_dialog(
                     # Preset Quick-Select Toolbar
                     with ui.row().classes("w-full items-center gap-2 pt-1 pb-2 border-b border-gray-700/50 flex-wrap"):
                         ui.label("Presets:").classes("text-xs font-semibold text-gray-400")
-                        active_presets = MONTHLY_PRESETS if dataset_radio.value == "monthly" else DAILY_PRESETS
+                        ds = dataset_radio.value
+                        if ds == "daily":
+                            active_presets = DAILY_PRESETS
+                        elif ds == "weekly":
+                            active_presets = WEEKLY_PRESETS
+                        elif ds == "yearly":
+                            active_presets = YEARLY_PRESETS
+                        else:
+                            active_presets = MONTHLY_PRESETS
                         for preset_name, preset_cols in active_presets.items():
                             def make_preset_handler(p_cols=preset_cols):
                                 def apply_preset():
@@ -339,7 +389,7 @@ def show_export_dialog(
                     ordered_cols = [k for k in registry.keys() if k in state["selected_keys"]]
                     cols_param = ",".join(ordered_cols)
 
-                    dataset = dataset_radio.value  # 'monthly' or 'daily'
+                    dataset = dataset_radio.value  # 'monthly', 'daily', 'weekly', 'yearly'
                     base_url = f"/api/export/fleet-{dataset}?fmt={fmt}&cols={cols_param}"
 
                     # Time params
@@ -347,11 +397,21 @@ def show_export_dialog(
                     if mode == "single":
                         if dataset == "monthly":
                             base_url += f"&month={single_month_select.value}"
+                        elif dataset == "yearly":
+                            yr = str(single_month_select.value)[:4]
+                            base_url += f"&start={yr}&end={yr}"
+                        elif dataset == "weekly":
+                            m_val = single_month_select.value
+                            base_url += f"&start={m_val}-01&end={m_val}-31"
                         else:
                             base_url += f"&month={single_month_select.value}"
                     elif mode == "range":
                         if dataset == "monthly":
                             base_url += f"&start_month={start_month_select.value}&end_month={end_month_select.value}"
+                        elif dataset == "yearly":
+                            s_yr = str(start_month_select.value)[:4]
+                            e_yr = str(end_month_select.value)[:4]
+                            base_url += f"&start={s_yr}&end={e_yr}"
                         else:
                             base_url += f"&start={start_month_select.value}-01&end={end_month_select.value}-31"
                     # If 'all', omit month filter so all historical data is exported

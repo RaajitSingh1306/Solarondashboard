@@ -95,12 +95,12 @@ def run_growatt_daytime_sync():
 
 
 def run_browser_portals_daytime_sync():
-    """Mid-frequency browser scrapes for iSolarCloud & SuryaLog (30 min, 06:00-19:00 IST)."""
+    """Mid-frequency browser scrapes for iSolarCloud, SuryaLog, Fronius & InjectSolar (30 min, 06:00-19:00 IST)."""
     if not acquire_sync_lock("browser_portals_daytime_sync"):
         return
     try:
-        logger.info("Executing 30-minute iSolarCloud & SuryaLog daytime sync...")
-        sources = ["isolarcloud", "suryalog"]
+        logger.info("Executing 30-minute browser portal daytime sync (iSolarCloud, SuryaLog, Fronius, InjectSolar)...")
+        sources = ["isolarcloud", "suryalog", "fronius", "injectsolar"]
         pipeline.run_fleet(sources=sources, force_refresh=True)
         pipeline.run_daily(sources=sources, force_refresh=True)
         cur_month = datetime.date.today().strftime("%Y-%m")
@@ -159,12 +159,12 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-    # 2. iSolarCloud + SuryaLog browser scrapes every 30 min between 06:00 and 19:00 IST
+    # 2. iSolarCloud + SuryaLog + Fronius + InjectSolar browser scrapes every 30 min
     scheduler.add_job(
         run_browser_portals_daytime_sync,
         trigger=CronTrigger(hour="6-19", minute="*/30", timezone=IST_TIMEZONE),
         id="browser_portals_daytime_sync",
-        name="30-Minute iSolarCloud & SuryaLog Daytime Sync (06:00-19:00 IST)",
+        name="30-Minute Browser Portal Daytime Sync (06:00-19:00 IST)",
         coalesce=True,
         max_instances=1,
         replace_existing=True,

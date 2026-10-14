@@ -9,6 +9,7 @@ from typing import Any, cast
 import pandas as pd
 
 from config import settings
+from core import platforms
 
 logger = logging.getLogger(__name__)
 
@@ -803,7 +804,7 @@ def get_last_sync_by_portal() -> dict[str, dict[str, Any]]:
 
         # 3. For each portal, get the latest successful sync run
         result = {}
-        for portal in ["growatt", "isolarcloud", "suryalog"]:
+        for portal in platforms.platform_keys():
             # Prefer latest completed run with success
             cur.execute("""
                 SELECT source, status, items_count, completed_at, error_message, duration_sec

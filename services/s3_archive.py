@@ -326,15 +326,19 @@ def archive_fleet_plants(date_str: Optional[str] = None) -> Dict[str, Any]:
     df = db.query_df(sql, db="analytics")
     records = df.to_dict(orient="records") if not df.empty else []
 
+    try:
+        from core import platforms
+        plat_keys = platforms.platform_keys()
+    except Exception:
+        plat_keys = ["growatt", "isolarcloud", "suryalog", "fronius", "injectsolar"]
+
+    sources_map = {k: sum(1 for r in records if str(r.get("source", "")).lower() == k) for k in plat_keys}
+    sources_map["other"] = sum(1 for r in records if str(r.get("source", "")).lower() not in plat_keys)
+
     payload = {
         "date": date_str,
         "total_plants": len(records),
-        "sources": {
-            "growatt": sum(1 for r in records if str(r.get("source", "")).lower() == "growatt"),
-            "isolarcloud": sum(1 for r in records if str(r.get("source", "")).lower() == "isolarcloud"),
-            "suryalog": sum(1 for r in records if str(r.get("source", "")).lower() == "suryalog"),
-            "other": sum(1 for r in records if str(r.get("source", "")).lower() not in ("growatt", "isolarcloud", "suryalog")),
-        },
+        "sources": sources_map,
         "archived_at": datetime.datetime.now().isoformat(),
         "plants": records
     }
