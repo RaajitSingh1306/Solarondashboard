@@ -70,13 +70,17 @@ def evaluate_anomaly_model(month_str: Optional[str] = None) -> Dict[str, Any]:
 
     # Compute evaluation metrics
     tp = 0  # Flagged and verified true fault
-    fp = 0  # Flagged but verified normal/false alarm
-    fn = 0  # Not flagged but had real hardware fault
-    tn = 0  # Not flagged and healthy
+    fp = 0  # Flagged and verified false alarm
+    fn = 0  # Not flagged and had verified true fault
+    tn = 0  # Not flagged and verified normal
+    unlabeled_flagged = 0
+    unlabeled_unflagged = 0
 
     for _, row in df_monthly.iterrows():
         key = (str(row["plant_id"]), str(row["month"]))
-        flagged = int(row.get("anomaly_flag", 0)) == 1 or row["tier"] in ("Critical", "Needs Attention")
+        is_ml_flag = int(row.get("anomaly_flag", 0)) == 1
+        is_tier_flag = str(row.get("tier")) in ("Critical", "Needs Attention")
+        flagged = is_ml_flag or is_tier_flag
 
         # Check ground truth
         has_hw_fault = key in hardware_fault_keys
@@ -84,26 +88,40 @@ def evaluate_anomaly_model(month_str: Optional[str] = None) -> Dict[str, Any]:
 
         is_true_fault = has_hw_fault or (tech_label in ("real_fault", "fault", "confirmed", "true_positive"))
         is_false_alarm = tech_label in ("false_alarm", "normal", "healthy", "false_positive")
+        is_labeled = is_true_fault or is_false_alarm
 
-        if flagged:
-            if is_true_fault or not is_false_alarm:
-                tp += 1
+        if is_labeled:
+            if flagged:
+                if is_true_fault:
+                    tp += 1
+                else:
+                    fp += 1
             else:
-                fp += 1
+                if is_true_fault:
+                    fn += 1
+                else:
+                    tn += 1
         else:
-            if is_true_fault:
-                fn += 1
+            if flagged:
+                unlabeled_flagged += 1
             else:
-                tn += 1
+                unlabeled_unflagged += 1
 
-    precision = round(tp / max(tp + fp, 1), 3)
-    recall = round(tp / max(tp + fn, 1), 3)
-    f1 = round(2 * (precision * recall) / max(precision + recall, 0.001), 3)
-    fpr = round(fp / max(fp + tn, 1), 3)
+    labeled_total = tp + fp + fn + tn
+    total_eval = len(df_monthly)
+    coverage_pct = round((labeled_total / max(total_eval, 1)) * 100.0, 1)
+
+    precision = round(tp / (tp + fp), 3) if (tp + fp) > 0 else 0.0
+    recall = round(tp / (tp + fn), 3) if (tp + fn) > 0 else 0.0
+    f1 = round(2 * (precision * recall) / (precision + recall), 3) if (precision + recall) > 0 else 0.0
+    fpr = round(fp / (fp + tn), 3) if (fp + tn) > 0 else 0.0
 
     return {
-        "total_evaluated": len(df_monthly),
-        "anomalies_flagged": tp + fp,
+        "total_evaluated": total_eval,
+        "labeled_count": labeled_total,
+        "coverage_pct": coverage_pct,
+        "anomalies_flagged": (tp + fp + unlabeled_flagged),
+        "unlabeled_flags": unlabeled_flagged,
         "true_positives": tp,
         "false_positives": fp,
         "false_negatives": fn,

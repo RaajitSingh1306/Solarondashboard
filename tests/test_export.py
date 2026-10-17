@@ -144,3 +144,54 @@ def test_export_preferences_persistence(tmp_path, monkeypatch):
     loaded = ed._load_persisted_cols()
     assert loaded["monthly"] == {"plant_id", "month", "kwh"}
     assert loaded["daily"] == {"plant_id", "date", "kwh"}
+
+
+def test_export_customer_number_columns():
+    """Verify exporting plant name, phone number, month, energy generated and money saved."""
+    cols = "plant_name,phone,month,kwh,revenue_inr"
+    res = client.get(f"/api/export/fleet-monthly?fmt=csv&cols={cols}&month=2026-09")
+    assert res.status_code == 200
+    df = pd.read_csv(io.StringIO(res.text))
+    expected_cols = [
+        "Plant Name",
+        "Phone Number",
+        "Month (YYYY-MM)",
+        "Total Generation (kWh)",
+        "Est. Savings (INR)",
+    ]
+    assert list(df.columns) == expected_cols
+    assert len(df) > 0
+    # Verify phone column exists and at least some customers have valid contact numbers
+    valid_phones = df["Phone Number"].dropna().astype(str)
+    assert any(p.startswith("91") and len(p) >= 10 for p in valid_phones)
+
+
+def test_monthly_statements_endpoint():
+    """Verify convenience /api/export/monthly-statements endpoint produces valid customer billing export."""
+    res = client.get("/api/export/monthly-statements?month=2026-09&fmt=csv")
+    assert res.status_code == 200
+    assert "text/csv" in res.headers["content-type"]
+    assert "attachment; filename=fleet_monthly_2026-09" in res.headers["content-disposition"]
+    df = pd.read_csv(io.StringIO(res.text))
+    expected_cols = [
+        "Plant Name",
+        "Phone Number",
+        "Month (YYYY-MM)",
+        "Total Generation (kWh)",
+        "Est. Savings (INR)",
+    ]
+    assert list(df.columns) == expected_cols
+    assert len(df) > 0
+
+
+def test_daily_customer_number_export():
+    """Verify daily telemetry export with phone number column."""
+    cols = "plant_name,phone,date,kwh,revenue_inr"
+    res = client.get(f"/api/export/fleet-daily?fmt=csv&cols={cols}&month=2026-08")
+    assert res.status_code == 200
+    df = pd.read_csv(io.StringIO(res.text))
+    assert "Plant Name" in df.columns
+    assert "Phone Number" in df.columns
+    assert "Date (YYYY-MM-DD)" in df.columns
+    assert "Daily Generation (kWh)" in df.columns
+

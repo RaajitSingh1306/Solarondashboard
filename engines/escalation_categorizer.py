@@ -197,14 +197,37 @@ def categorize_plant(plant_id: str, date_str: Optional[str] = None) -> Dict[str,
             "reason": "Plant telemetry missing or logged as offline",
         }
 
-    # 4. Performance Ratio Assessment
+    # 4. Performance Ratio Assessment with Peer RPI Weather-Awareness
     ratio = (today_kwh / baseline) if baseline > 0 else 0.0
     ratio_round = round(ratio, 3)
 
-    if ratio >= 0.90:
+    # Cross-check peer RPI for that day to avoid false alarms on cloudy days
+    try:
+        from core import peer_group
+        from engines import rpi
+
+        p_info = peer_group.get_plant_peer_group(plant_id)
+        peer_ref = rpi.get_peer_reference_yield(p_info["group_id"], p_info["peers"], date_str)
+        plant_df = db.query_df(
+            "SELECT capacity_kwp, capacity_effective FROM plants WHERE plant_id = ?",
+            [plant_id],
+            db="analytics"
+        )
+        cap = 3.3
+        if not plant_df.empty:
+            cap = float(plant_df.iloc[0].get("capacity_effective") or plant_df.iloc[0].get("capacity_kwp") or 3.3)
+        plant_sy = (today_kwh / cap) if cap > 0 else 0.0
+        daily_rpi = round(plant_sy / peer_ref, 2) if peer_ref > 0.05 else None
+    except Exception:
+        daily_rpi = None
+
+    # Weather-aware categorization:
+    # If ratio >= 0.90 -> ALL_FINE.
+    # If ratio is lower due to cloudy weather (peer_ref also dropped and daily_rpi >= 0.85) -> ALL_FINE
+    if ratio >= 0.90 or (daily_rpi is not None and daily_rpi >= 0.85 and ratio >= 0.50):
         cat = "ALL_FINE"
-        reason = f"Generation at {int(ratio*100)}% of expected baseline"
-    elif ratio >= 0.70:
+        reason = f"Generation at {int(ratio*100)}% of baseline" + (f" (Peer RPI: {daily_rpi})" if daily_rpi else "")
+    elif ratio >= 0.70 or (daily_rpi is not None and daily_rpi >= 0.70 and ratio >= 0.40):
         cat = "AVERAGE"
         reason = f"Generation at {int(ratio*100)}% of baseline (mild underperformance)"
     else:

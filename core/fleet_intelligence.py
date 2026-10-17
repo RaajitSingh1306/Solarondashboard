@@ -313,6 +313,8 @@ AGG_COLUMNS: Dict[str, Dict[str, Any]] = {
     "plant_name": {"label": "Plant Name", "group": "Scope", "default": True, "levels": ("plant",)},
     "source": {"label": "Platform", "group": "Scope", "default": True, "levels": ("plant", "platform")},
     "city": {"label": "City", "group": "Scope", "default": False, "levels": ("plant",)},
+    "phone": {"label": "Phone Number", "group": "Customer & Contact", "default": False, "levels": ("plant",)},
+    "customer_name": {"label": "Customer Name", "group": "Customer & Contact", "default": False, "levels": ("plant",)},
     "plants": {"label": "Plants", "group": "Scope", "default": True, "levels": ("platform", "fleet")},
     "capacity_kwp": {"label": "Capacity (kWp)", "group": "Scope", "default": True},
     "kwh": {"label": "Generation (kWh)", "group": "Energy", "default": True},

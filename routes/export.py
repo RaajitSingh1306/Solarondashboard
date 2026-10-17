@@ -17,6 +17,20 @@ router = APIRouter(prefix="/export")
 
 def df_to_response(df: pd.DataFrame, filename_prefix: str, fmt: str = "csv") -> StreamingResponse:
     fmt = fmt.lower()
+    df = df.copy()
+    for col in df.columns:
+        if "phone" in str(col).lower():
+            def _clean_p(x):
+                if pd.isna(x) or str(x).strip() in ("nan", "None", ""):
+                    return ""
+                s = str(x).strip().replace("+", "")
+                if s.endswith(".0"):
+                    s = s[:-2]
+                if len(s) == 10 and s.isdigit():
+                    s = f"91{s}"
+                return s
+            df[col] = df[col].apply(_clean_p)
+
     if fmt == "xlsx":
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -95,6 +109,20 @@ MONTHLY_COLUMNS = {
         "label": "Panel Model",
         "group": "Plant Profile",
         "expr": "p.panel_model",
+        "default": False,
+    },
+
+    # Customer & Contact
+    "phone": {
+        "label": "Phone Number",
+        "group": "Customer & Contact",
+        "expr": "CASE WHEN c.phone IS NULL OR c.phone = 'nan' OR c.phone = '' THEN '' WHEN length(REPLACE(c.phone, '+', '')) = 10 THEN '91' || REPLACE(c.phone, '+', '') ELSE REPLACE(c.phone, '+', '') END",
+        "default": False,
+    },
+    "customer_name": {
+        "label": "Customer Name",
+        "group": "Customer & Contact",
+        "expr": "coalesce(c.customer_name, '')",
         "default": False,
     },
 
@@ -256,6 +284,18 @@ DAILY_COLUMNS = {
         "expr": "p.city",
         "default": False,
     },
+    "phone": {
+        "label": "Phone Number",
+        "group": "Customer & Contact",
+        "expr": "CASE WHEN c.phone IS NULL OR c.phone = 'nan' OR c.phone = '' THEN '' WHEN length(REPLACE(c.phone, '+', '')) = 10 THEN '91' || REPLACE(c.phone, '+', '') ELSE REPLACE(c.phone, '+', '') END",
+        "default": False,
+    },
+    "customer_name": {
+        "label": "Customer Name",
+        "group": "Customer & Contact",
+        "expr": "coalesce(c.customer_name, '')",
+        "default": False,
+    },
     "date": {
         "label": "Date (YYYY-MM-DD)",
         "group": "Daily Telemetry",
@@ -371,10 +411,14 @@ def export_fleet_daily(
     select_clauses = [f"{DAILY_COLUMNS[k]['expr']} AS \"{DAILY_COLUMNS[k]['label']}\"" for k in requested_keys]
     select_str = ", ".join(select_clauses)
 
+    needs_crm = any("c." in DAILY_COLUMNS[k]["expr"] for k in requested_keys)
+    crm_join = "LEFT JOIN crm.customers c ON d.plant_id = c.plant_id" if needs_crm else ""
+
     sql = f"""
     SELECT {select_str}
     FROM daily_generation d
     JOIN plants p ON d.plant_id = p.plant_id
+    {crm_join}
     WHERE 1=1
     """
     params = []
@@ -430,10 +474,14 @@ def export_fleet_monthly(
     select_clauses = [f"{MONTHLY_COLUMNS[k]['expr']} AS \"{MONTHLY_COLUMNS[k]['label']}\"" for k in requested_keys]
     select_str = ", ".join(select_clauses)
 
+    needs_crm = any("c." in MONTHLY_COLUMNS[k]["expr"] for k in requested_keys)
+    crm_join = "LEFT JOIN crm.customers c ON m.plant_id = c.plant_id" if needs_crm else ""
+
     sql = f"""
     SELECT {select_str}
     FROM monthly_generation m
     JOIN plants p ON m.plant_id = p.plant_id
+    {crm_join}
     LEFT JOIN expected_generation eg ON m.plant_id = eg.plant_id AND m.month = eg.month
     LEFT JOIN loss_analysis la ON m.plant_id = la.plant_id AND m.month = la.month
     WHERE 1=1
@@ -491,6 +539,12 @@ def export_fleet_weekly(
     else:
         req_keys = [k for k, meta in WEEKLY_COLUMNS.items() if meta.get("default")]
 
+    if any(k in req_keys for k in ("phone", "customer_name")) and not df.empty and "plant_id" in df.columns:
+        cust_df = db.query_df("SELECT plant_id, phone, customer_name FROM customers", db="crm")
+        if not cust_df.empty:
+            cust_df["phone"] = cust_df["phone"].replace({"nan": "", None: ""})
+            df = df.merge(cust_df[["plant_id", "phone", "customer_name"]], on="plant_id", how="left")
+
     if req_keys and not df.empty:
         valid_cols = [c for c in req_keys if c in df.columns]
         df = df[valid_cols].rename(columns={c: WEEKLY_COLUMNS[c]["label"] for c in valid_cols})
@@ -526,11 +580,32 @@ def export_fleet_yearly(
     else:
         req_keys = [k for k, meta in YEARLY_COLUMNS.items() if meta.get("default")]
 
+    if any(k in req_keys for k in ("phone", "customer_name")) and not df.empty and "plant_id" in df.columns:
+        cust_df = db.query_df("SELECT plant_id, phone, customer_name FROM customers", db="crm")
+        if not cust_df.empty:
+            cust_df["phone"] = cust_df["phone"].replace({"nan": "", None: ""})
+            df = df.merge(cust_df[["plant_id", "phone", "customer_name"]], on="plant_id", how="left")
+
     if req_keys and not df.empty:
         valid_cols = [c for c in req_keys if c in df.columns]
         df = df[valid_cols].rename(columns={c: YEARLY_COLUMNS[c]["label"] for c in valid_cols})
 
     return df_to_response(df, "fleet_yearly", fmt_str)
+
+@router.get("/monthly-statements")
+def export_monthly_statements(
+    month: Optional[str] = Query(None, description="Month YYYY-MM"),
+    source: Optional[str] = Query(None, description="Platform filter"),
+    fmt: str = Query("csv", description="csv or xlsx"),
+):
+    """Export customer statements with plant name, number, month, energy generated, and money saved."""
+    return export_fleet_monthly(
+        fmt=fmt,
+        cols="plant_name,phone,month,kwh,revenue_inr",
+        month=month,
+        source=source,
+        include_decom=True,
+    )
 
 @router.get("/fleet-period")
 def export_fleet_period(
@@ -619,13 +694,25 @@ def export_plant_monthly(
 
 @router.get("/customers")
 def export_customers(fmt: str = Query("csv")):
-    sql = """
-    SELECT c.id, c.plant_id, p.plant_name, c.customer_name, c.phone, c.email, c.preferred_lang, c.opt_in_status
+    cust_df = db.query_df("""
+    SELECT c.id, c.plant_id, c.customer_name,
+           CASE
+               WHEN c.phone IS NULL OR c.phone = 'nan' OR c.phone = '' THEN ''
+               WHEN length(REPLACE(c.phone, '+', '')) = 10 THEN '91' || REPLACE(c.phone, '+', '')
+               ELSE REPLACE(c.phone, '+', '')
+           END as phone,
+           c.email, c.preferred_lang, c.opt_in_status
     FROM customers c
-    LEFT JOIN (SELECT plant_id, plant_name FROM plants) p ON c.plant_id = p.plant_id
     ORDER BY c.id ASC
-    """
-    df = db.query_df(sql, db="crm")
+    """, db="crm")
+
+    plants_df = db.query_df("SELECT plant_id, plant_name FROM plants", db="analytics")
+    if not plants_df.empty and not cust_df.empty:
+        df = cust_df.merge(plants_df, on="plant_id", how="left")
+        cols = ["id", "plant_id", "plant_name", "customer_name", "phone", "email", "preferred_lang", "opt_in_status"]
+        df = df[[c for c in cols if c in df.columns]]
+    else:
+        df = cust_df
     return df_to_response(df, "crm_customers", fmt)
 
 @router.get("/campaign")
@@ -634,7 +721,13 @@ def export_campaign(
     fmt: str = Query("csv"),
 ):
     sql = """
-    SELECT q.id, q.campaign_id, c.customer_name, q.phone, q.message_text, q.language, q.status
+    SELECT q.id, q.campaign_id, c.customer_name,
+           CASE
+               WHEN q.phone IS NULL OR q.phone = 'nan' OR q.phone = '' THEN ''
+               WHEN length(REPLACE(q.phone, '+', '')) = 10 THEN '91' || REPLACE(q.phone, '+', '')
+               ELSE REPLACE(q.phone, '+', '')
+           END as phone,
+           q.message_text, q.language, q.status
     FROM message_queue q
     LEFT JOIN customers c ON q.customer_id = c.id
     WHERE 1=1

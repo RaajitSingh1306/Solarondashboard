@@ -43,6 +43,7 @@ def calculate_poa_irradiance(
     tilt_deg: Optional[float] = None,
     latitude: Optional[float] = None,
     month: int = 9,
+    date_str: Optional[str] = None,
 ) -> float:
     """
     Estimate Plane of Array (POA) insolation from horizontal GHI and module tilt.
@@ -56,8 +57,18 @@ def calculate_poa_irradiance(
     lat = float(latitude or 20.0)
     tilt = min(float(tilt_deg), 45.0)
 
-    # Solar declination angle for the middle of the month
-    day_of_year = int((month - 0.5) * 30.4)
+    # Solar declination angle for the day
+    if date_str:
+        try:
+            import datetime
+            d_obj = datetime.date.fromisoformat(date_str[:10])
+            day_of_year = d_obj.timetuple().tm_yday
+            month = d_obj.month
+        except Exception:
+            day_of_year = int((month - 0.5) * 30.4)
+    else:
+        day_of_year = int((month - 0.5) * 30.4)
+
     declination = 23.45 * math.sin(math.radians((360 / 365) * (day_of_year - 81)))
 
     # Transposition gain factor (approximate seasonal geometric transposition ratio)
@@ -86,6 +97,7 @@ def calculate_physics_expected_energy(
     tilt_deg: Optional[float] = 18.0,
     latitude: Optional[float] = 20.0,
     month: int = 9,
+    date_str: Optional[str] = None,
 ) -> Dict[str, float]:
     """
     Compute high-fidelity expected energy incorporating tilt and thermal derating.
@@ -99,7 +111,7 @@ def calculate_physics_expected_energy(
     base_expected = cap * ghi * d
 
     # 2. POA transposition
-    poa_ghi = calculate_poa_irradiance(ghi, tilt_deg=tilt_deg, latitude=latitude, month=month)
+    poa_ghi = calculate_poa_irradiance(ghi, tilt_deg=tilt_deg, latitude=latitude, month=month, date_str=date_str)
     poa_expected = cap * poa_ghi * d
 
     # 3. Cell temperature and thermal derate

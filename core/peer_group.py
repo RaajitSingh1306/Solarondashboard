@@ -27,84 +27,127 @@ MIN_HEALTHY_PEERS = 5
 _PEER_GROUP_CACHE: Optional[Dict[str, Dict[str, Any]]] = None
 
 
-def get_plant_peer_hierarchy(p: Dict[str, Any]) -> Tuple[str, str, str]:
-    """Extract (city, pincode_prefix, state) hierarchy keys from plant metadata."""
+def get_plant_peer_hierarchy(p: Dict[str, Any]) -> Tuple[str, str, str, str]:
+    """Extract (city, pincode_prefix, state, capacity_bracket) hierarchy keys from plant metadata."""
     city = str(p.get("city") or "").lower().strip()
     if city in ("nan", "none"):
         city = ""
 
-    # Extract 2-digit or 3-digit pincode circle from city or address
-    lat = float(p.get("latitude") or 0.0)
-    lon = float(p.get("longitude") or 0.0)
-
     state = str(p.get("state") or "").lower().strip()
     if not state or state in ("nan", "none"):
-        # Infer state from city or coordinates
         if any(c in city for c in ("raipur", "durg", "bhilai", "gandai", "bilaspur", "rajnandgaon")):
             state = "chhattisgarh"
         elif any(c in city for c in ("bengaluru", "bangalore")):
             state = "karnataka"
         elif any(c in city for c in ("delhi",)):
             state = "delhi"
-        else:
+        elif any(c in city for c in ("pune", "mumbai", "nagpur", "nashik", "aurangabad", "thane", "solapur", "amravati", "jalgaon", "kolhapur")):
             state = "maharashtra"
+        else:
+            state = "unknown"
 
-    return city, city[:4] if city else "", state
+    cap = float(p.get("capacity_effective") or p.get("capacity_kwp") or 0.0)
+    if cap <= 10.0:
+        bracket = "res_small"
+    elif cap <= 50.0:
+        bracket = "comm_medium"
+    else:
+        bracket = "cni_large"
+
+    return city, city[:4] if city else "", state, bracket
 
 
 def build_fleet_peer_groups(plants: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Dict[str, Any]]:
     """
-    Cluster all active plants in the fleet into hierarchical peer groups.
+    Cluster all active plants in the fleet into hierarchical peer groups based on geography and capacity.
     Returns mapping: plant_id -> peer_group_metadata.
     """
     global _PEER_GROUP_CACHE
     if plants is None:
         plants = db.get_plants(include_decommissioned=False)
 
-    active_plants = [p for p in plants if str(p.get("operational_status", "")).lower() != "decommissioned"]
+    # Exclude decommissioned and capacity_suspect from peer references
+    active_plants = [
+        p for p in plants
+        if str(p.get("operational_status", "")).lower() != "decommissioned"
+        and not int(p.get("capacity_suspect") or 0)
+    ]
+    all_plants = [p for p in plants if str(p.get("operational_status", "")).lower() != "decommissioned"]
 
-    # Index by city and state
+    by_city_bracket: Dict[Tuple[str, str], List[str]] = {}
     by_city: Dict[str, List[str]] = {}
+    by_state_bracket: Dict[Tuple[str, str], List[str]] = {}
     by_state: Dict[str, List[str]] = {}
-    all_pids = [str(p["plant_id"]) for p in active_plants]
+    all_ref_pids = [str(p["plant_id"]) for p in active_plants]
 
     meta_map = {}
+    for p in all_plants:
+        pid = str(p["plant_id"])
+        city, _, state, bracket = get_plant_peer_hierarchy(p)
+        meta_map[pid] = (city, state, bracket)
+
     for p in active_plants:
         pid = str(p["plant_id"])
-        city, _, state = get_plant_peer_hierarchy(p)
-        meta_map[pid] = (city, state)
+        city, state, bracket = meta_map[pid]
         if city:
             by_city.setdefault(city, []).append(pid)
-        if state:
+            by_city_bracket.setdefault((city, bracket), []).append(pid)
+        if state and state != "unknown":
             by_state.setdefault(state, []).append(pid)
+            by_state_bracket.setdefault((state, bracket), []).append(pid)
 
     assignments = {}
-    for pid in all_pids:
-        city, state = meta_map[pid]
+    for p in all_plants:
+        pid = str(p["plant_id"])
+        city, state, bracket = meta_map[pid]
 
-        # 1. Level 1: City
-        if city and len(by_city.get(city, [])) >= MIN_HEALTHY_PEERS:
+        # 1. Level 1: City + Capacity Bracket
+        if city and len(by_city_bracket.get((city, bracket), [])) >= MIN_HEALTHY_PEERS:
+            peers = [x for x in by_city_bracket[(city, bracket)] if x != pid]
+            assignments[pid] = {
+                "group_id": f"city_bracket_{city}_{bracket}",
+                "level": "city",
+                "sub_level": "bracket",
+                "label": f"City ({city.title()}) [{bracket}]",
+                "peer_count": len(peers),
+                "peers": peers,
+            }
+        # 2. Level 2: City
+        elif city and len(by_city.get(city, [])) >= MIN_HEALTHY_PEERS:
             peers = [x for x in by_city[city] if x != pid]
             assignments[pid] = {
                 "group_id": f"city_{city}",
                 "level": "city",
+                "sub_level": "all",
                 "label": f"City: {city.title()}",
                 "peer_count": len(peers),
                 "peers": peers,
             }
-        # 2. Level 2: State
-        elif state and len(by_state.get(state, [])) >= MIN_HEALTHY_PEERS:
+        # 3. Level 3: State + Capacity Bracket
+        elif state and state != "unknown" and len(by_state_bracket.get((state, bracket), [])) >= MIN_HEALTHY_PEERS:
+            peers = [x for x in by_state_bracket[(state, bracket)] if x != pid]
+            assignments[pid] = {
+                "group_id": f"state_bracket_{state}_{bracket}",
+                "level": "state",
+                "sub_level": "bracket",
+                "label": f"State ({state.title()}) [{bracket}]",
+                "peer_count": len(peers),
+                "peers": peers,
+            }
+        # 4. Level 4: State
+        elif state and state != "unknown" and len(by_state.get(state, [])) >= MIN_HEALTHY_PEERS:
             peers = [x for x in by_state[state] if x != pid]
             assignments[pid] = {
                 "group_id": f"state_{state}",
                 "level": "state",
+                "sub_level": "all",
                 "label": f"State: {state.title()}",
                 "peer_count": len(peers),
                 "peers": peers,
             }
-        # 3. Level 3: Fleet fallback
+        # 5. Level 5: Fleet fallback
         else:
-            peers = [x for x in all_pids if x != pid]
+            peers = [x for x in all_ref_pids if x != pid]
             assignments[pid] = {
                 "group_id": "fleet_national",
                 "level": "fleet",
@@ -134,19 +177,22 @@ def get_plant_peer_group(plant_id: str) -> Dict[str, Any]:
 def get_healthy_peer_yields_for_date(peer_plant_ids: List[str], date_str: str) -> List[float]:
     """
     Fetch specific yield values of active, generating, non-stuck peers for a specific date.
-    Strictly excludes STUCK_VALUE and noise floor (< 0.05) days.
+    Strictly excludes STUCK_VALUE, SY_IMPOSSIBLE, and noise floor (< 0.05) days.
     """
     if not peer_plant_ids:
         return []
 
     placeholders = ",".join(["?"] * len(peer_plant_ids))
     sql = f"""
-    SELECT specific_yield
-    FROM daily_generation
-    WHERE plant_id IN ({placeholders})
-      AND date = ?
-      AND kwh > 0.05
-      AND (quality_flags IS NULL OR quality_flags NOT LIKE '%STUCK_VALUE%');
+    SELECT d.specific_yield
+    FROM daily_generation d
+    JOIN plants p ON d.plant_id = p.plant_id
+    WHERE d.plant_id IN ({placeholders})
+      AND d.date = ?
+      AND d.kwh > 0.05
+      AND (p.capacity_suspect IS NULL OR p.capacity_suspect = 0)
+      AND (p.operational_status IS NULL OR p.operational_status != 'decommissioned')
+      AND (d.quality_flags IS NULL OR (d.quality_flags NOT LIKE '%STUCK_VALUE%' AND d.quality_flags NOT LIKE '%SY_IMPOSSIBLE%'));
     """
     params = list(peer_plant_ids) + [date_str]
     df = db.query_df(sql, params, db="analytics")

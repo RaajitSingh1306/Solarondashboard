@@ -1,6 +1,9 @@
+import logging
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 class BaseExtractor(ABC):
     def __init__(self, source_name: str):
@@ -35,6 +38,20 @@ class BaseExtractor(ABC):
         """Fetch inverter snapshots matching inverter_snapshots schema."""
         pass
 
+    def supports_history(self) -> Dict[str, Any]:
+        """Declare historical capability. Returns e.g. {'daily': bool, 'hourly': bool, 'max_lookback_days': int|None}."""
+        return {"daily": False, "hourly": False, "max_lookback_days": None}
+
+    def fetch_history_daily(self, plant_raw_id: Any, year_month: str) -> List[Dict[str, Any]]:
+        """Fetch historical daily records for a given plant and month ('YYYY-MM').
+        Returns list of dicts matching daily_generation schema with source_type='portal_history'."""
+        return []
+
+    def fetch_history_hourly(self, plant_raw_id: Any, date_str: str) -> List[Dict[str, Any]]:
+        """Fetch historical hourly records for a given plant and date ('YYYY-MM-DD').
+        Returns list of dicts matching hourly_generation schema (plant_id, ts, power_kw, energy_kwh, source_type)."""
+        return []
+
     def archive_raw(self, endpoint: str, data: Any, date_str: Optional[str] = None) -> None:
         """Persist raw vendor response into immutable bronze data lake."""
         try:
@@ -43,8 +60,8 @@ class BaseExtractor(ABC):
             except ImportError:
                 import bronze
             bronze.archive_raw_response(self.source, endpoint, data, date_str=date_str)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to archive raw {self.source} response for {endpoint}: {e}")
 
     @staticmethod
     def safe_float(val: Any) -> Optional[float]:

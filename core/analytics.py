@@ -327,10 +327,19 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
 
     anomalies_detected = 0
     if not active_df.empty:
+        # Precompute observed days per plant in this month from daily telemetry
+        obs_df = db.query_df(
+            "SELECT plant_id, COUNT(DISTINCT date) as days_count FROM daily_generation WHERE substr(date, 1, 7) = ? AND kwh > 0 GROUP BY plant_id",
+            [month],
+            db="analytics"
+        )
+        obs_map = {str(r["plant_id"]): int(r["days_count"]) for _, r in obs_df.iterrows()} if not obs_df.empty else {}
+
         # Compute GHI, theoretical energy, and absolute PR for each active plant
         pr_list = []
         sy_eval_list = []
         for _, row in active_df.iterrows():
+            pid = str(row["plant_id"])
             nom_cap = float(row["capacity_kwp"] or 3.3)
             eff_cap = float(row.get("capacity_effective") or nom_cap)
             is_suspect = bool(row.get("capacity_suspect"))
@@ -341,11 +350,8 @@ def classify_all(month: Optional[str] = None) -> Dict[str, Any]:
             lon = float(row["longitude"] or 72.87)
             ghi = get_ghi(lat, lon, month)
             kwh = float(row["kwh"] or 0.0)
-            plant_source = str(row.get("source") or "").lower()
-            if month == "2026-09" and plant_source in ("isolarcloud", "suryalog"):
-                plant_eval_days = 24
-            else:
-                plant_eval_days = eval_days
+            observed = obs_map.get(pid, 0)
+            plant_eval_days = observed if observed > 0 else eval_days
             theoretical = ghi * plant_eval_days * cap
             pr = round((kwh / theoretical) * 100.0, 1) if theoretical > 0 else 0.0
             pr = min(150.0, max(0.0, pr))
@@ -519,6 +525,14 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
     loss_rows = []
     pr_updates = []
 
+    # Precompute observed days per plant in this month
+    obs_df = db.query_df(
+        "SELECT plant_id, COUNT(DISTINCT date) as days_count FROM daily_generation WHERE substr(date, 1, 7) = ? AND kwh > 0 GROUP BY plant_id",
+        [month],
+        db="analytics"
+    )
+    obs_map = {str(r["plant_id"]): int(r["days_count"]) for _, r in obs_df.iterrows()} if not obs_df.empty else {}
+
     for _, row in df.iterrows():
         pid = str(row["plant_id"])
         nom_cap = float(row["capacity_kwp"] or 3.3)
@@ -536,11 +550,8 @@ def calculate_loss_analysis(month: Optional[str] = None) -> Dict[str, Any]:
         if not ghi or ghi <= 0:
             ghi = INDIA_MONTHLY_GHI_DEFAULTS.get(m_key, 4.5)
 
-        plant_source = str(row.get("source") or "").lower()
-        if month == "2026-09" and plant_source in ("isolarcloud", "suryalog"):
-            plant_eval_days = 24
-        else:
-            plant_eval_days = eval_days
+        observed = obs_map.get(pid, 0)
+        plant_eval_days = observed if observed > 0 else eval_days
 
         # Decommissioned plants are extracted and listed, but excluded from loss analysis
         if row.get("operational_status") == "decommissioned":

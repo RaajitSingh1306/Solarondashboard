@@ -17,6 +17,9 @@ except ImportError:
 PREFS_FILE = Path(__file__).resolve().parent.parent / "data" / "export_preferences.json"
 
 MONTHLY_PRESETS = {
+    "📱 Customer & Savings Statement": [
+        "plant_name", "phone", "month", "kwh", "revenue_inr"
+    ],
     "⚡ Generation Report": [
         "plant_id", "plant_name", "source", "capacity_kwp", "month",
         "kwh", "specific_yield", "yield_per_day", "revenue_inr"
@@ -38,6 +41,9 @@ MONTHLY_PRESETS = {
 }
 
 DAILY_PRESETS = {
+    "📱 Customer & Savings Statement": [
+        "plant_name", "phone", "date", "kwh", "revenue_inr"
+    ],
     "⚡ Generation Report": [
         "plant_id", "plant_name", "source", "capacity_kwp", "date",
         "kwh", "specific_yield", "yield_per_day", "revenue_inr"
@@ -53,6 +59,9 @@ DAILY_PRESETS = {
 }
 
 WEEKLY_PRESETS = {
+    "📱 Customer & Savings Statement": [
+        "plant_name", "phone", "period", "kwh", "revenue_inr"
+    ],
     "⚡ Weekly Generation": [
         "period", "period_start", "period_end", "plant_id", "plant_name", "source",
         "capacity_kwp", "kwh", "specific_yield", "yield_per_day", "revenue_inr"
@@ -69,6 +78,9 @@ WEEKLY_PRESETS = {
 }
 
 YEARLY_PRESETS = {
+    "📱 Customer & Savings Statement": [
+        "plant_name", "phone", "period", "kwh", "revenue_inr"
+    ],
     "🏆 Annual Performance": [
         "period", "plant_id", "plant_name", "source", "capacity_kwp", "kwh",
         "specific_yield", "pr_pct", "cuf_pct", "availability_pct", "revenue_inr", "co2_kg"

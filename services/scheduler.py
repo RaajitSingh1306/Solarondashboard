@@ -76,17 +76,12 @@ def get_sync_status() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def run_growatt_daytime_sync():
-    """High-frequency Growatt sync (15 min, 06:00-19:00 IST)."""
+    """High-frequency Growatt sync (15 min, 06:00-19:00 IST) via recent 60-day window refresh."""
     if not acquire_sync_lock("growatt_daytime_sync"):
         return
     try:
-        logger.info("Executing 15-minute Growatt daytime sync...")
-        pipeline.run_fleet(sources=["growatt"], force_refresh=True)
-        pipeline.run_daily(sources=["growatt"], force_refresh=True)
-        cur_month = datetime.date.today().strftime("%Y-%m")
-        pipeline.run_monthly(month_str=cur_month, sources=["growatt"], force_refresh=True)
-        pipeline.run_snapshots(sources=["growatt"], force_refresh=True)
-        analytics.classify_all(cur_month)
+        logger.info("Executing 15-minute Growatt daytime sync via recent refresh...")
+        pipeline.run_recent_refresh(sources=["growatt"], force_refresh=True)
         logger.info("Growatt daytime sync completed successfully.")
     except Exception as e:
         logger.error(f"Error during Growatt daytime sync: {e}", exc_info=True)
@@ -101,12 +96,7 @@ def run_browser_portals_daytime_sync():
     try:
         logger.info("Executing 30-minute browser portal daytime sync (iSolarCloud, SuryaLog, Fronius, InjectSolar)...")
         sources = ["isolarcloud", "suryalog", "fronius", "injectsolar"]
-        pipeline.run_fleet(sources=sources, force_refresh=True)
-        pipeline.run_daily(sources=sources, force_refresh=True)
-        cur_month = datetime.date.today().strftime("%Y-%m")
-        pipeline.run_monthly(month_str=cur_month, sources=sources, force_refresh=True)
-        pipeline.run_snapshots(sources=sources, force_refresh=True)
-        analytics.classify_all(cur_month)
+        pipeline.run_recent_refresh(sources=sources, force_refresh=True)
         logger.info("Browser portals daytime sync completed successfully.")
     except Exception as e:
         logger.error(f"Error during browser portals daytime sync: {e}", exc_info=True)
@@ -147,6 +137,26 @@ def run_nightly_daily_close():
         release_sync_lock()
 
 
+def run_nightly_archive_and_retention(target_date: Optional[str] = None):
+    """Nightly S3 bronze archive, Parquet curated export, and 60-day hourly retention at 02:00 IST."""
+    try:
+        logger.info("Running 60-day hourly telemetry retention...")
+        pipeline.run_hourly_retention(retention_days=60)
+
+        target = target_date or datetime.date.today().isoformat()
+        logger.info(f"Executing S3 bronze archive for {target}...")
+        s3_archive.run_nightly_archive(target)
+
+        # Also export curated parquet partitions for current month
+        cur_m = target[:7]
+        logger.info(f"Exporting curated Parquet archives for {cur_m}...")
+        s3_archive.export_curated_parquet("daily", cur_m)
+        s3_archive.export_curated_parquet("monthly", cur_m)
+        logger.info("Nightly archive, retention, and Parquet curation complete.")
+    except Exception as e:
+        logger.error(f"Error during nightly archive and retention: {e}", exc_info=True)
+
+
 def setup_scheduler():
     # 1. Growatt daytime sync every 15 min between 06:00 and 19:00 IST
     scheduler.add_job(
@@ -181,12 +191,12 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-    # 4. Nightly S3 bronze archive and DB backup at 02:00 IST
+    # 4. Nightly S3 bronze archive, Parquet export, and DB backup at 02:00 IST
     scheduler.add_job(
-        s3_archive.run_nightly_archive,
+        run_nightly_archive_and_retention,
         trigger=CronTrigger(hour=2, minute=0, timezone=IST_TIMEZONE),
         id="nightly_s3_archive",
-        name="Nightly S3 Archive & DB Backup (02:00 IST)",
+        name="Nightly S3 Archive, Parquet & 60-Day Retention (02:00 IST)",
         coalesce=True,
         max_instances=1,
         replace_existing=True,

@@ -124,3 +124,61 @@ def classify_rpi_tier(rolling_rpi: Optional[float]) -> str:
     if val >= 0.35:
         return "Needs Attention"
     return "Critical"
+
+
+def calculate_monthly_fleet_rpi(month_str: str) -> pd.DataFrame:
+    """
+    Computes monthly peer-relative RPI scores for all active plants in a month (YYYY-MM).
+    Returns DataFrame with columns ['plant_id', 'rpi_score', 'rpi_tier', 'peer_count', 'group_id'].
+    """
+    sql = """
+    SELECT plant_id, date, specific_yield, kwh, status, quality_flags
+    FROM daily_generation
+    WHERE substr(date, 1, 7) = ?
+    """
+    df_daily = db.query_df(sql, [month_str[:7]], db="analytics")
+    if df_daily.empty:
+        return pd.DataFrame(columns=["plant_id", "rpi_score", "rpi_tier", "peer_count", "group_id"])
+
+    fleet_groups = peer_group.build_fleet_peer_groups()
+
+    dates = df_daily["date"].dropna().unique()
+    group_ids = {info["group_id"]: info["peers"] for info in fleet_groups.values()}
+
+    daily_group_refs: Dict[Tuple[str, str], float] = {}
+    for gid, peers in group_ids.items():
+        for d in dates:
+            daily_group_refs[(gid, d)] = get_peer_reference_yield(gid, peers, d)
+
+    plant_rpi_list: Dict[str, List[float]] = {}
+    for _, row in df_daily.iterrows():
+        pid = str(row["plant_id"])
+        d = str(row["date"])
+        sy = float(row["specific_yield"] or 0.0)
+        p_info = fleet_groups.get(pid, {"group_id": "fleet_national", "peers": []})
+        gid = p_info["group_id"]
+        ref = daily_group_refs.get((gid, d), 0.0)
+
+        if ref > 0.05:
+            rpi = sy / ref
+        else:
+            rpi = 1.0 if sy <= 0.05 else 1.0
+        plant_rpi_list.setdefault(pid, []).append(min(max(0.0, rpi), 3.0))
+
+    rows = []
+    for pid, rpi_vals in plant_rpi_list.items():
+        if rpi_vals:
+            score = round(float(np.median(rpi_vals)), 3)
+        else:
+            score = 1.0
+        p_info = fleet_groups.get(pid, {"group_id": "fleet_national", "peer_count": 0})
+        tier = classify_rpi_tier(score)
+        rows.append({
+            "plant_id": pid,
+            "rpi_score": score,
+            "rpi_tier": tier,
+            "peer_count": p_info.get("peer_count", 0),
+            "group_id": p_info.get("group_id", "fleet_national"),
+        })
+
+    return pd.DataFrame(rows)

@@ -47,15 +47,29 @@ def list_customers(
 
 @router.post("/customers")
 def create_or_update_customer(payload: CustomerCreate):
-    rowcount = crm.upsert_customer(
-        plant_id=payload.plant_id,
-        name=payload.customer_name,
-        phone=payload.phone,
-        email=payload.email or "",
-        lang=payload.preferred_lang or "english",
-        opt_in=payload.opt_in_status or "active"
-    )
-    return {"status": "success", "modified_rows": rowcount}
+    if not payload.phone or not str(payload.phone).strip() or str(payload.phone).strip().lower() in ("nan", "none", "null"):
+        raise HTTPException(status_code=400, detail="“Phone” column is mandatory.")
+
+    clean_phone = crm.normalize_phone(payload.phone)
+    if not clean_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Phone number should have country code as prefix and no ‘+’ symbol."
+        )
+
+    try:
+        rowcount = crm.upsert_customer(
+            plant_id=payload.plant_id,
+            name=payload.customer_name,
+            phone=clean_phone,
+            email=payload.email or "",
+            lang=payload.preferred_lang or "english",
+            opt_in=payload.opt_in_status or "active"
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+
+    return {"status": "success", "modified_rows": rowcount, "phone": clean_phone}
 
 @router.get("/customers/{customer_id}")
 def get_customer(customer_id: int):
@@ -67,28 +81,32 @@ def get_customer(customer_id: int):
 @router.post("/customers/import")
 async def import_customers(file: UploadFile = File(...)):
     contents = await file.read()
+    filename = (file.filename or "").lower()
     try:
-        df = pd.read_csv(pd.io.common.BytesIO(contents))
+        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+            engine = "openpyxl" if filename.endswith(".xlsx") else "xlrd"
+            try:
+                df = pd.read_excel(pd.io.common.BytesIO(contents), engine=engine)
+            except Exception:
+                df = pd.read_excel(pd.io.common.BytesIO(contents))
+        else:
+            df = pd.read_csv(pd.io.common.BytesIO(contents))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid CSV format: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid file format: {e}")
 
-    imported = 0
-    for _, row in df.iterrows():
-        pid = row.get("plant_id")
-        name = row.get("customer_name")
-        phone = row.get("phone")
-        if pd.notna(pid) and pd.notna(phone):
-            crm.upsert_customer(
-                plant_id=str(pid),
-                name=str(name) if pd.notna(name) else "Solar Customer",
-                phone=str(phone),
-                email=str(row.get("email", "")) if pd.notna(row.get("email")) else "",
-                lang=str(row.get("preferred_lang", "english")).lower(),
-                opt_in=str(row.get("opt_in_status", "active")).lower(),
-            )
-            imported += 1
+    try:
+        result = crm.import_customers_from_df(df)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
 
-    return {"status": "success", "imported": imported}
+    if result.get("imported", 0) == 0 and len(df) > 0:
+        err_msg = "; ".join(result.get("errors", [])[:3])
+        raise HTTPException(
+            status_code=400,
+            detail=f"No valid customer records could be imported. Phone number should have country code as prefix and no ‘+’ symbol. {err_msg}".strip()
+        )
+
+    return result
 
 @router.get("/campaigns")
 def list_campaigns():

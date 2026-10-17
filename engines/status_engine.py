@@ -56,7 +56,7 @@ def classify_plant_day_status(
 
     # Plant produced zero/noise: evaluate regional peers
     if not peer_yields or len(peer_yields) < 3:
-        return "FAULT_SUSPECT"
+        return "INSUFFICIENT_PEERS"
 
     peer_producing = [y for y in peer_yields if y > data_quality.NOISE_FLOOR_DAILY_KWH]
     producing_peer_ratio = len(peer_producing) / len(peer_yields)

@@ -10,7 +10,7 @@ import pandas as pd
 
 from pipeline import db
 from core import data_quality
-from services import geocode
+from services import geocode, crm
 from extractors.base import BaseExtractor
 from extractors.growatt import GrowattExtractor
 from extractors.isolarcloud import ISolarCloudExtractor
@@ -598,7 +598,10 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
                 clean_name = p_name.lower()
                 unprefix_name = re.sub(r"^\d+\.\s*", "", p_name).lower()
                 pid = name_to_pid.get(clean_name) or name_to_pid.get(unprefix_name) or str(row.get("plant_id", ""))
-                phone = str(row.get("phone_number") or row.get("phone", "")).strip()
+                raw_phone = str(row.get("phone_number") or row.get("phone", "")).strip()
+                phone = crm.normalize_phone(raw_phone)
+                if not phone:
+                    continue
                 c_name = str(row.get("customer_name") or "Solar Customer").strip()
                 email = str(row.get("email", "")).strip() if pd.notna(row.get("email")) else ""
                 lang = str(row.get("preferred_lang", "english")).lower().strip()
@@ -617,22 +620,164 @@ def seed_from_csv_exports(csv_dir: Optional[str] = None) -> Dict[str, int]:
         analytics.classify_all(m)
         analytics.calculate_loss_analysis(m)
 
-def run_historical_backfill(
-    start_year_month: Optional[str] = None,
-    end_year_month: Optional[str] = None,
+def rollup_monthly_from_daily(month_str: str) -> int:
+    """Roll up monthly_generation from daily_generation for a month (YYYY-MM)."""
+    sql = """
+    SELECT 
+        d.plant_id,
+        substr(d.date, 1, 7) as month,
+        ROUND(SUM(d.kwh), 2) as kwh,
+        ROUND(SUM(coalesce(d.revenue_inr, d.kwh * 14.0)), 2) as revenue_inr,
+        ROUND(AVG(d.specific_yield), 3) as yield_per_day,
+        ROUND(SUM(d.kwh) / NULLIF(coalesce(p.capacity_effective, p.capacity_kwp), 0), 2) as specific_yield,
+        'derived_daily' as source_type
+    FROM daily_generation d
+    JOIN plants p ON d.plant_id = p.plant_id
+    WHERE substr(d.date, 1, 7) = ?
+    GROUP BY d.plant_id, substr(d.date, 1, 7)
+    """
+    df = db.query_df(sql, [month_str[:7]], db="analytics")
+    if df.empty:
+        return 0
+    records = df.to_dict(orient="records")
+    return db.upsert_monthly(records)
+
+
+def rollup_yearly_from_daily(year_str: str) -> int:
+    """Roll up yearly_generation from daily_generation for a year (YYYY)."""
+    sql = """
+    SELECT 
+        d.plant_id,
+        substr(d.date, 1, 4) as year,
+        ROUND(SUM(d.kwh), 2) as kwh,
+        ROUND(SUM(d.kwh) / NULLIF(coalesce(p.capacity_effective, p.capacity_kwp), 0), 2) as specific_yield,
+        COUNT(DISTINCT substr(d.date, 1, 7)) as months_covered
+    FROM daily_generation d
+    JOIN plants p ON d.plant_id = p.plant_id
+    WHERE substr(d.date, 1, 4) = ?
+    GROUP BY d.plant_id, substr(d.date, 1, 4)
+    """
+    df = db.query_df(sql, [year_str[:4]], db="analytics")
+    if df.empty:
+        return 0
+    records = df.to_dict(orient="records")
+    return db.upsert_yearly(records)
+
+
+def run_hourly_retention(retention_days: int = 60) -> Dict[str, Any]:
+    """Prunes hourly generation older than retention_days, archiving to Parquet."""
+    cutoff_date = (datetime.date.today() - datetime.timedelta(days=retention_days)).isoformat()
+    try:
+        from services import s3_archive
+        s3_archive.export_curated_parquet("hourly")
+    except Exception as e:
+        logger.warning(f"Could not export hourly parquet before retention pruning: {e}")
+
+    deleted = db.execute(
+        "DELETE FROM hourly_generation WHERE substr(ts, 1, 10) < ?",
+        [cutoff_date],
+        db="analytics"
+    )
+    logger.info("Hourly retention pruned %d rows older than %s", deleted, cutoff_date)
+    return {"status": "success", "cutoff_date": cutoff_date, "deleted_rows": deleted, "deleted_count": deleted}
+
+
+def run_recent_refresh(
     sources: Optional[List[str]] = None,
-    include_daily: bool = True,
     force_refresh: bool = False,
-    progress_cb: Optional[Callable[[str, float], None]] = None
 ) -> Dict[str, Any]:
     """
-    Backfills monthly and representative daily solar generation records across the lifetime of the fleet.
-    If start_year_month is None, automatically detects the earliest plant installation date in the database.
+    High-frequency and nightly recent window refresh:
+    - Last month + this month to date (daily, monthly roll-up)
+    - Today's hourly curve (plus yesterday's if late evening)
+    - Snapshots
     """
     try:
         from core import analytics
     except ImportError:
         import analytics
+
+    start_t = time.time()
+    today_dt = datetime.date.today()
+    today_str = today_dt.isoformat()
+    curr_month = today_dt.strftime("%Y-%m")
+
+    # Compute previous month
+    first_of_curr = today_dt.replace(day=1)
+    prev_month_dt = first_of_curr - datetime.timedelta(days=1)
+    prev_month = prev_month_dt.strftime("%Y-%m")
+
+    run_fleet(sources=sources, force_refresh=force_refresh)
+    run_daily(date_str=today_str, sources=sources, force_refresh=force_refresh)
+    run_monthly(month_str=curr_month, sources=sources, force_refresh=force_refresh)
+    run_monthly(month_str=prev_month, sources=sources, force_refresh=force_refresh)
+    run_snapshots(sources=sources, force_refresh=force_refresh)
+
+    # Roll up
+    rollup_monthly_from_daily(curr_month)
+    rollup_monthly_from_daily(prev_month)
+    rollup_yearly_from_daily(str(today_dt.year))
+
+    # Hourly curve for today for active plants
+    extractors = {e.source: e for e in get_extractors(sources)}
+    active_plants = db.get_plants(include_decommissioned=False)
+    hourly_records_count = 0
+
+    for p in active_plants:
+        src = str(p.get("source", "")).lower()
+        ext = extractors.get(src)
+        if ext and ext.supports_history().get("hourly"):
+            raw_id = str(p.get("plant_id", "")).replace(f"{src}_", "")
+            try:
+                h_rows = ext.fetch_history_hourly(raw_id, today_str)
+                if h_rows:
+                    db.upsert_hourly(h_rows, overwrite=True)
+                    hourly_records_count += len(h_rows)
+            except Exception as e:
+                logger.debug(f"Hourly fetch for plant {p.get('plant_id')} failed: {e}")
+
+    # Classify & losses
+    analytics.classify_all(curr_month)
+    analytics.calculate_loss_analysis(curr_month)
+    analytics.classify_all(prev_month)
+    analytics.calculate_loss_analysis(prev_month)
+
+    duration = round(time.time() - start_t, 2)
+    return {
+        "status": "success",
+        "current_month": curr_month,
+        "previous_month": prev_month,
+        "hourly_rows": hourly_records_count,
+        "duration_sec": duration,
+    }
+
+
+def run_historical_full_fetch(
+    sources: Optional[List[str]] = None,
+    start_month: Optional[str] = None,
+    active_only_hourly: bool = True,
+    resume: bool = True,
+    overwrite: bool = True,
+    progress_cb: Optional[Callable[[str, float], None]] = None,
+    cancel_event: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Executes deep historical extraction across all platforms in parallel:
+    - Daily/monthly/yearly partial history from install date up to current month.
+    - Full hourly power curve for previous month and current month (~60 days) for active plants.
+    - Full overwrite policy (INSERT OR REPLACE) replacing seeds and calculated values.
+    - Resumable state tracking via backfill_progress table.
+    - Automatic rollup of monthly and yearly generation.
+    - S3 curated Parquet export via pyarrow.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    try:
+        from core import analytics
+        from services import s3_archive
+    except ImportError:
+        import analytics
+        import s3_archive
+
     start_time = time.time()
 
     def report(msg: str, pct: float):
@@ -642,93 +787,217 @@ def run_historical_backfill(
             except Exception:
                 pass
 
-    report("Verifying fleet metadata and installation dates...", 0.05)
-    run_fleet(sources=sources, force_refresh=force_refresh)
+    report("Verifying fleet metadata and active plant roster...", 0.03)
+    run_fleet(sources=sources, force_refresh=True)
 
-    # Determine date range
-    if not start_year_month:
-        with db.analytics_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT MIN(install_date) FROM plants WHERE install_date IS NOT NULL AND install_date != 'nan' AND install_date != ''")
-            row = cur.fetchone()
-            earliest = row[0] if row and row[0] else "2023-01-01"
-            start_year_month = earliest[:7]
+    today_dt = datetime.date.today()
+    today_str = today_dt.isoformat()
+    curr_month = today_dt.strftime("%Y-%m")
+    first_of_curr = today_dt.replace(day=1)
+    prev_month_dt = first_of_curr - datetime.timedelta(days=1)
+    prev_month = prev_month_dt.strftime("%Y-%m")
 
-    if not end_year_month:
-        end_year_month = datetime.date.today().strftime("%Y-%m")
+    # Load plants
+    plants = db.get_plants(include_decommissioned=True)
+    if sources and "all" not in [s.lower() for s in sources]:
+        src_set = {s.lower() for s in sources}
+        plants = [p for p in plants if str(p.get("source", "")).lower() in src_set]
 
-    # Generate list of YYYY-MM
-    try:
-        sy, sm = map(int, start_year_month.split("-"))
-        ey, em = map(int, end_year_month.split("-"))
-    except Exception:
-        sy, sm = 2023, 1
-        ey, em = 2026, 9
+    extractors_map = {e.source: e for e in get_extractors(sources)}
 
-    months = []
-    curr_y, curr_m = sy, sm
-    while (curr_y < ey) or (curr_y == ey and curr_m <= em):
-        months.append(f"{curr_y:04d}-{curr_m:02d}")
-        curr_m += 1
-        if curr_m > 12:
-            curr_m = 1
-            curr_y += 1
+    # Check backfill progress if resume is enabled
+    completed_periods = set()
+    if resume:
+        for prog in db.get_backfill_progress(status="success"):
+            completed_periods.add((
+                prog["source"].lower(),
+                str(prog["plant_id"]),
+                prog["granularity"].lower(),
+                prog["period"]
+            ))
 
-    total_months = len(months)
-    report(f"Starting historical backfill for {total_months} months ({start_year_month} to {end_year_month})...", 0.10)
+    work_items = []
+    affected_months = set()
+    affected_years = set()
 
-    total_monthly_records = 0
-    total_daily_records = 0
+    for p in plants:
+        pid = str(p["plant_id"])
+        src = str(p.get("source", "")).lower()
+        ext = extractors_map.get(src)
+        if not ext:
+            continue
 
-    for idx, m in enumerate(months):
-        progress_base = 0.10 + 0.80 * (idx / max(total_months, 1))
-        report(f"[{idx+1}/{total_months}] Ingesting monthly telemetry for {m}...", progress_base)
-        
-        m_count = run_monthly(m, sources=sources, force_refresh=force_refresh)
-        total_monthly_records += m_count
+        raw_id = pid.replace(f"{src}_", "")
+        inst_date = str(p.get("install_date") or "2023-01-01")[:7]
+        p_start_month = max(inst_date, start_month) if start_month else inst_date
 
-        if include_daily:
-            try:
-                my, mm = map(int, m.split("-"))
-                next_m = datetime.date(my + 1, 1, 1) if mm == 12 else datetime.date(my, mm + 1, 1)
-                days_in_m = (next_m - datetime.timedelta(days=1)).day
-            except Exception:
-                days_in_m = 30
-            curr_ym = datetime.date.today().strftime("%Y-%m")
-            if m == curr_ym:
-                target_day_str = min(datetime.date.today().isoformat(), f"{m}-{days_in_m:02d}")
-            else:
-                target_day_str = f"{m}-{days_in_m:02d}"
-            d_count = run_daily(target_day_str, sources=sources, force_refresh=force_refresh)
-            total_daily_records += d_count
+        # Generate month sequence
+        try:
+            sy, sm = map(int, p_start_month.split("-"))
+            ey, em = map(int, curr_month.split("-"))
+        except Exception:
+            sy, sm = 2023, 1
+            ey, em = today_dt.year, today_dt.month
 
+        p_months = []
+        cy, cm = sy, sm
+        while (cy < ey) or (cy == ey and cm <= em):
+            p_months.append(f"{cy:04d}-{cm:02d}")
+            affected_months.add(f"{cy:04d}-{cm:02d}")
+            affected_years.add(f"{cy:04d}")
+            cm += 1
+            if cm > 12:
+                cm = 1
+                cy += 1
+
+        # 1. Daily work items (per plant, per month from install date)
+        if ext.supports_history().get("daily"):
+            for m in p_months:
+                key = (src, pid, "daily", m)
+                if not (resume and key in completed_periods):
+                    work_items.append({
+                        "type": "daily",
+                        "source": src,
+                        "plant_id": pid,
+                        "raw_id": raw_id,
+                        "period": m,
+                    })
+
+        # 2. Hourly work items: strictly previous month and current month for active plants
+        is_active = str(p.get("operational_status", "")).lower() != "decommissioned"
+        if ext.supports_history().get("hourly") and (is_active or not active_only_hourly):
+            start_date_hourly = f"{prev_month}-01"
+            h_curr = datetime.date(prev_month_dt.year, prev_month_dt.month, 1)
+            while h_curr <= today_dt:
+                d_str = h_curr.isoformat()
+                key = (src, pid, "hourly", d_str)
+                if not (resume and key in completed_periods):
+                    work_items.append({
+                        "type": "hourly",
+                        "source": src,
+                        "plant_id": pid,
+                        "raw_id": raw_id,
+                        "period": d_str,
+                    })
+                h_curr += datetime.timedelta(days=1)
+
+    total_tasks = len(work_items)
+    report(f"Scheduled {total_tasks} parallel fetch tasks across {len(plants)} plants...", 0.08)
+
+    calls_made = 0
+    rows_written = 0
+    failed_tasks = 0
+
+    def _execute_task(task: Dict[str, Any]) -> Tuple[Dict[str, Any], int, Optional[str]]:
+        if cancel_event and cancel_event.is_set():
+            return task, 0, "Cancelled"
+        src = task["source"]
+        pid = task["plant_id"]
+        raw_id = task["raw_id"]
+        period = task["period"]
+        ext_obj = extractors_map[src]
+
+        try:
+            if task["type"] == "daily":
+                records = ext_obj.fetch_history_daily(raw_id, period)
+                if records:
+                    db.upsert_daily(records, overwrite=overwrite)
+                    db.record_backfill_progress(src, pid, "daily", period, "success", rows=len(records))
+                    return task, len(records), None
+                else:
+                    db.record_backfill_progress(src, pid, "daily", period, "success", rows=0)
+                    return task, 0, None
+            elif task["type"] == "hourly":
+                h_rows = ext_obj.fetch_history_hourly(raw_id, period)
+                if h_rows:
+                    db.upsert_hourly(h_rows, overwrite=overwrite)
+                    db.record_backfill_progress(src, pid, "hourly", period, "success", rows=len(h_rows))
+                    return task, len(h_rows), None
+                else:
+                    db.record_backfill_progress(src, pid, "hourly", period, "success", rows=0)
+                    return task, 0, None
+        except Exception as e:
+            err = str(e)
+            db.record_backfill_progress(src, pid, task["type"], period, "failed", rows=0, error=err)
+            return task, 0, err
+        return task, 0, None
+
+    done_count = 0
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_execute_task, item): item for item in work_items}
+        for fut in as_completed(futures):
+            if cancel_event and cancel_event.is_set():
+                report("Fetch cancelled by operator. Finalizing completed records...", 0.85)
+                break
+            done_count += 1
+            calls_made += 1
+            task, r_count, err = fut.result()
+            rows_written += r_count
+            if err:
+                failed_tasks += 1
+
+            if done_count % 25 == 0 or done_count == total_tasks:
+                pct = 0.08 + 0.70 * (done_count / max(total_tasks, 1))
+                report(f"Completed {done_count}/{total_tasks} periods ({rows_written} rows written)...", pct)
+
+    report("Computing monthly & yearly rollups from portal history...", 0.82)
+    for m in sorted(affected_months):
+        rollup_monthly_from_daily(m)
+    for y in sorted(affected_years):
+        rollup_yearly_from_daily(y)
+
+    report("Scanning for stuck sensors and updating data quality flags...", 0.86)
+    data_quality.scan_and_flag_stuck_values()
+
+    report("Recalibrating health tiers and loss models across historical months...", 0.90)
+    for m in sorted(affected_months, reverse=True)[:12]:
         try:
             analytics.classify_all(m)
             analytics.calculate_loss_analysis(m)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Analytics run for month {m} failed: {e}")
 
-    report("Syncing decommissioned plants & finalizing fleet metrics...", 0.95)
-    analytics.sync_decommissioned_plants()
-
+    report("Exporting Parquet archives to local bronze & AWS S3 via pyarrow...", 0.96)
     try:
-        from services import s3_archive
-        s3_archive.archive_full_sync(month_str=end_year_month)
-    except Exception as s3_err:
-        logger.debug(f"S3 archive backfill sync error: {s3_err}")
+        s3_archive.export_curated_parquet("daily")
+        s3_archive.export_curated_parquet("hourly")
+        s3_archive.export_curated_parquet("monthly")
+        s3_archive.export_curated_parquet("yearly")
+    except Exception as e:
+        logger.warning(f"Parquet export failed: {e}")
 
-    elapsed = round(time.time() - start_time, 2)
-    report(f"Historical backfill complete in {elapsed}s: {total_monthly_records} monthly records across {total_months} months.", 1.0)
+    duration = round(time.time() - start_time, 2)
+    report(f"Historical full fetch complete in {duration}s: {rows_written} rows written across {total_tasks} periods.", 1.0)
 
     return {
         "status": "success",
-        "months_processed": total_months,
-        "start_month": start_year_month,
-        "end_month": end_year_month,
-        "monthly_records": total_monthly_records,
-        "daily_records": total_daily_records,
-        "duration_sec": elapsed
+        "tasks_scheduled": total_tasks,
+        "tasks_completed": done_count,
+        "tasks_failed": failed_tasks,
+        "calls_made": calls_made,
+        "rows_written": rows_written,
+        "affected_months": len(affected_months),
+        "duration_sec": duration,
     }
+
+
+def run_historical_backfill(
+    start_year_month: Optional[str] = None,
+    end_year_month: Optional[str] = None,
+    sources: Optional[List[str]] = None,
+    include_daily: bool = True,
+    force_refresh: bool = False,
+    progress_cb: Optional[Callable[[str, float], None]] = None
+) -> Dict[str, Any]:
+    """Backward compatible wrapper around run_historical_full_fetch."""
+    return run_historical_full_fetch(
+        sources=sources,
+        start_month=start_year_month,
+        active_only_hourly=True,
+        resume=True,
+        overwrite=True,
+        progress_cb=progress_cb,
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Solaron Data Pipeline")

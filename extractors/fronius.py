@@ -191,13 +191,8 @@ class FroniusExtractor(BaseExtractor):
                     except Exception:
                         pass
 
-            if kwh <= 0.0:
-                # Realistic benchmark yield for Mumbai (~3.4 kWh/kWp in October)
-                kwh = round(cap * 3.42, 2)
-                live_pac_w = round(cap * 0.65 * 1000.0, 1)
-
+            pwr_kw = round(live_pac_w / 1000.0, 3) if live_pac_w > 0 else 0.0
             sy = round(kwh / cap, 3) if cap > 0 else 0.0
-            pwr_kw = round(live_pac_w / 1000.0, 3) if live_pac_w > 0 else round(cap * 0.65, 3)
 
             daily_records.append({
                 "plant_id": pid,
@@ -206,7 +201,7 @@ class FroniusExtractor(BaseExtractor):
                 "revenue_inr": round(kwh * 14.0, 2),
                 "specific_yield": sy,
                 "live_power_kw": pwr_kw,
-                "status": "active" if (kwh > 0 or pwr_kw > 0) else "offline",
+                "status": p.get("status", "active"),
                 "last_log_time": datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "source_type": source_type,
             })
@@ -248,10 +243,6 @@ class FroniusExtractor(BaseExtractor):
                     for d_point in api_res.get("data", []):
                         kwh = self.safe_float(d_point.get("energy")) or 0.0
 
-            # 2. Resilient baseline from daily aggregation or monthly benchmark (~105 kWh/kWp/month)
-            if kwh <= 0.0:
-                kwh = round(cap * 3.42 * elapsed_days, 2)
-
             sy = round(kwh / cap, 2) if cap > 0 else 0.0
             ypd = round(sy / float(elapsed_days), 2) if elapsed_days > 0 else 0.0
             cuf_pct = round((kwh / (cap * 24.0 * float(elapsed_days))) * 100, 2) if (elapsed_days > 0 and cap > 0) else 0.0
@@ -266,7 +257,7 @@ class FroniusExtractor(BaseExtractor):
                 "cuf_pct": cuf_pct,
                 "tier": None,
                 "percentile": None,
-                "explanation": f"Generated {kwh} kWh in {month_str}",
+                "explanation": f"Generated {kwh} kWh in {month_str}" if kwh > 0 else f"No monthly telemetry recorded for {month_str}",
             })
 
         return monthly_records
@@ -274,7 +265,7 @@ class FroniusExtractor(BaseExtractor):
     def fetch_snapshots(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
         Fetch real-time inverter snapshots for Fronius plants.
-        Adheres strictly to CEC 97.5% efficiency and physical temperature bounds.
+        Returns actual measured power, omitting synthetic estimates when telemetry is absent.
         """
         fleet = self.fetch_fleet(force_refresh=force_refresh)
         snapshots: List[Dict[str, Any]] = []
@@ -283,7 +274,6 @@ class FroniusExtractor(BaseExtractor):
         for p in fleet:
             pid = p["plant_id"]
             raw_uuid = pid.replace("fronius_", "")
-            cap = p["capacity_kwp"]
 
             ac_w = 0.0
             e_today = 0.0
@@ -295,36 +285,16 @@ class FroniusExtractor(BaseExtractor):
                     ac_w = self.safe_float(ld.get("power")) or 0.0
                     e_today = self.safe_float(ld.get("energyToday")) or 0.0
 
-            if ac_w <= 0.0:
-                # Operational during daytime
-                now_hour = datetime.datetime.now().hour
-                if 7 <= now_hour <= 18:
-                    ac_w = round(cap * 1000.0 * 0.65, 1)
-                    e_today = round(cap * 3.42, 2)
-                else:
-                    ac_w = 0.0
-                    e_today = round(cap * 3.42, 2)
-
-            # CEC 97.5% inverter efficiency
-            dc_w = round(ac_w / 0.975, 1) if ac_w > 0 else 0.0
-            
-            # Physics-based heat dissipation (25°C - 55°C bound)
-            if ac_w > 0:
-                load_ratio = min(1.0, ac_w / max(100.0, cap * 1000.0))
-                temp_c = round(36.0 + load_ratio * 16.5, 1)
-            else:
-                temp_c = 30.0
-
             snapshots.append({
                 "plant_id": pid,
                 "inverter_sn": str(p.get("inverter_id") or "29841857"),
                 "snapshot_ts": now_ts,
                 "ac_power_w": ac_w,
-                "dc_power_w": dc_w,
-                "temperature_c": temp_c,
+                "dc_power_w": None,
+                "temperature_c": None,
                 "e_today_kwh": e_today,
                 "fault_code": None,
-                "status": "active" if ac_w > 10.0 or e_today > 0.1 else "offline",
+                "status": p.get("status", "active"),
             })
 
         return snapshots
@@ -352,3 +322,72 @@ class FroniusExtractor(BaseExtractor):
                         })
 
         return alarms
+
+    def supports_history(self) -> Dict[str, Any]:
+        has_keys = bool(self.access_key_id and self.access_key_value)
+        return {"daily": has_keys, "hourly": has_keys, "max_lookback_days": None}
+
+    def fetch_history_daily(self, plant_raw_id: Any, year_month: str) -> List[Dict[str, Any]]:
+        raw_uuid = str(plant_raw_id).replace("fronius_", "")
+        pid = self.plant_id("fronius", raw_uuid)
+        fleet = {p["plant_id"]: p for p in self.fetch_fleet()}
+        plant = fleet.get(pid, {})
+        cap = float(plant.get("capacity_kwp") or 12.5)
+
+        if self.access_key_id and self.access_key_value:
+            y, m = [int(x) for x in year_month.split("-")]
+            import calendar
+            _, last_day = calendar.monthrange(y, m)
+            start_date = f"{year_month}-01"
+            end_date = f"{year_month}-{last_day:02d}"
+            res = self._api_get(f"/pvsystems/{raw_uuid}/histdata", params={"from": start_date, "to": end_date, "channel": "EnergyReal_WAC_Sum_Produced"})
+            if res and "data" in res:
+                records = []
+                for item in res["data"]:
+                    d_str = str(item.get("logDateTime", ""))[:10]
+                    kwh = self.safe_float(item.get("value"))
+                    if kwh is not None:
+                        sy = round(kwh / cap, 3) if cap > 0 else None
+                        records.append({
+                            "plant_id": pid,
+                            "date": d_str,
+                            "kwh": round(kwh, 2),
+                            "specific_yield": sy,
+                            "yield_per_day": sy,
+                            "status": "active" if kwh > 0.05 else "offline",
+                            "source_type": "portal_history",
+                        })
+                if records:
+                    return records
+        return []
+
+    def fetch_history_hourly(self, plant_raw_id: Any, date_str: str) -> List[Dict[str, Any]]:
+        raw_uuid = str(plant_raw_id).replace("fronius_", "")
+        pid = self.plant_id("fronius", raw_uuid)
+        if self.access_key_id and self.access_key_value:
+            res = self._api_get(f"/pvsystems/{raw_uuid}/histdata", params={"from": date_str[:10], "to": date_str[:10], "channel": "PowerReal_PAC_Sum"})
+            if res and "data" in res:
+                hourly_power: Dict[int, List[float]] = {h: [] for h in range(24)}
+                for item in res["data"]:
+                    ts = str(item.get("logDateTime", ""))
+                    w = self.safe_float(item.get("value"))
+                    if w is not None and len(ts) >= 13:
+                        try:
+                            hour = int(ts[11:13])
+                            if 0 <= hour <= 23:
+                                hourly_power[hour].append(w / 1000.0)
+                        except ValueError:
+                            pass
+                results = []
+                for hour in range(24):
+                    readings = hourly_power[hour]
+                    avg_kw = round(sum(readings) / len(readings), 3) if readings else 0.0
+                    results.append({
+                        "plant_id": pid,
+                        "ts": f"{date_str[:10]} {hour:02d}:00",
+                        "power_kw": avg_kw,
+                        "energy_kwh": round(avg_kw * 1.0, 3),
+                        "source_type": "portal_history",
+                    })
+                return results
+        return []

@@ -474,3 +474,140 @@ def run_nightly_archive(target_date: Optional[str] = None) -> Dict[str, Any]:
     }
     logger.info("Nightly archive completed successfully.")
     return summary
+
+
+def export_curated_parquet(granularity: str, period: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Exports structured database tables to compressed columnar Parquet files using pyarrow,
+    saving to local bronze and uploading to S3 with partition layout:
+    curated/{granularity}/.../part.parquet
+    """
+    import io
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    granularity = granularity.lower()
+    sql = ""
+    params = []
+    s3_key = ""
+
+    if granularity == "hourly":
+        if period:
+            sql = """
+            SELECT h.plant_id, p.source, h.ts, h.power_kw, h.energy_kwh, h.source_type
+            FROM hourly_generation h
+            LEFT JOIN plants p ON h.plant_id = p.plant_id
+            WHERE substr(h.ts, 1, 10) = ?
+            """
+            params = [period[:10]]
+            s3_key = f"curated/hourly/date={period[:10]}/part.parquet"
+        else:
+            sql = """
+            SELECT h.plant_id, p.source, h.ts, h.power_kw, h.energy_kwh, h.source_type
+            FROM hourly_generation h
+            LEFT JOIN plants p ON h.plant_id = p.plant_id
+            """
+            s3_key = f"curated/hourly/all/part.parquet"
+
+    elif granularity == "daily":
+        if period:
+            sql = """
+            SELECT d.plant_id, p.source, d.date, d.kwh, d.specific_yield, d.status, d.source_type
+            FROM daily_generation d
+            LEFT JOIN plants p ON d.plant_id = p.plant_id
+            WHERE substr(d.date, 1, 7) = ?
+            """
+            params = [period[:7]]
+            y, m = period[:7].split("-")
+            s3_key = f"curated/daily/year={y}/month={m}/part.parquet"
+        else:
+            sql = """
+            SELECT d.plant_id, p.source, d.date, d.kwh, d.specific_yield, d.status, d.source_type
+            FROM daily_generation d
+            LEFT JOIN plants p ON d.plant_id = p.plant_id
+            """
+            s3_key = "curated/daily/all/part.parquet"
+
+    elif granularity == "monthly":
+        if period:
+            sql = """
+            SELECT m.plant_id, p.source, m.month, m.kwh, m.specific_yield, m.pr_pct, m.tier, m.source_type
+            FROM monthly_generation m
+            LEFT JOIN plants p ON m.plant_id = p.plant_id
+            WHERE m.month = ?
+            """
+            params = [period[:7]]
+            s3_key = f"curated/monthly/month={period[:7]}/part.parquet"
+        else:
+            sql = """
+            SELECT m.plant_id, p.source, m.month, m.kwh, m.specific_yield, m.pr_pct, m.tier, m.source_type
+            FROM monthly_generation m
+            LEFT JOIN plants p ON m.plant_id = p.plant_id
+            """
+            s3_key = "curated/monthly/all/part.parquet"
+
+    elif granularity == "yearly":
+        if period:
+            sql = """
+            SELECT y.plant_id, p.source, y.year, y.kwh, y.specific_yield, y.months_covered
+            FROM yearly_generation y
+            LEFT JOIN plants p ON y.plant_id = p.plant_id
+            WHERE y.year = ?
+            """
+            params = [period[:4]]
+            s3_key = f"curated/yearly/year={period[:4]}/part.parquet"
+        else:
+            sql = """
+            SELECT y.plant_id, p.source, y.year, y.kwh, y.specific_yield, y.months_covered
+            FROM yearly_generation y
+            LEFT JOIN plants p ON y.plant_id = p.plant_id
+            """
+            s3_key = "curated/yearly/all/part.parquet"
+    else:
+        return {"status": "error", "error": f"Unsupported granularity: {granularity}"}
+
+    df = db.query_df(sql, params, db="analytics")
+    if df.empty:
+        return {"status": "skipped", "reason": "No rows found for period", "granularity": granularity, "period": period}
+
+    # Convert to PyArrow Table and serialize with snappy compression
+    table = pa.Table.from_pandas(df)
+    buf = io.BytesIO()
+    pq.write_table(table, buf, compression="snappy")
+    parquet_bytes = buf.getvalue()
+
+    local_file = LOCAL_BRONZE_DIR / s3_key
+    local_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(local_file, "wb") as f:
+        f.write(parquet_bytes)
+
+    client = get_s3_client()
+    bucket = settings.s3_bucket_name or "solaron-dashboard-data"
+    s3_target = None
+    if client:
+        try:
+            client.put_object(
+                Bucket=bucket,
+                Key=s3_key,
+                Body=parquet_bytes,
+                ContentType="application/vnd.apache.parquet",
+                Metadata={
+                    "granularity": granularity,
+                    "rows": str(len(df)),
+                    "created_at": datetime.datetime.now().isoformat(),
+                },
+            )
+            s3_target = f"s3://{bucket}/{s3_key}"
+            logger.info("Uploaded parquet to S3: %s (%d rows, %d bytes)", s3_target, len(df), len(parquet_bytes))
+        except Exception as e:
+            logger.warning("S3 parquet upload failed, retained locally at %s: %s", local_file, e)
+
+    return {
+        "status": "success",
+        "granularity": granularity,
+        "period": period,
+        "rows": len(df),
+        "size_bytes": len(parquet_bytes),
+        "local_path": str(local_file),
+        "s3_target": s3_target,
+    }

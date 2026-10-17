@@ -735,31 +735,157 @@ class GrowattExtractor(BaseExtractor):
                 e_today = self.safe_float(st_info.get("e_today_kwh") or 0.0) or 0.0
             e_today = round(max(0.0, e_today), 2)
 
-            # Inverter DC power and realistic operating heatsink temperature
-            dc_w = round(ac_w / 0.975, 1) if ac_w > 0 else 0.0
-            if ac_w > 0:
-                load_ratio = min(1.0, ac_w / max(100.0, cap * 1000.0))
-                temp_c = round(36.0 + load_ratio * 16.5, 1)
-            else:
-                temp_c = 30.0
-
+            # Real inverter AC power and daily energy from portal telemetry
             fault_code = str(p.get("alarmValue") or st_info.get("fault_code") or "")
             if not fault_code or fault_code in ("0", "nan", "None"):
                 fault_code = None
 
-            is_active = (ac_w > 10.0 or e_today > 0.1)
-            stat = "active" if is_active else ("fault" if fault_code else "offline")
+            # Preserve real platform status rather than false-offline at night
+            plant_raw_status = p.get("status") or st_info.get("status")
+            stat = "fault" if fault_code else self.normalize_status(plant_raw_status or "active")
 
             snapshots.append({
                 "plant_id": pid,
-                "inverter_sn": f"GW-{raw_id}",
+                "inverter_sn": p.get("inverter_sn") or f"GW-{raw_id}",
                 "snapshot_ts": now_ts,
                 "ac_power_w": ac_w,
-                "dc_power_w": dc_w,
-                "temperature_c": temp_c,
+                "dc_power_w": None,
+                "temperature_c": None,
                 "e_today_kwh": e_today,
                 "fault_code": fault_code,
                 "status": stat,
             })
 
         return snapshots
+
+    def supports_history(self) -> Dict[str, Any]:
+        return {"daily": True, "hourly": True, "max_lookback_days": None}
+
+    def _call_api_with_retry(self, func, *args, max_retries: int = 3, **kwargs):
+        """Throttled API caller with rate limiting (~5 req/sec), retry and auto re-login."""
+        now = time.time()
+        elapsed = now - getattr(self, "_last_api_call_ts", 0.0)
+        if elapsed < 0.2:
+            time.sleep(0.2 - elapsed)
+        self._last_api_call_ts = time.time()
+
+        for attempt in range(max_retries):
+            try:
+                res = func(*args, **kwargs)
+                if isinstance(res, dict) and str(res.get("msg", "")).lower() in ("error", "login error", "token invalid", "unauthorized"):
+                    logger.info("Growatt session may have expired, re-logging in...")
+                    self.logged_in = False
+                    self.login()
+                    res = func(*args, **kwargs)
+                return res
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.warning(f"Growatt API call failed after {max_retries} attempts: {e}")
+                    raise
+                time.sleep(0.8 * (attempt + 1))
+
+    def fetch_history_daily(self, plant_raw_id: Any, year_month: str) -> List[Dict[str, Any]]:
+        """Fetch historical daily generation records for a plant for a full month (YYYY-MM)."""
+        if not self.login():
+            return []
+        try:
+            import growattServer
+            y, m = [int(x) for x in year_month.split("-")]
+            target_dt = datetime.date(y, m, 1)
+            raw_id = str(plant_raw_id).strip()
+            res = self._call_api_with_retry(self.api.plant_detail, raw_id, growattServer.Timespan.month, target_dt)
+            if not res or not isinstance(res, dict):
+                return []
+
+            self.archive_raw(f"plant_detail_month_{raw_id}", res, date_str=year_month)
+            days_dict = res.get("data") or {}
+            if not days_dict:
+                return []
+
+            pid = self.plant_id("growatt", raw_id)
+            cap = self.plant_capacities.get(pid, 3.3)
+            today_str = datetime.date.today().isoformat()
+
+            records = []
+            for d_num_str, val in days_dict.items():
+                try:
+                    d_num = int(d_num_str)
+                    d_str = f"{year_month}-{d_num:02d}"
+                except ValueError:
+                    continue
+                if d_str > today_str:
+                    continue
+                kwh = self.safe_float(val)
+                if kwh is None:
+                    continue
+                kwh = max(0.0, round(kwh, 2))
+                sy = round(kwh / cap, 3) if cap > 0 else None
+                stat = "active" if kwh > 0.05 else "offline"
+                records.append({
+                    "plant_id": pid,
+                    "date": d_str,
+                    "kwh": kwh,
+                    "specific_yield": sy,
+                    "yield_per_day": sy,
+                    "status": stat,
+                    "source_type": "portal_history",
+                })
+            return records
+        except Exception as e:
+            logger.warning(f"Growatt fetch_history_daily failed for plant {plant_raw_id} {year_month}: {e}")
+            return []
+
+    def fetch_history_hourly(self, plant_raw_id: Any, date_str: str) -> List[Dict[str, Any]]:
+        """Fetch historical hourly generation records for a plant on a given date (YYYY-MM-DD)."""
+        if not self.login():
+            return []
+        try:
+            import growattServer
+            target_dt = datetime.date.fromisoformat(date_str[:10])
+            raw_id = str(plant_raw_id).strip()
+            res = self._call_api_with_retry(self.api.plant_detail, raw_id, growattServer.Timespan.hour, target_dt)
+            if not res or not isinstance(res, dict):
+                return []
+
+            self.archive_raw(f"plant_detail_hour_{raw_id}", res, date_str=date_str[:10])
+            data = res.get("data") or res.get("pac") or {}
+            if not data or not isinstance(data, dict):
+                return []
+
+            pid = self.plant_id("growatt", raw_id)
+
+            hourly_power: Dict[int, List[float]] = {h: [] for h in range(24)}
+            for t_str, val in data.items():
+                p_val = self.safe_float(val)
+                if p_val is None:
+                    continue
+                parts = str(t_str).strip().split(":")
+                try:
+                    hour = int(parts[0])
+                    if 0 <= hour <= 23:
+                        kw = p_val / 1000.0 if p_val > 50.0 else p_val
+                        hourly_power[hour].append(max(0.0, kw))
+                except (ValueError, IndexError):
+                    continue
+
+            results = []
+            for hour in range(24):
+                readings = hourly_power[hour]
+                if readings:
+                    avg_kw = round(sum(readings) / len(readings), 3)
+                    energy_kwh = round(avg_kw * 1.0, 3)
+                else:
+                    avg_kw = 0.0
+                    energy_kwh = 0.0
+
+                results.append({
+                    "plant_id": pid,
+                    "ts": f"{date_str[:10]} {hour:02d}:00",
+                    "power_kw": avg_kw,
+                    "energy_kwh": energy_kwh,
+                    "source_type": "portal_history",
+                })
+            return results
+        except Exception as e:
+            logger.warning(f"Growatt fetch_history_hourly failed for plant {plant_raw_id} {date_str}: {e}")
+            return []

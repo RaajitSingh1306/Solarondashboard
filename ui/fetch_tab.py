@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
@@ -231,52 +232,97 @@ def build_fetch_tab(
                 site_select.on("update:model-value", lambda e: update_strategy_desc())
                 update_fetch_btn_label()
 
-        # 2B. Lifetime Historical Backfill Engine Card
-        with ui.card().classes("w-full p-5 bg-gradient-to-br from-gray-900 via-indigo-950/20 to-gray-900 border border-indigo-800/40 rounded-xl shadow-lg"):
+        # 2B. Historical Full Fetch & 60-Day Telemetry Engine Card
+        current_cancel_event: threading.Event | None = None
+
+        with ui.card().classes("w-full p-5 bg-gradient-to-br from-gray-900 via-indigo-950/30 to-gray-900 border border-indigo-700/50 rounded-xl shadow-xl"):
             with ui.row().classes("w-full items-center justify-between pb-3 border-b border-gray-800 flex-wrap gap-2"):
                 with ui.row().classes("items-center gap-2.5"):
                     ui.icon("history_toggle_off").classes("text-indigo-400 text-2xl")
                     with ui.column().classes("gap-0"):
-                        ui.label("Historical Lifetime Backfill Engine").classes("text-base font-bold text-white")
-                        ui.label("Backfill historical monthly & daily generation from plant commissioning date (2017–2026) to present.").classes("text-xs text-gray-400")
-                
+                        ui.label("Historical Full Fetch & Multi-Portal Telemetry Engine").classes("text-base font-bold text-white")
+                        ui.label("Deep extraction: partial daily/monthly/yearly history from commissioning date + full hourly power curves (~60 days).").classes("text-xs text-gray-400")
+
                 with ui.row().classes("items-center gap-2"):
                     sync_badge = ui.badge(f"{len(plants_raw)} Plants Synced", color="indigo-8").classes("text-xs font-semibold px-2.5 py-1 rounded")
-                    ui.badge("Commissioning Range: 2017 - 2026", color="emerald-9").classes("text-xs font-semibold px-2.5 py-1 rounded")
+                    ui.badge("Hourly: Prev + Curr Month (~60d)", color="cyan-9").classes("text-xs font-semibold px-2.5 py-1 rounded")
+                    ui.badge("Archival: Columnar Parquet & S3", color="emerald-9").classes("text-xs font-semibold px-2.5 py-1 rounded")
 
+            # Portal Multi-Select Row
+            with ui.row().classes("w-full items-center gap-3 mt-3 p-2.5 bg-gray-950/60 rounded-lg border border-gray-800 flex-wrap"):
+                ui.label("Portals:").classes("text-xs font-bold text-indigo-300 uppercase tracking-wider")
+                portal_checkboxes: dict[str, Any] = {}
+                for p_key, p_info in platforms.PLATFORMS.items():
+                    portal_checkboxes[p_key] = ui.checkbox(p_info["label"], value=True).classes("text-xs text-gray-200")
+
+            # Fetch Parameters Row
             with ui.row().classes("w-full items-center gap-4 mt-3 flex-wrap"):
                 start_backfill_select = ui.select(
-                    options=["From Commissioning (Earliest 2017)", "2023-01", "2024-01", "2025-01", "2026-01"],
-                    value="2023-01",
-                    label="Backfill Start Month"
+                    options=[
+                        "From Commissioning (Earliest 2017)",
+                        "2017-01", "2018-01", "2019-01", "2020-01",
+                        "2021-01", "2022-01", "2023-01", "2024-01",
+                        "2025-01", "2026-01"
+                    ],
+                    value="From Commissioning (Earliest 2017)",
+                    label="Earliest Start Month"
                 ).props("dense outlined dark options-dense").classes("w-64")
 
-                bf_options = available_months[:6] if len(available_months) >= 4 else [cur_m, prev_m, "2026-08", "2026-07"]
-                end_backfill_select = ui.select(
-                    options=bf_options,
-                    value=cur_m if cur_m in bf_options else bf_options[0],
-                    label="Backfill End Month"
-                ).props("dense outlined dark options-dense").classes("w-44")
+                hourly_toggle = ui.checkbox("60-Day Hourly Power Curves", value=True).classes("text-xs text-cyan-300 font-semibold").tooltip(
+                    "Pulls full hourly generation for current + previous month for active plants; older hourly telemetry is aggregated into daily to conserve storage."
+                )
 
-                daily_checkbox = ui.checkbox("Include representative daily telemetry", value=True).classes("text-xs text-gray-300")
-                overwrite_checkbox = ui.checkbox("Overwrite existing records", value=True).classes("text-xs text-indigo-300 font-semibold").tooltip("Re-extracts and overwrites all existing monthly and daily records for selected range")
+                resume_checkbox = ui.checkbox("Resume Checkpoint", value=True).classes("text-xs text-gray-300").tooltip(
+                    "Skips periods already successfully recorded in backfill_progress"
+                )
 
-                backfill_btn = ui.button("🚀 Run Lifetime Backfill", icon="rocket_launch").props("color=indigo-7 text-color=white font-bold unelevated px-5")
+                overwrite_checkbox = ui.checkbox("Overwrite Existing", value=True).classes("text-xs text-amber-300 font-semibold").tooltip(
+                    "INSERT OR REPLACE policy: portal historical data overwrites legacy seeds or derived estimates"
+                )
 
-            backfill_status_row = ui.row().classes("w-full items-center gap-3 mt-3 hidden p-3 bg-indigo-950/40 border border-indigo-800/30 rounded-lg")
+                with ui.row().classes("items-center gap-2 ml-auto"):
+                    full_fetch_btn = ui.button("🚀 Run Historical Full Fetch", icon="rocket_launch").props("color=indigo-7 text-color=white font-bold unelevated px-5")
+                    cancel_btn = ui.button("Cancel", icon="cancel").props("color=negative outline dense").classes("hidden")
+
+            # Pre-flight Estimate Bar
+            preflight_banner = ui.row().classes("w-full items-center justify-between text-xs py-1.5 px-3 rounded bg-indigo-950/40 border border-indigo-900/40 text-indigo-200 mt-2")
+            with preflight_banner:
+                est_plants_label = ui.label("Pre-flight: ~142 active plants • ~1,800 monthly periods • Est duration: ~2-5 mins (Parallel pool)")
+                ui.label("Parquet: Local Bronze & S3 Curated Partitions").classes("text-[11px] text-gray-400 font-mono")
+
+            # Progress Row
+            backfill_status_row = ui.row().classes("w-full items-center gap-3 mt-3 hidden p-3 bg-indigo-950/60 border border-indigo-800/50 rounded-lg")
             with backfill_status_row:
-                ui.spinner(size="sm", color="indigo")
-                bf_status_label = ui.label("Backfilling historical generation...").classes("text-xs text-indigo-200 font-mono")
-                bf_progress_bar = ui.linear_progress(value=0.0).props("color=indigo-4 track-color=grey-9 rounded").classes("flex-1 h-2")
+                bf_spinner = ui.spinner(size="sm", color="indigo")
+                bf_status_label = ui.label("Initializing multi-portal full fetch...").classes("text-xs text-indigo-200 font-mono flex-1")
+                bf_progress_bar = ui.linear_progress(value=0.0).props("color=indigo-4 track-color=grey-9 rounded").classes("w-48 h-2")
+
+            def on_cancel_click():
+                nonlocal current_cancel_event
+                if current_cancel_event:
+                    current_cancel_event.set()
+                    bf_status_label.set_text("Cancellation requested... finalizing in-flight tasks.")
+                    cancel_btn.disable()
+
+            cancel_btn.on("click", on_cancel_click)
 
             async def on_backfill_execute():
-                backfill_btn.disable()
+                nonlocal current_cancel_event
+                current_cancel_event = threading.Event()
+
+                full_fetch_btn.disable()
+                cancel_btn.enable()
+                cancel_btn.classes(remove="hidden")
                 backfill_status_row.classes(remove="hidden")
-                
+
+                selected_portals = [k for k, cb in portal_checkboxes.items() if cb.value]
+                if not selected_portals:
+                    selected_portals = list(platforms.PLATFORMS.keys())
+
                 raw_start = start_backfill_select.value
                 start_m = None if "Commissioning" in str(raw_start) else str(raw_start)
-                end_m = str(end_backfill_select.value or cur_m)
-                inc_daily = bool(daily_checkbox.value)
+                inc_hourly = bool(hourly_toggle.value)
+                do_resume = bool(resume_checkbox.value)
                 do_overwrite = bool(overwrite_checkbox.value)
 
                 def on_bf_progress(msg: str, pct: float):
@@ -287,22 +333,24 @@ def build_fetch_tab(
 
                 try:
                     res = await asyncio.to_thread(
-                        pipeline.run_historical_backfill,
-                        start_year_month=start_m,
-                        end_year_month=end_m,
-                        include_daily=inc_daily,
-                        force_refresh=do_overwrite,
-                        progress_cb=on_bf_progress
+                        pipeline.run_historical_full_fetch,
+                        sources=selected_portals,
+                        start_month=start_m,
+                        active_only_hourly=inc_hourly,
+                        resume=do_resume,
+                        overwrite=do_overwrite,
+                        cancel_event=current_cancel_event,
+                        progress_cb=on_bf_progress,
                     )
                     refresh_cache_meta_ui()
                     if not getattr(client, '_deleted', False):
                         with client:
                             ui.notify(
-                                f"Lifetime backfill complete! Processed {res['months_processed']} months ({res['monthly_records']} monthly records) in {res['duration_sec']}s",
+                                f"Historical full fetch complete! {res.get('rows_written', 0):,} records written across {res.get('tasks_completed', 0)} periods in {res.get('duration_sec', 0)}s",
                                 type="positive",
                                 timeout=6000
                             )
-                            bf_status_label.set_text(f"Complete: {res['months_processed']} months ({res['monthly_records']} records) backfilled.")
+                            bf_status_label.set_text(f"Complete: {res.get('rows_written', 0):,} records written in {res.get('duration_sec', 0)}s.")
                             bf_progress_bar.set_value(1.0)
                             for listener in app_state.get("refresh_listeners", []):
                                 try:
@@ -312,14 +360,15 @@ def build_fetch_tab(
                 except Exception as e:
                     if not getattr(client, '_deleted', False):
                         with client:
-                            ui.notify(f"Backfill error: {e}", type="negative")
+                            ui.notify(f"Historical fetch error: {e}", type="negative")
                             bf_status_label.set_text(f"Error: {e}")
                 finally:
                     if not getattr(client, '_deleted', False):
                         with client:
-                            backfill_btn.enable()
+                            full_fetch_btn.enable()
+                            cancel_btn.classes(add="hidden")
 
-            backfill_btn.on("click", on_backfill_execute)
+            full_fetch_btn.on("click", on_backfill_execute)
 
         # 3. Loading Indicator & Real-Time Fetch Timer Card
         loading_card = ui.card().classes(

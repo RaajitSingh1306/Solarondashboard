@@ -593,15 +593,14 @@ class ISolarCloudExtractor(BaseExtractor):
             temp = self.safe_float(p.get("temperature_c"))
 
             ac_w = round(cur_kw * 1000.0, 1) if (cur_kw is not None and cur_kw > 0) else 0.0
-            dc_w = round(ac_w / 0.975, 1) if ac_w > 0 else 0.0
             actual_today = today_kwh if today_kwh is not None else 0.0
 
             snapshots.append({
                 "plant_id": pid,
-                "inverter_sn": f"SG-INV-{raw_id}-{idx+1}",
+                "inverter_sn": inv_model if inv_model else None,
                 "status": status,
                 "ac_power_w": ac_w,
-                "dc_power_w": dc_w,
+                "dc_power_w": None,
                 "temperature_c": temp,
                 "e_today_kwh": actual_today,
                 "fault_code": "0",
@@ -609,3 +608,31 @@ class ISolarCloudExtractor(BaseExtractor):
             })
 
         return snapshots
+
+    def supports_history(self) -> Dict[str, Any]:
+        return {"daily": True, "hourly": False, "max_lookback_days": 60}
+
+    def fetch_history_daily(self, plant_raw_id: Any, year_month: str) -> List[Dict[str, Any]]:
+        """Fetch historical daily generation from real portal scrape cache or db."""
+        raw_id = str(plant_raw_id)
+        pid = self.plant_id("isolarcloud", raw_id)
+        # Check raw archive for scraped daily exports
+        hist_file = self.raw_dir / f"isolarcloud_daily_{year_month}.json"
+        if hist_file.exists():
+            try:
+                with open(hist_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    records = []
+                    for r in data:
+                        if r.get("plant_id") == pid:
+                            r_copy = dict(r)
+                            r_copy["source_type"] = "portal_history"
+                            records.append(r_copy)
+                    if records:
+                        return records
+            except Exception:
+                pass
+        return []
+
+    def fetch_history_hourly(self, plant_raw_id: Any, date_str: str) -> List[Dict[str, Any]]:
+        return []

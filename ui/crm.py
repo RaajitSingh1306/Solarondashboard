@@ -497,9 +497,9 @@ def build_crm_tab(app_state: dict):
     cust_dialog_mode = {"mode": "add", "id": None}
     with customer_dialog, ui.card().classes("w-[500px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-xl shadow-2xl"):
         cust_dialog_title = ui.label("Add New Customer Contact").classes("text-base font-bold text-white mb-2")
-        d_name = ui.input("Customer Name").classes("w-full").props("dense outlined dark")
-        d_plant = ui.input("Plant ID / Serial").classes("w-full").props("dense outlined dark")
-        d_phone = ui.input("Phone Number (with Country Code e.g. 919820012345)").classes("w-full").props("dense outlined dark")
+        d_name = ui.input("Customer Name *").classes("w-full").props("dense outlined dark")
+        d_plant = ui.input("Plant ID / Serial *").classes("w-full").props("dense outlined dark")
+        d_phone = ui.input("Phone Number * (Mandatory, e.g. 919820012345 — no '+')").classes("w-full").props("dense outlined dark")
         d_email = ui.input("Email (Optional)").classes("w-full").props("dense outlined dark")
         d_lang = ui.select(options=["english", "hindi", "marathi"], value="english", label="Preferred Language").classes("w-full").props("dense outlined dark")
         d_opt = ui.select(options=["active", "opt-out"], value="active", label="WhatsApp Opt-In Status").classes("w-full").props("dense outlined dark")
@@ -507,6 +507,50 @@ def build_crm_tab(app_state: dict):
         with ui.row().classes("w-full justify-end gap-3 mt-4"):
             ui.button("Cancel", on_click=customer_dialog.close).props("dense flat color=white")
             save_cust_btn = ui.button("Save Customer", icon="save").props("dense unelevated color=primary")
+
+    # Customer Import Dialog
+    with ui.dialog() as import_cust_dialog, ui.card().classes("w-[500px] max-w-full p-6 bg-gray-900 border border-gray-700 text-white rounded-xl shadow-2xl"):
+        with ui.row().classes("w-full items-center justify-between pb-2 border-b border-gray-800"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("upload_file").classes("text-cyan-400 text-xl")
+                ui.label("Import Customer Directory").classes("text-base font-bold text-white")
+            ui.button(icon="close", on_click=import_cust_dialog.close).props("dense flat round color=gray-4")
+
+        with ui.column().classes("w-full gap-3 mt-3"):
+            with ui.card().classes("p-3 bg-gray-950 border border-gray-800 rounded-lg w-full"):
+                ui.label("Validation Requirements:").classes("text-xs font-bold text-cyan-400 mb-1")
+                ui.markdown(
+                    "1. **“Phone” column is mandatory** in your CSV/Excel file.\\n"
+                    "2. **Phone number should have country code as prefix and no ‘+’ symbol** (e.g. `919876543210`)."
+                ).classes("text-xs text-gray-300 leading-relaxed")
+
+            async def handle_cust_import(e):
+                try:
+                    content = e.content.read()
+                    fname = e.name.lower()
+                    if fname.endswith(".xlsx") or fname.endswith(".xls"):
+                        engine = "openpyxl" if fname.endswith(".xlsx") else "xlrd"
+                        try:
+                            df = pd.read_excel(pd.io.common.BytesIO(content), engine=engine)
+                        except Exception:
+                            df = pd.read_excel(pd.io.common.BytesIO(content))
+                    else:
+                        df = pd.read_csv(pd.io.common.BytesIO(content))
+
+                    res = await asyncio.to_thread(crm.import_customers_from_df, df)
+                    import_cust_dialog.close()
+                    ui.notify(f"Successfully imported {res['imported']} customer(s)! ({res.get('skipped', 0)} skipped)", type="positive")
+                    await load_directory_data()
+                except ValueError as ve:
+                    ui.notify(str(ve), type="negative")
+                except Exception as err:
+                    ui.notify(f"Import failed: {err}", type="negative")
+
+            ui.upload(
+                label="Select or Drop CSV / Excel (.csv, .xlsx, .xls)",
+                on_upload=handle_cust_import,
+                auto_upload=True
+            ).props("dense outlined dark accept=.csv,.xlsx,.xls").classes("w-full")
 
     # Main Tab Container
     with ui.column().classes("w-full gap-5"):
@@ -670,6 +714,7 @@ def build_crm_tab(app_state: dict):
 
                         with ui.row().classes("items-center gap-2"):
                             ui.button("Add Customer", icon="person_add", on_click=lambda: open_customer_dialog("add")).props("dense unelevated color=primary")
+                            ui.button("Import CSV", icon="upload_file", on_click=import_cust_dialog.open).props("dense outline color=emerald").tooltip("Bulk import customer contacts (Phone column mandatory)")
                             ui.button("Export Directory CSV", icon="download", on_click=lambda: ui.download("/api/export/customers?fmt=csv")).props("dense outline color=cyan")
 
                 # Directory Table
@@ -720,7 +765,16 @@ def build_crm_tab(app_state: dict):
                             ).classes("w-40").props("dense outlined dark options-dense")
 
                             ui.button("⚡ Prepare Monthly Campaign", icon="campaign", on_click=lambda: run_prepare_monthly()).props("dense unelevated color=primary")
-                            ui.button("📥 Export CSV", icon="download", on_click=lambda: ui.download("/api/export/campaign?fmt=csv")).props("dense outline color=cyan")
+                            ui.button(
+                                "📥 Export Statements (CSV)",
+                                icon="download",
+                                on_click=lambda: ui.download(f"/api/export/monthly-statements?month={stmt_month_select.value or selected_month['val']}&fmt=csv")
+                            ).props("dense outline color=cyan").tooltip("Export Plant Name, Phone Number, Month, Energy Generated, and Money Saved")
+                            ui.button(
+                                "📊 Export Excel",
+                                icon="description",
+                                on_click=lambda: ui.download(f"/api/export/monthly-statements?month={stmt_month_select.value or selected_month['val']}&fmt=xlsx")
+                            ).props("dense outline color=emerald").tooltip("Export Excel with Plant Name, Phone Number, Month, Generation, and Savings")
 
                     # 4 KPI Summary Cards
                     with ui.row().classes("w-full gap-4 mt-3 grid grid-cols-2 lg:grid-cols-4"):
@@ -1331,16 +1385,27 @@ def build_crm_tab(app_state: dict):
     async def save_customer():
         name = d_name.value.strip()
         pid = d_plant.value.strip()
-        phone = d_phone.value.strip()
+        raw_phone = d_phone.value.strip()
         if not name or not pid:
             ui.notify("Customer name and Plant ID are required.", type="warning")
             return
-        await asyncio.to_thread(
-            crm.upsert_customer,
-            plant_id=pid, name=name, phone=phone,
-            email=d_email.value.strip(),
-            lang=d_lang.value, opt_in=d_opt.value
-        )
+        if not raw_phone:
+            ui.notify("“Phone” column is mandatory.", type="warning")
+            return
+        phone = crm.normalize_phone(raw_phone)
+        if not phone:
+            ui.notify("Phone number should have country code as prefix and no '+' symbol.", type="warning")
+            return
+        try:
+            await asyncio.to_thread(
+                crm.upsert_customer,
+                plant_id=pid, name=name, phone=phone,
+                email=d_email.value.strip(),
+                lang=d_lang.value, opt_in=d_opt.value
+            )
+        except ValueError as err:
+            ui.notify(str(err), type="warning")
+            return
         customer_dialog.close()
         ui.notify("Customer saved successfully!", type="positive")
         await load_directory_data()

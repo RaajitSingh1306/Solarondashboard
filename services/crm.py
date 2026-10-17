@@ -553,27 +553,45 @@ def normalize_phone(phone: Any) -> Optional[str]:
     """
     Normalizes phone string:
     - Strips '.0' float artifact (e.g. '917020188095.0' -> '917020188095')
-    - Strips non-digits
-    - If 10 digits starting with 6-9, prepends '91'
-    - If 12 digits starting with 91, keeps as is
-    - If 11 digits starting with 0, replaces with 91
+    - Strips '+' symbol and all non-digits
+    - Prepends country code (default '91' for India) if missing
+    - Guarantees return value has country code as prefix and NO '+' symbol
     """
-    if not phone:
+    if phone is None:
+        return None
+    if isinstance(phone, float) and (np.isnan(phone) or np.isneginf(phone) or np.isposinf(phone)):
         return None
     s = str(phone).strip()
+    if s.lower() in ("nan", "none", "null", "", "—", "-", "undefined"):
+        return None
     if s.endswith(".0"):
         s = s[:-2]
+    # Remove '+' symbol explicitly and any other non-digit characters
     digits = re.sub(r"\D", "", s)
+    if not digits:
+        return None
+
+    # If 10 digits starting with 6-9 (Indian standard mobile) -> prepend '91'
     if len(digits) == 10 and digits[0] in "6789":
         return f"91{digits}"
-    elif len(digits) == 12 and digits.startswith("91") and digits[2] in "6789":
-        return digits
-    elif len(digits) == 11 and digits.startswith("0") and digits[1] in "6789":
+    # If 10 digits generally -> prepend '91'
+    elif len(digits) == 10:
+        return f"91{digits}"
+    # If 11 digits starting with 0 -> replace '0' with '91'
+    elif len(digits) == 11 and digits.startswith("0"):
         return f"91{digits[1:]}"
-    return digits if len(digits) >= 10 else None
+    # If 12 digits starting with 91 -> valid Indian number with country code, no '+'
+    elif len(digits) == 12 and digits.startswith("91"):
+        return digits
+    # International number already containing country code (>10 digits, max 15 digits)
+    elif 10 <= len(digits) <= 15:
+        return digits
+    return None
 
 def upsert_customer(plant_id: str, name: str, phone: str, email: str = "", lang: str = "english", opt_in: str = "active") -> int:
-    clean_phone = normalize_phone(phone) or ""
+    clean_phone = normalize_phone(phone)
+    if not clean_phone:
+        raise ValueError("“Phone” is mandatory and must have country code prefix with no '+' symbol.")
     sql = """
     INSERT INTO customers (plant_id, customer_name, phone, email, preferred_lang, opt_in_status)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -585,6 +603,88 @@ def upsert_customer(plant_id: str, name: str, phone: str, email: str = "", lang:
         opt_in_status = excluded.opt_in_status;
     """
     return db.execute(sql, (plant_id, name, clean_phone, email, lang.lower(), opt_in.lower()), db="crm")
+
+def find_phone_column(columns: List[str]) -> Optional[str]:
+    """Finds the phone column from list of column names, ensuring case-insensitivity and common headers."""
+    for col in columns:
+        c_norm = str(col).strip().lower().replace(" ", "_").replace("-", "_")
+        if c_norm in ("phone", "phone_number", "phonenumber", "mobile", "mobile_number", "mobilenumber", "contact", "contact_number", "phone_no") or c_norm.startswith("phone"):
+            return col
+    return None
+
+def import_customers_from_df(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Imports customers from DataFrame with mandatory Phone column validation and normalization.
+    Requirements:
+    1. “Phone” column is mandatory.
+    2. Phone number should have country code as prefix and no ‘+’ symbol.
+    """
+    phone_col = find_phone_column(list(df.columns))
+    if not phone_col:
+        raise ValueError("“Phone” column is mandatory.")
+
+    plant_col = None
+    for col in df.columns:
+        c_norm = str(col).strip().lower().replace(" ", "_").replace("-", "_")
+        if c_norm in ("plant_id", "plantid", "plant", "serial", "plant_serial") or "plant" in c_norm:
+            plant_col = col
+            break
+
+    name_col = None
+    for col in df.columns:
+        c_norm = str(col).strip().lower().replace(" ", "_").replace("-", "_")
+        if c_norm in ("customer_name", "customer", "name", "client_name", "owner"):
+            name_col = col
+            break
+
+    email_col = next((c for c in df.columns if "email" in str(c).lower()), None)
+    lang_col = next((c for c in df.columns if "lang" in str(c).lower()), None)
+    opt_col = next((c for c in df.columns if "opt" in str(c).lower()), None)
+
+    imported = 0
+    skipped = 0
+    errors: List[str] = []
+
+    for idx, row in df.iterrows():
+        raw_phone = row.get(phone_col)
+        if pd.isna(raw_phone) or not str(raw_phone).strip() or str(raw_phone).strip().lower() in ("nan", "none", "null", "—"):
+            skipped += 1
+            errors.append(f"Row {idx+1}: Missing mandatory phone number.")
+            continue
+
+        clean_phone = normalize_phone(raw_phone)
+        if not clean_phone:
+            skipped += 1
+            errors.append(f"Row {idx+1}: Invalid phone '{raw_phone}'. Phone number should have country code as prefix and no '+' symbol.")
+            continue
+
+        pid = row.get(plant_col) if plant_col else row.get("plant_id")
+        if pd.isna(pid) or not str(pid).strip():
+            pid = f"plant_{clean_phone}"
+
+        name = row.get(name_col) if name_col else row.get("customer_name")
+        c_name = str(name).strip() if (pd.notna(name) and str(name).strip()) else "Solar Customer"
+        email = str(row.get(email_col, "")).strip() if (email_col and pd.notna(row.get(email_col))) else ""
+        lang = str(row.get(lang_col, "english")).lower().strip() if (lang_col and pd.notna(row.get(lang_col))) else "english"
+        opt_in = str(row.get(opt_col, "active")).lower().strip() if (opt_col and pd.notna(row.get(opt_col))) else "active"
+
+        upsert_customer(
+            plant_id=str(pid),
+            name=c_name,
+            phone=clean_phone,
+            email=email,
+            lang=lang,
+            opt_in=opt_in,
+        )
+        imported += 1
+
+    return {
+        "status": "success",
+        "imported": imported,
+        "total_rows": len(df),
+        "skipped": skipped,
+        "errors": errors[:10] if errors else [],
+    }
 
 def get_customer_profile(cust_id: int) -> Dict[str, Any]:
     df = db.query_df("SELECT * FROM customers WHERE id = ?", [cust_id], db="crm")

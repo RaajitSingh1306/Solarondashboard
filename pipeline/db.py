@@ -111,6 +111,11 @@ def get_plants(source: str | None = None, include_decommissioned: bool = False) 
 def query_df(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> pd.DataFrame:
     with get_conn(db) as conn:
         try:
+            if db == "analytics" and "crm." in sql:
+                try:
+                    conn.execute("ATTACH DATABASE ? AS crm", [settings.resolved_crm_db_path])
+                except Exception:
+                    pass
             df = pd.read_sql_query(sql, conn, params=params or [])
             if not df.empty:
                 return df.astype(object).where(pd.notnull(df), None)
@@ -121,6 +126,11 @@ def query_df(sql: str, params: tuple | list | dict | None = None, db: str = "ana
 
 def execute(sql: str, params: tuple | list | dict | None = None, db: str = "analytics") -> int:
     with get_conn(db) as conn:
+        if db == "analytics" and "crm." in sql:
+            try:
+                conn.execute("ATTACH DATABASE ? AS crm", [settings.resolved_crm_db_path])
+            except Exception:
+                pass
         cur = conn.cursor()
         cur.execute(sql, params or [])
         return cur.rowcount
@@ -175,7 +185,7 @@ def upsert_plant(row: dict[str, Any]) -> None:
     """
     execute(sql, row_copy, db="analytics")
 
-def upsert_daily(rows: list[dict[str, Any]]) -> int:
+def upsert_daily(rows: list[dict[str, Any]], overwrite: bool = False) -> int:
     if not rows:
         return 0
     today_str = datetime.date.today().isoformat()  # noqa: DTZ011
@@ -191,23 +201,42 @@ def upsert_daily(rows: list[dict[str, Any]]) -> int:
         r.setdefault("last_log_time", None)
         r.setdefault("quality_flags", None)
         r.setdefault("source_type", "portal")
-    sql = """
-    INSERT INTO daily_generation (
-        plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time, source_type
-    ) VALUES (
-        :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time, :source_type
-    )
-    ON CONFLICT(plant_id, date) DO UPDATE SET
-        kwh = coalesce(excluded.kwh, daily_generation.kwh),
-        revenue_inr = coalesce(excluded.revenue_inr, daily_generation.revenue_inr),
-        specific_yield = coalesce(excluded.specific_yield, daily_generation.specific_yield),
-        yield_per_day = coalesce(excluded.yield_per_day, daily_generation.yield_per_day),
-        live_power_kw = coalesce(excluded.live_power_kw, daily_generation.live_power_kw),
-        status = excluded.status,
-        quality_flags = coalesce(excluded.quality_flags, daily_generation.quality_flags),
-        last_log_time = coalesce(nullif(excluded.last_log_time, ''), daily_generation.last_log_time),
-        source_type = coalesce(excluded.source_type, daily_generation.source_type);
-    """
+    if overwrite:
+        sql = """
+        INSERT INTO daily_generation (
+            plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time, source_type
+        ) VALUES (
+            :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time, :source_type
+        )
+        ON CONFLICT(plant_id, date) DO UPDATE SET
+            kwh = excluded.kwh,
+            revenue_inr = excluded.revenue_inr,
+            specific_yield = excluded.specific_yield,
+            yield_per_day = excluded.yield_per_day,
+            live_power_kw = excluded.live_power_kw,
+            status = excluded.status,
+            quality_flags = excluded.quality_flags,
+            last_log_time = excluded.last_log_time,
+            source_type = excluded.source_type;
+        """
+    else:
+        sql = """
+        INSERT INTO daily_generation (
+            plant_id, date, kwh, revenue_inr, specific_yield, yield_per_day, live_power_kw, status, quality_flags, last_log_time, source_type
+        ) VALUES (
+            :plant_id, :date, :kwh, :revenue_inr, :specific_yield, :yield_per_day, :live_power_kw, :status, :quality_flags, :last_log_time, :source_type
+        )
+        ON CONFLICT(plant_id, date) DO UPDATE SET
+            kwh = coalesce(excluded.kwh, daily_generation.kwh),
+            revenue_inr = coalesce(excluded.revenue_inr, daily_generation.revenue_inr),
+            specific_yield = coalesce(excluded.specific_yield, daily_generation.specific_yield),
+            yield_per_day = coalesce(excluded.yield_per_day, daily_generation.yield_per_day),
+            live_power_kw = coalesce(excluded.live_power_kw, daily_generation.live_power_kw),
+            status = excluded.status,
+            quality_flags = coalesce(excluded.quality_flags, daily_generation.quality_flags),
+            last_log_time = coalesce(nullif(excluded.last_log_time, ''), daily_generation.last_log_time),
+            source_type = coalesce(excluded.source_type, daily_generation.source_type);
+        """
     res = executemany(sql, rows, db="analytics")
     clear_available_months_cache()
     return res
@@ -317,6 +346,217 @@ def upsert_loss_analysis(rows: list[dict[str, Any]]) -> int:
         calculated_at = CURRENT_TIMESTAMP;
     """
     return executemany(sql, rows, db="analytics")
+
+def upsert_hourly(rows: list[dict[str, Any]], overwrite: bool = True) -> int:
+    if not rows:
+        return 0
+    for r in rows:
+        r.setdefault("power_kw", None)
+        r.setdefault("energy_kwh", None)
+        r.setdefault("source_type", "portal")
+    if overwrite:
+        sql = """
+        INSERT INTO hourly_generation (
+            plant_id, ts, power_kw, energy_kwh, source_type
+        ) VALUES (
+            :plant_id, :ts, :power_kw, :energy_kwh, :source_type
+        )
+        ON CONFLICT(plant_id, ts) DO UPDATE SET
+            power_kw = excluded.power_kw,
+            energy_kwh = excluded.energy_kwh,
+            source_type = excluded.source_type;
+        """
+    else:
+        sql = """
+        INSERT OR IGNORE INTO hourly_generation (
+            plant_id, ts, power_kw, energy_kwh, source_type
+        ) VALUES (
+            :plant_id, :ts, :power_kw, :energy_kwh, :source_type
+        );
+        """
+    return executemany(sql, rows, db="analytics")
+
+def upsert_yearly(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    for r in rows:
+        r.setdefault("kwh", 0.0)
+        r.setdefault("specific_yield", None)
+        r.setdefault("months_covered", 0)
+    sql = """
+    INSERT INTO yearly_generation (
+        plant_id, year, kwh, specific_yield, months_covered
+    ) VALUES (
+        :plant_id, :year, :kwh, :specific_yield, :months_covered
+    )
+    ON CONFLICT(plant_id, year) DO UPDATE SET
+        kwh = excluded.kwh,
+        specific_yield = excluded.specific_yield,
+        months_covered = excluded.months_covered;
+    """
+    return executemany(sql, rows, db="analytics")
+
+def record_backfill_progress(
+    source: str,
+    plant_id: str,
+    granularity: str,
+    period: str,
+    status: str,
+    rows: int = 0,
+    error: str | None = None,
+) -> None:
+    init_db()
+    sql = """
+    INSERT INTO backfill_progress (
+        source, plant_id, granularity, period, status, rows, attempts, error, fetched_at
+    ) VALUES (
+        :source, :plant_id, :granularity, :period, :status, :rows, 1, :error, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(source, plant_id, granularity, period) DO UPDATE SET
+        status = excluded.status,
+        rows = excluded.rows,
+        attempts = backfill_progress.attempts + 1,
+        error = excluded.error,
+        fetched_at = CURRENT_TIMESTAMP;
+    """
+    execute(sql, {
+        "source": source.lower(),
+        "plant_id": plant_id,
+        "granularity": granularity.lower(),
+        "period": period,
+        "status": status.lower(),
+        "rows": rows,
+        "error": error,
+    }, db="analytics")
+
+def get_backfill_progress(
+    source: str | None = None,
+    granularity: str | None = None,
+    status: str | None = None,
+    plant_id: str | None = None,
+) -> list[dict[str, Any]]:
+    init_db()
+    sql = "SELECT source, plant_id, granularity, period, status, rows, attempts, error, fetched_at FROM backfill_progress WHERE 1=1"
+    params = []
+    if source:
+        sql += " AND lower(source) = ?"
+        params.append(source.lower())
+    if plant_id:
+        sql += " AND plant_id = ?"
+        params.append(str(plant_id))
+    if granularity:
+        sql += " AND lower(granularity) = ?"
+        params.append(granularity.lower())
+    if status:
+        sql += " AND lower(status) = ?"
+        params.append(status.lower())
+    sql += " ORDER BY fetched_at DESC"
+    df = query_df(sql, params, db="analytics")
+    if df.empty:
+        return []
+    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+
+def upsert_plant_day_features(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    for r in rows:
+        if "kwh" not in r and "actual_kwh" in r:
+            r["kwh"] = r["actual_kwh"]
+        r.setdefault("kwh", None)
+        r.setdefault("specific_yield", None)
+        r.setdefault("day_status", None)
+        r.setdefault("quality_ok", 1)
+        r.setdefault("peer_ref_yield", None)
+        r.setdefault("rpi", None)
+        r.setdefault("rpi_7d_median", None)
+        r.setdefault("rpi_14d_median", None)
+        r.setdefault("rpi_30d_median", None)
+        r.setdefault("ghi_daily", None)
+        r.setdefault("poa", None)
+        r.setdefault("expected_kwh", None)
+        r.setdefault("is_telemetry_gap", 0)
+    sql = """
+    INSERT INTO plant_day_features (
+        plant_id, date, kwh, specific_yield, day_status, quality_ok,
+        peer_ref_yield, rpi, rpi_7d_median, rpi_14d_median, rpi_30d_median,
+        ghi_daily, poa, expected_kwh, is_telemetry_gap, updated_at
+    ) VALUES (
+        :plant_id, :date, :kwh, :specific_yield, :day_status, :quality_ok,
+        :peer_ref_yield, :rpi, :rpi_7d_median, :rpi_14d_median, :rpi_30d_median,
+        :ghi_daily, :poa, :expected_kwh, :is_telemetry_gap, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(plant_id, date) DO UPDATE SET
+        kwh = excluded.kwh,
+        specific_yield = excluded.specific_yield,
+        day_status = excluded.day_status,
+        quality_ok = excluded.quality_ok,
+        peer_ref_yield = excluded.peer_ref_yield,
+        rpi = excluded.rpi,
+        rpi_7d_median = excluded.rpi_7d_median,
+        rpi_14d_median = excluded.rpi_14d_median,
+        rpi_30d_median = excluded.rpi_30d_median,
+        ghi_daily = excluded.ghi_daily,
+        poa = excluded.poa,
+        expected_kwh = excluded.expected_kwh,
+        is_telemetry_gap = excluded.is_telemetry_gap,
+        updated_at = CURRENT_TIMESTAMP;
+    """
+    return executemany(sql, rows, db="analytics")
+
+def upsert_plant_health_daily(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    for r in rows:
+        r.setdefault("operational_state", "PRODUCING")
+        r.setdefault("health_index", None)
+        r.setdefault("performance_tier", "Good")
+        r.setdefault("confidence", 1.0)
+        r.setdefault("anomaly_category", "NONE")
+        r.setdefault("anomaly_score", None)
+        r.setdefault("details_json", None)
+    sql = """
+    INSERT INTO plant_health_daily (
+        plant_id, date, operational_state, health_index, performance_tier,
+        confidence, anomaly_category, anomaly_score, details_json, updated_at
+    ) VALUES (
+        :plant_id, :date, :operational_state, :health_index, :performance_tier,
+        :confidence, :anomaly_category, :anomaly_score, :details_json, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(plant_id, date) DO UPDATE SET
+        operational_state = excluded.operational_state,
+        health_index = excluded.health_index,
+        performance_tier = excluded.performance_tier,
+        confidence = excluded.confidence,
+        anomaly_category = excluded.anomaly_category,
+        anomaly_score = excluded.anomaly_score,
+        details_json = excluded.details_json,
+        updated_at = CURRENT_TIMESTAMP;
+    """
+    return executemany(sql, rows, db="analytics")
+
+def upsert_nasa_power_daily_cache(rows: list[dict[str, Any]]) -> int:
+    if not rows:
+        return 0
+    sql = """
+    INSERT INTO nasa_power_daily_cache (
+        cell_lat, cell_lon, date, ghi_kwh_m2, temp_c, fetched_at
+    ) VALUES (
+        :cell_lat, :cell_lon, :date, :ghi_kwh_m2, :temp_c, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(cell_lat, cell_lon, date) DO UPDATE SET
+        ghi_kwh_m2 = excluded.ghi_kwh_m2,
+        temp_c = excluded.temp_c,
+        fetched_at = CURRENT_TIMESTAMP;
+    """
+    return executemany(sql, rows, db="analytics")
+
+def get_cached_nasa_power_daily(cell_lat: float, cell_lon: float, date_str: str) -> dict[str, Any] | None:
+    init_db()
+    sql = "SELECT cell_lat, cell_lon, date, ghi_kwh_m2, temp_c FROM nasa_power_daily_cache WHERE cell_lat = ? AND cell_lon = ? AND date = ?"
+    df = query_df(sql, [cell_lat, cell_lon, date_str], db="analytics")
+    if df.empty:
+        return None
+    return cast(dict[str, Any], df.iloc[0].to_dict())
 
 _cached_available_months: list[str] | None = None
 
@@ -564,6 +804,85 @@ def init_db() -> None:
             PRIMARY KEY (source, portal_token)
         );
 
+        CREATE TABLE IF NOT EXISTS hourly_generation (
+            plant_id TEXT NOT NULL,
+            ts TEXT NOT NULL,
+            power_kw REAL,
+            energy_kwh REAL,
+            source_type TEXT DEFAULT 'portal',
+            PRIMARY KEY (plant_id, ts),
+            FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS yearly_generation (
+            plant_id TEXT NOT NULL,
+            year TEXT NOT NULL,
+            kwh REAL,
+            specific_yield REAL,
+            months_covered INTEGER,
+            PRIMARY KEY (plant_id, year),
+            FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS backfill_progress (
+            source TEXT NOT NULL,
+            plant_id TEXT NOT NULL,
+            granularity TEXT NOT NULL,
+            period TEXT NOT NULL,
+            status TEXT NOT NULL,
+            rows INTEGER DEFAULT 0,
+            attempts INTEGER DEFAULT 0,
+            error TEXT,
+            fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (source, plant_id, granularity, period)
+        );
+
+        CREATE TABLE IF NOT EXISTS plant_day_features (
+            plant_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            kwh REAL,
+            specific_yield REAL,
+            day_status TEXT,
+            quality_ok INTEGER DEFAULT 1,
+            peer_ref_yield REAL,
+            rpi REAL,
+            rpi_7d_median REAL,
+            rpi_14d_median REAL,
+            rpi_30d_median REAL,
+            ghi_daily REAL,
+            poa REAL,
+            expected_kwh REAL,
+            is_telemetry_gap INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (plant_id, date),
+            FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS plant_health_daily (
+            plant_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            operational_state TEXT NOT NULL,
+            health_index REAL,
+            performance_tier TEXT,
+            confidence REAL,
+            anomaly_category TEXT,
+            anomaly_score REAL,
+            details_json TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (plant_id, date),
+            FOREIGN KEY (plant_id) REFERENCES plants(plant_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS nasa_power_daily_cache (
+            cell_lat REAL NOT NULL,
+            cell_lon REAL NOT NULL,
+            date TEXT NOT NULL,
+            ghi_kwh_m2 REAL,
+            temp_c REAL,
+            fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (cell_lat, cell_lon, date)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sync_runs_status ON sync_runs(status);
         CREATE INDEX IF NOT EXISTS idx_sync_runs_source ON sync_runs(source, started_at);
         CREATE INDEX IF NOT EXISTS idx_portal_tokens ON plant_portal_tokens(source, portal_token);
@@ -583,6 +902,16 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_loss_plant_month ON loss_analysis(plant_id, month);
         CREATE INDEX IF NOT EXISTS idx_snapshots_ts ON inverter_snapshots(snapshot_ts);
         CREATE INDEX IF NOT EXISTS idx_snapshots_plant_ts ON inverter_snapshots(plant_id, snapshot_ts);
+
+        CREATE INDEX IF NOT EXISTS idx_hourly_ts ON hourly_generation(ts);
+        CREATE INDEX IF NOT EXISTS idx_hourly_plant_date ON hourly_generation(plant_id, substr(ts,1,10));
+        CREATE INDEX IF NOT EXISTS idx_yearly_plant_year ON yearly_generation(plant_id, year);
+        CREATE INDEX IF NOT EXISTS idx_backfill_progress_status ON backfill_progress(source, granularity, status);
+        CREATE INDEX IF NOT EXISTS idx_features_plant_date ON plant_day_features(plant_id, date);
+        CREATE INDEX IF NOT EXISTS idx_features_date ON plant_day_features(date);
+        CREATE INDEX IF NOT EXISTS idx_health_plant_date ON plant_health_daily(plant_id, date);
+        CREATE INDEX IF NOT EXISTS idx_health_date ON plant_health_daily(date);
+        CREATE INDEX IF NOT EXISTS idx_nasa_cache_cell ON nasa_power_daily_cache(cell_lat, cell_lon, date);
         """)
 
         # Safe column migrations for existing databases
